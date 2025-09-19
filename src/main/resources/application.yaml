@@ -1,0 +1,15 @@
+truststore:
+  icpbrasil:
+    certificates-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
+    hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+    download-timeout: 60s
+    max-retries: 3
+    retry-interval: 30s
+    cache-ttl: 24h
+    refresh-interval: 1h
+  letsencrypt:
+    certificates:
+      isrg-root-x1: "https://letsencrypt.org/certs/isrgrootx1.pem"
+      lets-encrypt-r3: "https://letsencrypt.org/certs/lets-encrypt-r3.pem"
+      lets-encrypt-e5: "https://letsencrypt.org/certs/2024/e5.pem"
+      lets-encrypt-e6: "https://letsencrypt.org/certs/2024/e6.pem"
