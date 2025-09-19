@@ -8,7 +8,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableScheduling
 @EnableConfigurationProperties({
-    com.github.nogueiralegacy.truststore.config.TrustStoreConfig.class,
     TrustStoreConfig.class
 })
 @SpringBootApplication

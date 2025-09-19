@@ -73,6 +73,21 @@ public class TrustStoreConfig {
          * Intervalo entre tentativas em segundos (padrão 30, intervalo [10, 300])
          */
         private int retryIntervalSeconds = 30;
+
+        /**
+         * Retorna o timeout de download em milissegundos
+         */
+        public int getDownloadTimeoutMillis() {
+            return downloadTimeoutSeconds * 1000;
+        }
+
+        /**
+         * Retorna o intervalo entre tentativas em milissegundos
+         */
+        public long getRetryIntervalMillis() {
+            return retryIntervalSeconds * 1000L;
+        }
+
     }
 
     /**
@@ -176,20 +191,6 @@ public class TrustStoreConfig {
         }
 
         log.debug("Configurações de cache validadas com sucesso");
-    }
-
-    /**
-     * Retorna o timeout de download em milissegundos
-     */
-    public long getDownloadTimeoutMillis() {
-        return network.downloadTimeoutSeconds * 1000L;
-    }
-
-    /**
-     * Retorna o intervalo entre tentativas em milissegundos
-     */
-    public long getRetryIntervalMillis() {
-        return network.retryIntervalSeconds * 1000L;
     }
 
     /**

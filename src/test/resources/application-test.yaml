@@ -7,7 +7,7 @@ truststore:
       max-retries: 3
       retry-interval-seconds: 30
     cache-ttl-hours: 24
-    refresh-interval-hours: 1
+    refresh-interval-hours: 2
   letsencrypt:
     certificates:
       isrg-root-x1: "https://letsencrypt.org/certs/isrgrootx1.pem"

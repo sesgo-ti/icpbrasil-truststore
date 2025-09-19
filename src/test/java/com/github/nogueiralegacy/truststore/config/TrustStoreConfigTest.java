@@ -163,7 +163,7 @@ class TrustStoreConfigTest {
     @Test
     void testGetDownloadTimeoutMillis_DeveRetornarValorCorreto() {
         // When
-        long timeoutMillis = trustStoreConfig.getDownloadTimeoutMillis();
+        long timeoutMillis = trustStoreConfig.getNetwork().getDownloadTimeoutMillis();
 
         // Then
         assertEquals(60000L, timeoutMillis); // 60 segundos = 60000 milissegundos
@@ -172,7 +172,7 @@ class TrustStoreConfigTest {
     @Test
     void testGetRetryIntervalMillis_DeveRetornarValorCorreto() {
         // When
-        long retryIntervalMillis = trustStoreConfig.getRetryIntervalMillis();
+        long retryIntervalMillis = trustStoreConfig.getNetwork().getRetryIntervalMillis();
 
         // Then
         assertEquals(30000L, retryIntervalMillis); // 30 segundos = 30000 milissegundos
@@ -211,6 +211,6 @@ class TrustStoreConfigTest {
         assertEquals(3, trustStoreConfig.getNetwork().getMaxRetries());
         assertEquals(30, trustStoreConfig.getNetwork().getRetryIntervalSeconds());
         assertEquals(24, trustStoreConfig.getCacheTtlHours());
-        assertEquals(1, trustStoreConfig.getRefreshIntervalHours());
+        assertEquals(2, trustStoreConfig.getRefreshIntervalHours());
     }
 }

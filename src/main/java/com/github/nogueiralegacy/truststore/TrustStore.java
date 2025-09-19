@@ -2,6 +2,7 @@ package com.github.nogueiralegacy.truststore;
 
 import com.github.nogueiralegacy.truststore.config.LetsEncryptProperties;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -72,7 +73,7 @@ public class TrustStore {
                     if (cert instanceof X509Certificate) {
                         X509Certificate x509 = (X509Certificate) cert;
                         String alias = extractCertName(certUrl);
-                        trustStore.setCertificateEntry(alias, x509);
+                        trustStore.setCertificateEntry(alias, cert);
                         System.out.println("Certificado adicionado: " + alias);
                     }
                 }
@@ -171,12 +172,12 @@ public class TrustStore {
      */
     private String extractFileNameFromUrl(String url) {
         String fileName = url.substring(url.lastIndexOf('/') + 1);
-        
+
         // Se não conseguir extrair um nome válido, usa um nome padrão
         if (fileName.isEmpty() || !fileName.contains(".")) {
             fileName = "certificate.crt";
         }
-        
+
         return fileName;
     }
 }
