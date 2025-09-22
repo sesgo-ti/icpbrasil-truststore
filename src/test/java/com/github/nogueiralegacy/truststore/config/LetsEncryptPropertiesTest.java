@@ -1,6 +1,5 @@
-package com.github.nogueiralegacy.truststore;
+package com.github.nogueiralegacy.truststore.config;
 
-import com.github.nogueiralegacy.truststore.config.LetsEncryptProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -10,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @TestPropertySource(locations = "classpath:application-test.yaml")
-class LetsEncryptConfigTest {
+class LetsEncryptPropertiesTest {
 
     @Autowired
     private LetsEncryptProperties letsEncryptProperties;
