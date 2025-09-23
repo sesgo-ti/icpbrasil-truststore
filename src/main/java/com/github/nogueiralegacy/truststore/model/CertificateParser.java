@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.cert.*;
@@ -41,6 +42,27 @@ public class CertificateParser {
         } catch (IOException e) {
             log.error("Erro ao fechar InputStream: {}", e.getMessage());
             throw new CertificateParsingException("Erro ao fechar InputStream", e);
+        }
+    }
+
+    /**
+     * Faz o parse de um certificado X.509 a partir de um array de bytes.
+     * 
+     * @param certData Array de bytes contendo os dados do certificado
+     * @return Certificado X509 parseado
+     * @throws CertificateParsingException Se houver erro no parsing do certificado
+     */
+    public static X509Certificate parse(byte[] certData) throws CertificateParsingException {
+        if (certData == null || certData.length == 0) {
+            log.error("Erro ao carregar certificado: dados do certificado são nulos ou vazios");
+            throw new IllegalArgumentException("Dados do certificado não podem ser nulos ou vazios");
+        }
+
+        try (InputStream inputStream = new ByteArrayInputStream(certData)) {
+            return parse(inputStream);
+        } catch (IOException e) {
+            log.error("Erro ao criar InputStream a partir dos dados do certificado: {}", e.getMessage());
+            throw new CertificateParsingException("Erro ao processar dados do certificado", e);
         }
     }
 
