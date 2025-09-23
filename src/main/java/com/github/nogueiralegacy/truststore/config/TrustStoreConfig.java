@@ -40,12 +40,12 @@ public class TrustStoreConfig {
     /**
      * TTL do cache de consulta em horas (padrão 24 horas, intervalo [1, 168])
      */
-    private int cacheTtlHours = 24;
+    private int cacheTtlHours;
 
     /**
      * Período para recuperação de trust store atualizado em horas
      */
-    private int refreshIntervalHours = 2;
+    private int refreshIntervalHours;
 
     /**
      * Certificados LetsEncrypt de CA (Certificate Authority).
@@ -62,17 +62,17 @@ public class TrustStoreConfig {
         /**
          * Timeout de download em segundos (padrão 60, intervalo [30, 300])
          */
-        private int downloadTimeoutSeconds = 60;
+        private int downloadTimeoutSeconds;
 
         /**
          * Número máximo de tentativas (padrão 3, intervalo [1, 10])
          */
-        private int maxRetries = 3;
+        private int maxRetries;
 
         /**
          * Intervalo entre tentativas em segundos (padrão 30, intervalo [10, 300])
          */
-        private int retryIntervalSeconds = 30;
+        private int retryIntervalSeconds;
 
         /**
          * Retorna o timeout de download em milissegundos
@@ -84,8 +84,8 @@ public class TrustStoreConfig {
         /**
          * Retorna o intervalo entre tentativas em milissegundos
          */
-        public long getRetryIntervalMillis() {
-            return retryIntervalSeconds * 1000L;
+        public int getRetryIntervalMillis() {
+            return retryIntervalSeconds * 1000;
         }
 
     }
