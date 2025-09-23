@@ -20,6 +20,4 @@ public class Util {
 
         return is;
     }
-
-
 }
