@@ -43,7 +43,7 @@ public class TrustStoreConfig {
     private int cacheTtlHours;
 
     /**
-     * Período para recuperação de trust store atualizado em horas
+     * Período para recuperação de trust store atualizado em horas, inteiros positivos
      */
     private int refreshIntervalHours;
 
