@@ -4,7 +4,6 @@ import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.net.MalformedURLException;
@@ -18,7 +17,6 @@ import java.util.Map;
  */
 @Data
 @Slf4j
-@Component
 @ConfigurationProperties(prefix = "truststore.icp-brasil")
 public class TrustStoreConfig {
 
