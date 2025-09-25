@@ -1,0 +1,62 @@
+package com.github.nogueiralegacy.truststore.service;
+
+import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
+import com.github.nogueiralegacy.truststore.model.CertificateParser;
+import com.github.nogueiralegacy.truststore.model.IcpBrasilCertificateProvider;
+import com.github.nogueiralegacy.truststore.util.Downloader;
+import com.github.nogueiralegacy.truststore.util.Util;
+import lombok.SneakyThrows;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.security.cert.X509Certificate;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
+
+@SpringBootTest
+@TestPropertySource(locations = "classpath:application-test.yaml")
+class CacheTest {
+    @Autowired
+    TrustStoreConfig trustStoreConfig;
+
+    @MockitoBean
+    Downloader downloader;
+
+    Cache cache;
+
+    @Autowired
+    Util util;
+
+    X509Certificate testCertificate;
+
+    @SneakyThrows
+    @BeforeEach
+    void setUp() {
+        // Configurar o mock do downloader para retornar os recursos locais
+        byte[] zipBytes = util.getResource("ACcompactado.zip").readAllBytes();
+        String hashContent = new String(util.getResource("hashsha512.txt").readAllBytes());
+
+        when(downloader.downloadBytes(trustStoreConfig.getCertificateUrl())).thenReturn(zipBytes);
+        when(downloader.downloadText(trustStoreConfig.getHashUrl())).thenReturn(hashContent);
+
+        var icpBrasilCertificateProvider = new IcpBrasilCertificateProvider(
+                trustStoreConfig,
+                downloader);
+
+        cache = new Cache(icpBrasilCertificateProvider.getCertificates());
+
+        testCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
+    }
+
+    @Test
+    public void testGetCertificateBySki() {
+        String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate).get();
+
+        assertEquals(testCertificate, cache.getCertificateBySki(testSki));
+    }
+}
