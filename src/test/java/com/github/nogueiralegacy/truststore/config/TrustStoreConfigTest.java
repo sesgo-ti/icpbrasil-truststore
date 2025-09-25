@@ -1,5 +1,6 @@
 package com.github.nogueiralegacy.truststore.config;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,8 +12,30 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestPropertySource(locations = "classpath:application-test.yaml")
 class TrustStoreConfigTest {
 
+    // Válid
     @Autowired
     private TrustStoreConfig trustStoreConfig;
+
+
+    private TrustStoreConfig testTrustStoreConfig;
+
+    @BeforeEach
+    void setUp() {
+        // Valid
+        testTrustStoreConfig = new TrustStoreConfig();
+        testTrustStoreConfig.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
+        testTrustStoreConfig.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
+
+        TrustStoreConfig.NetworkConfig networkConfig = new TrustStoreConfig.NetworkConfig();
+        networkConfig.setDownloadTimeoutSeconds(30);
+        networkConfig.setMaxRetries(5);
+        networkConfig.setRetryIntervalSeconds(10);
+
+        testTrustStoreConfig.setNetwork(networkConfig);
+
+        testTrustStoreConfig.setCacheTtlHours(24);
+        testTrustStoreConfig.setRefreshIntervalHours(1);
+    }
 
     @Test
     void testValidateProperties_ComConfiguracoesValidas_DevePassar() {
@@ -97,17 +120,12 @@ class TrustStoreConfigTest {
     @Test
     void testValidateNetworkConfig_ComMaxRetriesInvalido_DeveLancarExcecao() {
         // Given
-        TrustStoreConfig invalidConfig = new TrustStoreConfig();
-        invalidConfig.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
-        invalidConfig.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
-        
-        TrustStoreConfig.NetworkConfig networkConfig = new TrustStoreConfig.NetworkConfig();
-        networkConfig.setMaxRetries(15); // Maior que 10
-        invalidConfig.setNetwork(networkConfig);
+        // Valor inválido
+        testTrustStoreConfig.getNetwork().setMaxRetries(15); // Maior do que 10
 
         // When & Then
         IllegalStateException exception = assertThrows(IllegalStateException.class,
-                invalidConfig::validateProperties);
+                testTrustStoreConfig::validateProperties);
 
         assertTrue(exception.getMessage().contains("Número máximo de tentativas deve estar entre 1 e 10"));
     }
@@ -115,17 +133,11 @@ class TrustStoreConfigTest {
     @Test
     void testValidateNetworkConfig_ComRetryIntervalInvalido_DeveLancarExcecao() {
         // Given
-        TrustStoreConfig invalidConfig = new TrustStoreConfig();
-        invalidConfig.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
-        invalidConfig.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
-        
-        TrustStoreConfig.NetworkConfig networkConfig = new TrustStoreConfig.NetworkConfig();
-        networkConfig.setRetryIntervalSeconds(5); // Menor que 10
-        invalidConfig.setNetwork(networkConfig);
-
+        // Valor inválido
+        testTrustStoreConfig.getNetwork().setRetryIntervalSeconds(5); // Menor que 10
         // When & Then
         IllegalStateException exception = assertThrows(IllegalStateException.class,
-                invalidConfig::validateProperties);
+                testTrustStoreConfig::validateProperties);
 
         assertTrue(exception.getMessage().contains("Intervalo entre tentativas deve estar entre 10 e 300 segundos"));
     }
@@ -133,14 +145,12 @@ class TrustStoreConfigTest {
     @Test
     void testValidateCacheConfig_ComCacheTtlInvalido_DeveLancarExcecao() {
         // Given
-        TrustStoreConfig invalidConfig = new TrustStoreConfig();
-        invalidConfig.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
-        invalidConfig.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
-        invalidConfig.setCacheTtlHours(200); // Maior que 168
+        // Valor inválido
+        testTrustStoreConfig.setCacheTtlHours(200); // Maior que 168
 
         // When & Then
         IllegalStateException exception = assertThrows(IllegalStateException.class,
-                invalidConfig::validateProperties);
+                testTrustStoreConfig::validateProperties);
 
         assertTrue(exception.getMessage().contains("TTL do cache deve estar entre 1 e 168 horas"));
     }
@@ -148,14 +158,12 @@ class TrustStoreConfigTest {
     @Test
     void testValidateCacheConfig_ComRefreshIntervalInvalido_DeveLancarExcecao() {
         // Given
-        TrustStoreConfig invalidConfig = new TrustStoreConfig();
-        invalidConfig.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
-        invalidConfig.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
-        invalidConfig.setRefreshIntervalHours(0); // Menor que 1
+        // Valor inválido
+        testTrustStoreConfig.setRefreshIntervalHours(-1); // Valor negativo
 
         // When & Then
         IllegalStateException exception = assertThrows(IllegalStateException.class,
-                invalidConfig::validateProperties);
+                testTrustStoreConfig::validateProperties);
 
         assertTrue(exception.getMessage().contains("Intervalo de refresh deve ser pelo menos 1 hora"));
     }

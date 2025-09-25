@@ -43,6 +43,12 @@ class CertificateParserTest {
         assertEquals("BBRswxkyOOcUmd+i5AcIpo+cftCWRw==", CertificateParser.getSubjectKeyIdentifier(certificate).get());
     }
 
+    @Test
+    void testGetAuthorityKeyIdentifier() {
+        assertNotNull(certificate);
+        assertEquals("MBaAFJYnOPtSn6I9NNNdyCv3Qa2CXrCP", CertificateParser.getAuthorityKeyIdentifier(certificate).get());
+    }
+
     //TODO: descobrir porque esse teste falha
 //    @Test
 //    void testGetAuthorityKeyIdentifier() {
