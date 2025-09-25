@@ -1,6 +1,5 @@
 package com.github.nogueiralegacy.truststore.model;
 
-import com.github.nogueiralegacy.truststore.config.LetsEncryptProperties;
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.util.Downloader;
 import com.github.nogueiralegacy.truststore.util.Util;
@@ -11,11 +10,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.security.cert.X509Certificate;
 import java.util.List;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+import static org.mockito.Mockito.when;
 
 @Slf4j
 @SpringBootTest
@@ -30,14 +31,24 @@ public class IcpBrasilCertificateProviderTest {
     @Autowired
     Util util;
 
+    @MockitoBean
+    Downloader downloader;
+
     X509Certificate testCertificate;
 
     @SneakyThrows
     @BeforeEach
     void setUp() {
+        // Configurar o mock do downloader para retornar os recursos locais
+        byte[] zipBytes = util.getResource("ACcompactado.zip").readAllBytes();
+        String hashContent = new String(util.getResource("hashsha512.txt").readAllBytes());
+        
+        when(downloader.downloadBytes(trustStoreConfig.getCertificateUrl())).thenReturn(zipBytes);
+        when(downloader.downloadText(trustStoreConfig.getHashUrl())).thenReturn(hashContent);
+        
         icpBrasilCertificateProvider = new IcpBrasilCertificateProvider(
                 trustStoreConfig,
-                new DownloaderTest(trustStoreConfig, new LetsEncryptProperties()));
+                downloader);
 
         testCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
@@ -49,28 +60,5 @@ public class IcpBrasilCertificateProviderTest {
         assertThat(certificates).isNotEmpty();
         assertThat(certificates).hasSize(159);
         assertThat(certificates).contains(testCertificate);
-    }
-
-    class DownloaderTest extends Downloader {
-
-        public DownloaderTest(TrustStoreConfig trustStoreConfig, LetsEncryptProperties letsEncryptProperties) {
-            super(trustStoreConfig, letsEncryptProperties);
-        }
-
-        @SneakyThrows
-        @Override
-        public byte[] downloadBytes(String url) {
-            String zipName = "ACcompactado.zip";
-
-            return util.getResource(zipName).readAllBytes();
-        }
-
-        @SneakyThrows
-        @Override
-        public String downloadText(String url) {
-            String hashName = "hashsha512.txt";
-
-            return new String(util.getResource(hashName).readAllBytes());
-        }
     }
 }
