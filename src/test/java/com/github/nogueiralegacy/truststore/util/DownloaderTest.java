@@ -2,6 +2,7 @@ package com.github.nogueiralegacy.truststore.util;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import lombok.SneakyThrows;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +19,7 @@ public class DownloaderTest {
     @Autowired
     TrustStoreConfig trustStoreConfig;
 
+    @Disabled("Download de arquivo pesado")
     @SneakyThrows
     @Test
     void testDownlaodBytes() {

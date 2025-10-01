@@ -34,31 +34,29 @@ class CertificateParserTest {
     @Test
     void testParse() {
         assertNotNull(certificate);
-        assertEquals("DANIEL NOGUEIRA DA COSTA:02057377148", CertificateParser.getCommonName(certificate).get());
+        assertEquals("DANIEL NOGUEIRA DA COSTA:02057377148", CertificateParser.getSubjectCommonName(certificate));
     }
 
     @Test
     void testGetSubjectKeyIdentifier() {
         assertNotNull(certificate);
-        assertEquals("BBRswxkyOOcUmd+i5AcIpo+cftCWRw==", CertificateParser.getSubjectKeyIdentifier(certificate).get());
+        assertEquals("6cc3193238e71499dfa2e40708a68f9c7ed09647", CertificateParser.getSubjectKeyIdentifier(certificate));
     }
 
     @Test
     void testGetAuthorityKeyIdentifier() {
         assertNotNull(certificate);
-        assertEquals("MBaAFJYnOPtSn6I9NNNdyCv3Qa2CXrCP", CertificateParser.getAuthorityKeyIdentifier(certificate).get());
+        assertEquals("962738fb529fa23d34d35dc82bf741ad825eb08f", CertificateParser.getAuthorityKeyIdentifier(certificate));
     }
 
-    //TODO: descobrir porque esse teste falha
-//    @Test
-//    void testGetAuthorityKeyIdentifier() {
-//        assertNotNull(certificate);
-//        assertEquals("MBaAFJYnOPtSn6I9NNNdyCv3Qa2CXrCP", CertificateParser.getAuthorityKeyIdentifier(certificate).get());
-//
-//        assertEquals(
-//                CertificateParser.getAuthorityKeyIdentifier(certificate).get(),
-//                CertificateParser.getSubjectKeyIdentifier(authorityCertificate).get()
-//        );
-//    }
 
+    @Test
+    void testAuthorityKeyIdentifier() {
+        assertNotNull(certificate);
+
+        assertEquals(
+                CertificateParser.getAuthorityKeyIdentifier(certificate),
+                CertificateParser.getSubjectKeyIdentifier(authorityCertificate)
+        );
+    }
 }

@@ -2,7 +2,9 @@ package com.github.nogueiralegacy.truststore.model;
 
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1OctetString;
-import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
+import org.bouncycastle.asn1.x509.GeneralNames;
+import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
 import org.springframework.stereotype.Component;
 
 import javax.naming.InvalidNameException;
@@ -12,8 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.cert.*;
-import java.util.Base64;
+import java.util.HexFormat;
 import java.util.Optional;
+import java.util.function.Function;
 
 @Slf4j
 @Component
@@ -28,7 +31,7 @@ public class CertificateParser {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
             Certificate cert = cf.generateCertificate(is);
-            if (cert instanceof X509Certificate x509 ) {
+            if (cert instanceof X509Certificate x509) {
                 return x509;
             } else {
                 String error = "Erro ao carregar certificado como x509Certificate";
@@ -36,7 +39,7 @@ public class CertificateParser {
                 throw new CertificateParsingException(error);
             }
 
-        } catch (CertificateException e){
+        } catch (CertificateException e) {
             log.error("Erro ao carregar certificado: {}", e.getMessage());
             throw new CertificateParsingException("Erro ao carregar certificado", e);
         } catch (IOException e) {
@@ -47,7 +50,7 @@ public class CertificateParser {
 
     /**
      * Faz o parse de um certificado X.509 a partir de um array de bytes.
-     * 
+     *
      * @param certData Array de bytes contendo os dados do certificado
      * @return Certificado X509 parseado
      * @throws CertificateParsingException Se houver erro no parsing do certificado
@@ -67,14 +70,41 @@ public class CertificateParser {
     }
 
     /**
+     * Retorna o Common Name (CN) so subject do certificado.
+     */
+    public static String getSubjectCommonName(X509Certificate certificate) {
+        return getCommonName(certificate, true).orElseThrow(
+                () -> {
+                    log.error("CN do subject do certificado não encontrado");
+                    return new IllegalArgumentException("CN do subject do certificado não encontrado");
+                }
+        );
+    }
+
+    /**
+     * Retorna o Common Name (CN) so issuer do certificado.
+     */
+    public static String getIssuerCommonName(X509Certificate certificate) {
+        // Se não é "subject", logo é "issuer"
+        return getCommonName(certificate, false).orElseThrow(
+                () -> {
+                    log.error("CN do issuer do certificado não encontrado");
+                    return new IllegalArgumentException("CN do issuer do certificado não encontrado");
+                }
+        );
+    }
+
+    /**
      * Retorna o Common Name (CN) do certificado.
      */
-    public static Optional<String> getCommonName(X509Certificate certificate) {
+    private static Optional<String> getCommonName(X509Certificate certificate, boolean subject) {
         if (certificate == null) {
             throw new IllegalArgumentException("Certificate cannot be null");
         }
 
-        String dn = certificate.getSubjectX500Principal().getName();
+        String dn = subject ?
+                certificate.getSubjectX500Principal().getName() :
+                certificate.getIssuerX500Principal().getName();
 
         try {
             LdapName ldapDN = new LdapName(dn);
@@ -91,47 +121,77 @@ public class CertificateParser {
         return Optional.empty();
     }
 
+    /**
+     * Retorna os Subject Alternative Names (SAN) do certificado como lista de strings.
+     */
+    public static GeneralNames getSubjectAlternativeNames(X509Certificate certificate) {
+        return X509ExtensionUtils.getExtensionValue(
+                        certificate,
+                        "2.5.29.17",
+                        GeneralNames::getInstance
+                )
+                .orElseThrow(() -> {
+                    log.error("Extensão Subject Alternative Name não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão SAN (2.5.29.17) não encontrada no certificado");
+                });
+    }
 
-    public static Optional<String> getSimpleExtensionValue(X509Certificate certificate, String oid) {
-        if (certificate == null) {
-            throw new IllegalArgumentException("Certificate cannot be null");
-        }
+    /**
+     * Retorna o Subject Key Identifier (SKI) do certificado em formato hexadecimal.
+     */
+    public static String getSubjectKeyIdentifier(X509Certificate certificate) {
+        return X509ExtensionUtils.getExtensionValue(
+                        certificate,
+                        "2.5.29.14",
+                        octets -> {
+                            SubjectKeyIdentifier ski = SubjectKeyIdentifier.getInstance(octets);
+                            return ski.getKeyIdentifier(); // byte[]
+                        })
+                .map(value -> HexFormat.of().formatHex(value)) // converte byte[] -> String hex
+                .orElseThrow(() -> {
+                    log.error("Extensão SKI não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão AKI (2.5.29.14) não encontrada no certificado");
+                });
+    }
 
-        try {
+    /**
+     * Retorna o Authority Key Identifier (AKI) do certificado em formato hexadecimal.
+     */
+    public static String getAuthorityKeyIdentifier(X509Certificate certificate) {
+        return X509ExtensionUtils.getExtensionValue(
+                        certificate,
+                        "2.5.29.35",
+                        octets -> {
+                            AuthorityKeyIdentifier aki = AuthorityKeyIdentifier.getInstance(octets);
+                            return aki.getKeyIdentifier(); // byte[]
+                        })
+                .map(value -> HexFormat.of().formatHex(value)) // converte byte[] -> String hex
+                .orElseThrow(() -> {
+                    log.error("Extensão AKI não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão AKI (2.5.29.35) não encontrada no certificado");
+                });
+    }
+
+
+    private static class X509ExtensionUtils {
+
+        private static <T> Optional<T> getExtensionValue(
+                X509Certificate certificate,
+                String oid,
+                Function<byte[], T> parser) {
+
             byte[] extensionValue = certificate.getExtensionValue(oid);
             if (extensionValue == null) {
                 return Optional.empty();
             }
 
-            // Decodifica corretamente o OCTET STRING usando BouncyCastle
-            ASN1Primitive asn1 = ASN1Primitive.fromByteArray(extensionValue);
-            ASN1OctetString octetString = ASN1OctetString.getInstance(asn1);
-            byte[] ski = octetString.getOctets();
-
-            String skiBase64 = Base64.getEncoder().encodeToString(ski);
-            return Optional.of(skiBase64);
-
-        } catch (Exception e) {
-            log.error("Erro ao extrair Subject Key Identifier do certificado: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro ao extrair Subject Key Identifier", e);
+            try {
+                ASN1OctetString octetString = ASN1OctetString.getInstance(extensionValue);
+                T result = parser.apply(octetString.getOctets());
+                return Optional.ofNullable(result);
+            } catch (Exception e) {
+                return Optional.empty();
+            }
         }
-    }
-
-    /**
-     * Retorna o Subject Key Identifier (SKI) do certificado em Base64.
-     */
-    public static Optional<String> getSubjectKeyIdentifier(X509Certificate certificate) {
-        final String SKI_OID = "2.5.29.14";
-
-        return getSimpleExtensionValue(certificate, SKI_OID);
-    }
-
-    /**
-     * Retorna o Authority Key Identifier (AKI) do certificado em Base64.
-     */
-    public static Optional<String> getAuthorityKeyIdentifier(X509Certificate certificate) {
-        String AKI_OID = "2.5.29.35";
-
-        return getSimpleExtensionValue(certificate, AKI_OID);
     }
 }
