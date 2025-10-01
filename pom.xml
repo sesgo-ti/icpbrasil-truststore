@@ -16,11 +16,11 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
     <junit-jupiter.version>5.9.0</junit-jupiter.version>
     <surefire.version>3.2.5</surefire.version>
-    <mockito.version>5.14.2</mockito.version>
+    <mockito.version>5.12.0</mockito.version>
   </properties>
 
   <dependencies>
@@ -85,12 +85,14 @@
         </executions>
       </plugin>
 
-      <!-- Plugin Surefire configurado com Mockito como Java agent -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${surefire.version}</version>
-      </plugin>
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <version>${surefire.version}</version>
+    <configuration>
+        <argLine>-XX:+EnableDynamicAgentLoading --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+    </configuration>
+</plugin>
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

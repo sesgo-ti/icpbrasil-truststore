@@ -1,6 +1,7 @@
 package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -8,8 +9,8 @@ import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
+@Getter
 @Slf4j
 @Service
 public class Cache {
@@ -24,14 +25,8 @@ public class Cache {
 
         for (X509Certificate certificate : certificates) {
             try {
-                Optional<String> ski = CertificateParser.getSubjectKeyIdentifier(certificate);
-
-                if (ski.isPresent()) {
-                    this.skiIndex.put(ski.get(), certificate);
-                } else {
-                    log.error("Erro ao extrair Subject Key Identifier do certificado: {}", certificate);
-                    throw new RuntimeException("Erro ao construir cache map ski to certificate");
-                }
+                String ski = CertificateParser.getSubjectKeyIdentifier(certificate);
+                this.skiIndex.put(ski, certificate);
             } catch (RuntimeException e) {
                 log.error("Erro ao extrair Subject Key Identifier do certificado: {}", e.getMessage(), e);
             }
