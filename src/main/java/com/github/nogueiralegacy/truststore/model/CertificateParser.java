@@ -2,9 +2,7 @@ package com.github.nogueiralegacy.truststore.model;
 
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1OctetString;
-import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
-import org.bouncycastle.asn1.x509.GeneralNames;
-import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
+import org.bouncycastle.asn1.x509.*;
 import org.springframework.stereotype.Component;
 
 import javax.naming.InvalidNameException;
@@ -13,8 +11,12 @@ import javax.naming.ldap.Rdn;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
 import java.security.cert.*;
+import java.security.cert.Certificate;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -122,7 +124,7 @@ public class CertificateParser {
     }
 
     /**
-     * Retorna os Subject Alternative Names (SAN) do certificado como lista de strings.
+     * Retorna os Subject Alternative Names (SAN) do certificado.
      */
     public static GeneralNames getSubjectAlternativeNames(X509Certificate certificate) {
         return X509ExtensionUtils.getExtensionValue(
@@ -133,6 +135,41 @@ public class CertificateParser {
                 .orElseThrow(() -> {
                     log.error("Extensão Subject Alternative Name não encontrada no certificado");
                     return new IllegalArgumentException("Extensão SAN (2.5.29.17) não encontrada no certificado");
+                });
+    }
+
+    /**
+     * Retorna o Certificate Authority Information Access ( 1.3.6.1.5.5.7.1.1 ) do certificado
+     *
+     */
+    public static AccessDescription[] getCertificateAuthorityInformationAccess(X509Certificate certificate) {
+        return X509ExtensionUtils.getExtensionValue(
+                        certificate,
+                        "1.3.6.1.5.5.7.1.1",
+                        octets -> {
+                            AuthorityInformationAccess authorityInformationAccess = AuthorityInformationAccess.getInstance(octets);
+                            return authorityInformationAccess.getAccessDescriptions();
+                        })
+                .orElseThrow(() -> {
+                    log.error("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
+                });
+    }
+
+    /**
+     * Retorna o CRL Distribution Points ( 2.5.29.31 ) do certificado.
+     */
+    public static DistributionPoint[] getCrlDistributionPoints(X509Certificate certificate) {
+        return X509ExtensionUtils.getExtensionValue(
+                        certificate,
+                        "2.5.29.31",
+                        octets -> {
+                            CRLDistPoint crlDistPoint = CRLDistPoint.getInstance(octets);
+                            return crlDistPoint.getDistributionPoints();
+                        })
+                .orElseThrow(() -> {
+                    log.error("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
                 });
     }
 

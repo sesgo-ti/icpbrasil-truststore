@@ -2,6 +2,9 @@ package com.github.nogueiralegacy.truststore.model;
 
 import com.github.nogueiralegacy.truststore.util.Util;
 import lombok.SneakyThrows;
+import org.bouncycastle.asn1.x509.AccessDescription;
+import org.bouncycastle.asn1.x509.DistributionPoint;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,5 +61,27 @@ class CertificateParserTest {
                 CertificateParser.getAuthorityKeyIdentifier(certificate),
                 CertificateParser.getSubjectKeyIdentifier(authorityCertificate)
         );
+    }
+
+    @Test
+    void testSubjectAlternativeNames() {
+        GeneralNames generalNames = CertificateParser.getSubjectAlternativeNames(certificate);
+
+        assertEquals(4, generalNames.getNames().length);
+        assertEquals("daniel.nogueira.dacosta@gmail.com", generalNames.getNames()[0].getName().toString());
+    }
+
+    @Test
+    void testGetCrlDistributionPoints() {
+        DistributionPoint[] crlDistributionPoints = CertificateParser.getCrlDistributionPoints(certificate);
+        assertEquals(2, crlDistributionPoints.length);
+    }
+
+    @Test
+    void testAuthorityInformationAccess() {
+
+        AccessDescription[] accessDescriptions = CertificateParser.getCertificateAuthorityInformationAccess(certificate);
+
+        assertEquals(1, accessDescriptions.length);
     }
 }
