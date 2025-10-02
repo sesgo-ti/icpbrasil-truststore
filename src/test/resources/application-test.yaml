@@ -3,7 +3,7 @@ truststore:
     certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
     hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
     network:
-      download-timeout-seconds: 60
+      download-timeout-seconds: 30  # Valor mínimo permitido pela validação (diferente dos 60 segundos da produção)
       max-retries: 3
       retry-interval-seconds: 30
     cache-ttl-hours: 24
