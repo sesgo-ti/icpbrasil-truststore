@@ -4,12 +4,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@TestPropertySource(locations = "classpath:application-test.yaml")
+@ActiveProfiles("test")
 class TrustStoreConfigTest {
 
     // Válid
@@ -174,7 +174,7 @@ class TrustStoreConfigTest {
         long timeoutMillis = trustStoreConfig.getNetwork().getDownloadTimeoutMillis();
 
         // Then
-        assertEquals(60000L, timeoutMillis); // 60 segundos = 60000 milissegundos
+        assertEquals(30000L, timeoutMillis); // 30 segundos = 30000 milissegundos (valor do application-test.yaml)
     }
 
     @Test
@@ -215,7 +215,7 @@ class TrustStoreConfigTest {
                     trustStoreConfig.getCertificateUrl());
         assertEquals("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt", 
                     trustStoreConfig.getHashUrl());
-        assertEquals(60, trustStoreConfig.getNetwork().getDownloadTimeoutSeconds());
+        assertEquals(30, trustStoreConfig.getNetwork().getDownloadTimeoutSeconds());
         assertEquals(3, trustStoreConfig.getNetwork().getMaxRetries());
         assertEquals(30, trustStoreConfig.getNetwork().getRetryIntervalSeconds());
         assertEquals(24, trustStoreConfig.getCacheTtlHours());
