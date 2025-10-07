@@ -53,6 +53,16 @@ class CertificateParserTest {
     }
 
     @Test
+    void testGetSubjectCountry() {
+        assertEquals("BR", CertificateParser.getSubjectCountry(certificate));
+    }
+
+    @Test
+    void testGetIssuerCountry() {
+        assertEquals("BR", CertificateParser.getIssuerCountry(certificate));
+    }
+
+    @Test
     void testGetSubjectKeyIdentifier() {
         assertEquals("6cc3193238e71499dfa2e40708a68f9c7ed09647", CertificateParser.getSubjectKeyIdentifier(certificate));
     }

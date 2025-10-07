@@ -118,6 +118,30 @@ public class CertificateParser {
     }
 
     /**
+     * Retorna o Country (C) do subject do certificado.
+     */
+    public static String getSubjectCountry(X509Certificate certificate) {
+        return getCountry(certificate, true).orElseThrow(
+                () -> {
+                    log.error("Country (C) do subject do certificado não encontrado");
+                    return new IllegalArgumentException("Country (C) do subject do certificado não encontrado");
+                }
+        );
+    }
+
+    /**
+     * Retorna o Country (C) do issuer do certificado.
+     */
+    public static String getIssuerCountry(X509Certificate certificate) {
+        return getCountry(certificate, false).orElseThrow(
+                () -> {
+                    log.error("Country (C) do issuer do certificado não encontrado");
+                    return new IllegalArgumentException("Country (C) do issuer do certificado não encontrado");
+                }
+        );
+    }
+
+    /**
      * Retorna o valor de um atributo (ex: CN, O) do DN do Subject ou Issuer do certificado.
      */
     private static Optional<String> getDnAttribute(X509Certificate certificate, String attribute, boolean isSubject) {
@@ -153,6 +177,13 @@ public class CertificateParser {
      */
     private static Optional<String> getOrganization(X509Certificate certificate, boolean isSubject) {
         return getDnAttribute(certificate, "O", isSubject);
+    }
+
+    /**
+     * Retorna o Country (C) do certificado.
+     */
+    private static Optional<String> getCountry(X509Certificate certificate, boolean isSubject) {
+        return getDnAttribute(certificate, "C", isSubject);
     }
 
     /**
