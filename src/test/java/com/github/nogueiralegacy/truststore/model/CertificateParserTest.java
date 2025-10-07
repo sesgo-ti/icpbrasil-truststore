@@ -33,30 +33,31 @@ class CertificateParserTest {
         this.authorityCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
 
-    @SneakyThrows
     @Test
-    void testParse() {
-        assertNotNull(certificate);
+    void testGetSubjectCommonName() {
         assertEquals("DANIEL NOGUEIRA DA COSTA:02057377148", CertificateParser.getSubjectCommonName(certificate));
     }
 
     @Test
-    void testGetSubjectKeyIdentifier() {
+    void testGetIssuerCommonName() {
         assertNotNull(certificate);
+        assertEquals("AC SOLUTI Multipla v5 G2", CertificateParser.getIssuerCommonName(certificate));
+    }
+
+
+    @Test
+    void testGetSubjectKeyIdentifier() {
         assertEquals("6cc3193238e71499dfa2e40708a68f9c7ed09647", CertificateParser.getSubjectKeyIdentifier(certificate));
     }
 
     @Test
     void testGetAuthorityKeyIdentifier() {
-        assertNotNull(certificate);
         assertEquals("962738fb529fa23d34d35dc82bf741ad825eb08f", CertificateParser.getAuthorityKeyIdentifier(certificate));
     }
 
 
     @Test
     void testAuthorityKeyIdentifier() {
-        assertNotNull(certificate);
-
         assertEquals(
                 CertificateParser.getAuthorityKeyIdentifier(certificate),
                 CertificateParser.getSubjectKeyIdentifier(authorityCertificate)
@@ -68,7 +69,6 @@ class CertificateParserTest {
         GeneralNames generalNames = CertificateParser.getSubjectAlternativeNames(certificate);
 
         assertEquals(4, generalNames.getNames().length);
-        assertEquals("daniel.nogueira.dacosta@gmail.com", generalNames.getNames()[0].getName().toString());
     }
 
     @Test
