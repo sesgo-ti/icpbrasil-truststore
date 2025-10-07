@@ -11,12 +11,9 @@ import javax.naming.ldap.Rdn;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URL;
 import java.security.cert.*;
 import java.security.cert.Certificate;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -97,30 +94,65 @@ public class CertificateParser {
     }
 
     /**
-     * Retorna o Common Name (CN) do certificado.
+     * Retorna o Organization (O) do subject do certificado.
      */
-    private static Optional<String> getCommonName(X509Certificate certificate, boolean subject) {
+    public static String getSubjectOrganization(X509Certificate certificate) {
+        return getOrganization(certificate, true).orElseThrow(
+                () -> {
+                    log.error("Organization (O) do subject do certificado não encontrado");
+                    return new IllegalArgumentException("Organization (O) do subject do certificado não encontrado");
+                }
+        );
+    }
+
+    /**
+     * Retorna o Organization (O) do issuer do certificado.
+     */
+    public static String getIssuerOrganization(X509Certificate certificate) {
+        return getOrganization(certificate, false).orElseThrow(
+                () -> {
+                    log.error("Organization (O) do issuer do certificado não encontrado");
+                    return new IllegalArgumentException("Organization (O) do issuer do certificado não encontrado");
+                }
+        );
+    }
+
+    /**
+     * Retorna o valor de um atributo (ex: CN, O) do DN do Subject ou Issuer do certificado.
+     */
+    private static Optional<String> getDnAttribute(X509Certificate certificate, String attribute, boolean isSubject) {
         if (certificate == null) {
             throw new IllegalArgumentException("Certificate cannot be null");
         }
-
-        String dn = subject ?
+        String dn = isSubject ?
                 certificate.getSubjectX500Principal().getName() :
                 certificate.getIssuerX500Principal().getName();
-
         try {
             LdapName ldapDN = new LdapName(dn);
             for (Rdn rdn : ldapDN.getRdns()) {
-                if ("CN".equalsIgnoreCase(rdn.getType())) {
+                if (attribute.equalsIgnoreCase(rdn.getType())) {
                     return Optional.of(rdn.getValue().toString().trim());
                 }
             }
         } catch (InvalidNameException e) {
             log.error("Erro ao processar DN {}: {}", dn, e.getMessage(), e);
-            throw new RuntimeException("Erro ao extrair CN do certificado", e);
+            throw new RuntimeException("Erro ao extrair atributo '" + attribute + "' do certificado", e);
         }
-
         return Optional.empty();
+    }
+
+    /**
+     * Retorna o Common Name (CN) do certificado.
+     */
+    private static Optional<String> getCommonName(X509Certificate certificate, boolean isSubject) {
+        return getDnAttribute(certificate, "CN", isSubject);
+    }
+
+    /**
+     * Retorna o Organization (O) do certificado. Te
+     */
+    private static Optional<String> getOrganization(X509Certificate certificate, boolean isSubject) {
+        return getDnAttribute(certificate, "O", isSubject);
     }
 
     /**

@@ -14,7 +14,6 @@ import org.springframework.test.context.ActiveProfiles;
 import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -40,10 +39,18 @@ class CertificateParserTest {
 
     @Test
     void testGetIssuerCommonName() {
-        assertNotNull(certificate);
         assertEquals("AC SOLUTI Multipla v5 G2", CertificateParser.getIssuerCommonName(certificate));
     }
 
+    @Test
+    void testGetSubjectOrganization() {
+        assertEquals("ICP-Brasil", CertificateParser.getSubjectOrganization(certificate));
+    }
+
+    @Test
+    void testGetIssuerOrganization() {
+        assertEquals("ICP-Brasil", CertificateParser.getIssuerOrganization(certificate));
+    }
 
     @Test
     void testGetSubjectKeyIdentifier() {
