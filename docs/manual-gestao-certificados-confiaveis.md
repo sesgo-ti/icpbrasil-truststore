@@ -38,35 +38,35 @@ Resultado esperado
 O que fazer
 - Baixe o arquivo e salve localmente com nome claro (neste caso, `isrgrootx1.pem`).
 
-```powershell
+```bash
 # Usando PowerShell nativo
-Invoke-WebRequest -Uri "https://letsencrypt.org/certs/isrgrootx1.pem" -OutFile ".\isrgrootx1.pem"
+Invoke-WebRequest -Uri "https://letsencrypt.org/certs/isrgrootx1.pem" -OutFile "./isrgrootx1.pem"
 
-# Alternativa (se houver curl real no PATH; no Windows, 'curl' pode ser alias de Invoke-WebRequest)
-curl -L "https://letsencrypt.org/certs/isrgrootx1.pem" -o ".\isrgrootx1.pem"
+# Usando curl (bash)
+curl -L "https://letsencrypt.org/certs/isrgrootx1.pem" -o "./isrgrootx1.pem"
 
-# Alternativa (HTTPie)
-http --download "https://letsencrypt.org/certs/isrgrootx1.pem" --output ".\isrgrootx1.pem"
+# HTTPie
+http --download "https://letsencrypt.org/certs/isrgrootx1.pem" --output "./isrgrootx1.pem"
 ```
 
 Resultado esperado
 - Arquivo `isrgrootx1.pem` criado no diretório atual, com tamanho > 0 byte. Verifique se o OpenSSL consegue ler:
 
-```powershell
-openssl x509 -in ".\isrgrootx1.pem" -noout -subject
+```bash
+openssl x509 -in "./isrgrootx1.pem" -noout -subject
 ```
 
 ### Passo 3 — Calcular o fingerprint SHA-256 do certificado
 O que fazer
 - Gere o fingerprint SHA-256 localmente. Você pode calcular de duas maneiras equivalentes:
 
-```powershell
+```bash
 # 3.A) Fingerprint direto via OpenSSL (formato HEX com ":" entre bytes)
-openssl x509 -in ".\isrgrootx1.pem" -noout -fingerprint -sha256
+openssl x509 -in "./isrgrootx1.pem" -noout -fingerprint -sha256
 
 # 3.B) Hash do certificado em DER (deve bater com 3.A ignorando formatação)
-openssl x509 -in ".\isrgrootx1.pem" -outform der -out ".\isrgrootx1.der"
-openssl dgst -sha256 ".\isrgrootx1.der"
+openssl x509 -in "./isrgrootx1.pem" -outform der -out "./isrgrootx1.der"
+openssl dgst -sha256 "./isrgrootx1.der"
 ```
 
 Resultado esperado
@@ -76,12 +76,12 @@ Resultado esperado
 O que fazer
 - Exibir os campos principais do certificado (sujeito/issuer/validade) e compare o fingerprint calculado no Passo 3 com o valor oficial (veja Passo 1).
 
-```powershell
+```bash
 # Com OpenSSL (detalhes completos)
-openssl x509 -in ".\isrgrootx1.pem" -noout -text | more
+openssl x509 -in "./isrgrootx1.pem" -noout -text | more
 
 # Com keytool (JDK)
-keytool -printcert -v -file ".\isrgrootx1.pem"
+keytool -printcert -v -file "./isrgrootx1.pem"
 ```
 
 Dica: ao comparar o fingerprint, ignore maiúsculas/minúsculas e separadores (`:` ou espaços). O conteúdo hexadecimal deve coincidir integralmente.
@@ -104,30 +104,18 @@ são passos visando disponibilizar o certificado e outras informações para o c
 O que fazer
 - O SPKI (Subject Public Key Info) já está presente no certificado. Aqui, você deve calcular o hash SHA-256 sobre o SPKI em formato DER e codificar o resultado em Base64 — esse é o pin de SPKI usado para pinning em tempo de execução.
 
-```powershell
+```bash
 # Extrai o SPKI (PUBLIC KEY), converte para DER, calcula SHA-256 e codifica em Base64
-openssl x509 -in ".\isrgrootx1.pem" -noout -pubkey `
-        | openssl pkey -pubin -outform der `
-        | openssl dgst -sha256 -binary `
-        | openssl enc -base64
+openssl x509 -in "./isrgrootx1.pem" -noout -pubkey \
+  | openssl pkey -pubin -outform der \
+  | openssl dgst -sha256 -binary \
+  | openssl enc -base64
 ```
 
 Resultado esperado
 - Você possui o valor do pin de SPKI (SHA-256 do SPKI em Base64) calculado e anotado para registro posterior.
 
-### Passo 6 — Converter para DER e calcular hash
-O que fazer
-- Converta o PEM para DER e calcule o hash SHA-256 do arquivo DER para verificação futura (o registro formal ocorrerá no Passo 8).
-
-```powershell
-openssl x509 -in ".\isrgrootx1.pem" -outform der -out ".\isrgrootx1.der"
-openssl dgst -sha256 ".\isrgrootx1.der"
-```
-
-Resultado esperado
-- Arquivo `isrgrootx1.der` gerado e hash SHA-256 calculado e anotado para registro posterior.
-
-### Passo 7 — Montar o JSON de registro
+### Passo 6 — Montar o JSON de registro
 
 O que fazer
 - Consolidar em um arquivo JSON os dados obtidos e aqueles calculados. Este arquivo será registrado (Passo 8). Monte o JSON garantindo exatidão dos valores.
@@ -141,7 +129,6 @@ Exemplo de JSON (ilustrativo)
         "sourceUrl": "https://letsencrypt.org/certs/isrgrootx1.pem",
         "fingerprintSha256": "AA:BB:...:ZZ",
         "spkiSha256_b64": "RE1JQkJJakFOQmdrcU...",
-        "derSha256": "aa bb cc ... zz",
         "format": "pem",
         "issuer": "ISRG Root X1",
         "subject": "ISRG Root X1",
@@ -154,7 +141,7 @@ Exemplo de JSON (ilustrativo)
 Resultado esperado
 - Arquivo JSON de registro montado e consistente com os valores verificados.
 
-### Passo 8 — Efetuar registros
+### Passo 7 — Efetuar registros
 
 O registro dos dados é necessário porque a finalidade destas operações é disponibilizar certificado confiáveis para serem acrescentados a um truststore que, por sua vez, será criado dinamicamente, a partir destes dados devidamente registrados. 
 
@@ -169,10 +156,10 @@ Opção A — Registrar no Cofre (HashiCorp Vault)
 - Ações:
         - Garanta que a auditoria do Cofre esteja habilitada.
         - Defina o caminho padrão (ex.: `kv/certificates/isrg-root-x1`).
-        - O payload a ser registrdo é o documento JSON criado anteriormente (Passo 7).
+        - O payload a ser registrdo é o documento JSON criado anteriormente (Passo 6).
 
 Como registrar no Cofre (HashCorp Vault)
-- Use a UI do HashCorp Vault ou a CLI (`vault kv put`) para gravar os campos definidos no JSON do Passo 7 no caminho definido (ex.: `kv/certificates/isrg-root-x1`).
+- Use a UI do HashCorp Vault ou a CLI (`vault kv put`) para gravar os campos definidos no JSON do Passo 6 no caminho definido (ex.: `kv/certificates/isrg-root-x1`).
 - Garanta que a auditoria do Cofre esteja habilitada e que as políticas de acesso estejam corretas.
 
 Opção B — Fallback: registrar em arquivo (filesystem)
@@ -183,19 +170,19 @@ Opção B — Fallback: registrar em arquivo (filesystem)
 
 Como registrar no filesystem (fallback)
 - Crie um diretório padronizado (ex.: `registries/certificates/isrg-root-x1`).
-- Salve o JSON de registro montado no Passo 7 como `isrgrootx1.json` no diretório.
+- Salve o JSON de registro montado no Passo 6 como `isrgrootx1.json` no diretório.
 
 Resultado esperado
 - Certificado e metadados armazenados de forma segura, com registro auditável completo no Vault; quando indisponível, registro de fallback consistente e versionável no filesystem.
 
-### Passo 9 — Checklist
+### Passo 8 — Checklist
 - [ ] Conseguiu abrir o certificado baixado (`openssl x509 -noout`) sem erros.
 - [ ] `Subject`/`Issuer` são os esperados (para raiz, autoassinado).
 - [ ] Informações compatíveis com a informação oficial.
 - [ ] Fingerprint SHA-256 local = fingerprint oficial (sem diferenças).
 - [ ] SPKI pin calculado (Passo 5), 
-- [ ] Objeto JSON construído (Passo 7) 
-- [ ] Objeto JSON registrado (Passo 8).
+- [ ] Objeto JSON construído (Passo 6) 
+- [ ] Objeto JSON registrado (Passo 7).
 - [ ] Auditoria registrada indicando adição do certificado (quem, data e skpi)
 
 ---
