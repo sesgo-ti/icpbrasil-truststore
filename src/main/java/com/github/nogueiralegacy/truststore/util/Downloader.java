@@ -33,7 +33,7 @@ public class Downloader {
         this.letsEncryptProperties = letsEncryptProperties;
         
         try {
-            if (letsEncryptProperties.getCertificateCount() > 0) {
+            if (!letsEncryptProperties.getCertificates().isEmpty()) {
                 SSLContext sslContext = createSSLContextWithLetsEncrypt();
                 HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
             }
