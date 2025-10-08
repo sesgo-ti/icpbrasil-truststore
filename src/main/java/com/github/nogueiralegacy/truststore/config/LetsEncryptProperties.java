@@ -1,6 +1,7 @@
 package com.github.nogueiralegacy.truststore.config;
 
-import jakarta.annotation.PostConstruct;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.Map;
 
@@ -19,6 +21,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Slf4j
+@Validated
 @Configuration
 @ConfigurationProperties(prefix = "truststore.letsencrypt")
 public class LetsEncryptProperties {
@@ -29,39 +32,15 @@ public class LetsEncryptProperties {
      * - isrg-root-x1: https://letsencrypt.org/certs/isrgrootx1.pem
      * - lets-encrypt-r3: https://letsencrypt.org/certs/lets-encrypt-r3.pem
      */
-    private Map<String, String> certificates;
-
-    /**
-     * Valida as propriedades após a inicialização do bean.
-     * Este método é executado automaticamente pelo Spring após a injeção das propriedades.
-     * 
-     * @throws IllegalStateException se as propriedades não estiverem configuradas corretamente
-     */
-    @PostConstruct
-    public void validateProperties() {
-        log.info("Validando propriedades dos certificados Let's Encrypt...");
-        
-        if (CollectionUtils.isEmpty(certificates)) {
-            throw new IllegalStateException(
-                "Configuração inválida: Nenhuma URL de certificado Let's Encrypt foi configurada. " +
-                "Verifique a propriedade 'truststore.letsencrypt.certificates' no arquivo de configuração."
-            );
-        }
-        
-        // Validar se todas as URLs são válidas
-        certificates.forEach((name, url) -> {
-            if (!StringUtils.hasText(url)) {
-                throw new IllegalStateException(
-                    String.format("Configuração inválida: URL vazia para o certificado '%s'. " +
-                                "Todas as URLs devem ser válidas.", name)
-                );
-            }
-
-        });
-        
-        log.info("{} certificados configurados: {}",
-                certificates.size(), certificates.keySet());
-    }
+    @NotEmpty(message =
+            """
+            Pelo menos um certificado Let's Encrypt deve ser configurado em\s
+            'truststore.letsencrypt.certificates'
+           """)
+    private Map<
+            @NotBlank(message = "Nome do certificado é obrigatório") String,
+            @NotBlank(message = "URL de acesso ao certificado é obrigatória") String
+            > certificates;
     
     /**
      * Retorna todas as URLs dos certificados Let's Encrypt como um array.
@@ -108,14 +87,5 @@ public class LetsEncryptProperties {
             return false;
         }
         return !CollectionUtils.isEmpty(certificates) && certificates.containsKey(name.trim());
-    }
-    
-    /**
-     * Retorna o número total de certificados configurados.
-     * 
-     * @return Número de certificados configurados
-     */
-    public int getCertificateCount() {
-        return CollectionUtils.isEmpty(certificates) ? 0 : certificates.size();
     }
 }

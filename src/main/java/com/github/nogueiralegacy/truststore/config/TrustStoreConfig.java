@@ -51,7 +51,7 @@ public class TrustStoreConfig {
      * Certificados LetsEncrypt de CA (Certificate Authority).
      * Necessários para validar certificado do site https://acraiz.icpbrasil.gov.br/
      */
-    private Map<String, String> letsEncryptCertificates = new LetsEncryptProperties().getCertificates();
+    private Map<String, String> letsEncryptCertificates;
 
     @Autowired
     private MinioClient minIOClient;
