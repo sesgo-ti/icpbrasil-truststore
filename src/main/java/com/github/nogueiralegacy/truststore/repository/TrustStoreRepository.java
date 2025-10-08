@@ -1,13 +1,14 @@
 package com.github.nogueiralegacy.truststore.repository;
 
+import java.io.InputStream;
 import java.time.Instant;
 
 public interface TrustStoreRepository {
-    Byte[] recuperarZip();
+    InputStream recuperarZip();
 
     String recuperarHash();
 
-    void armazenarZip(Byte[] zip);
+    void armazenarZip(byte[] zip);
 
     void armazenarHash(String hash);
 

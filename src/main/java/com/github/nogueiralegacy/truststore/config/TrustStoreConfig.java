@@ -1,8 +1,10 @@
 package com.github.nogueiralegacy.truststore.config;
 
+import io.minio.MinioClient;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
@@ -51,6 +53,8 @@ public class TrustStoreConfig {
      */
     private Map<String, String> letsEncryptCertificates = new LetsEncryptProperties().getCertificates();
 
+    @Autowired
+    private MinioClient minIOClient;
 
     /**
      * Configurações de rede para download
