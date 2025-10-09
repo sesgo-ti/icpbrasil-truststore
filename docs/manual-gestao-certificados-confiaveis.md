@@ -167,7 +167,7 @@ Como registrar no Cofre (HashCorp Vault)
 - Use a UI do HashCorp Vault ou a CLI (`vault kv put`) para gravar os campos definidos no JSON do Passo 6 no caminho definido (ex.: `kv/certificates`).
 ```bash
 # Exemplo usando CLI
-vault kv put /kv/certificates isrgrootx1=@isrgrootx1.json
+vault kv put /kv/certificates/isrgrootx1 isrgrootx1=@isrgrootx1.json
 ```
 - Garanta que a auditoria do Cofre esteja habilitada e que as políticas de acesso estejam corretas.
 
