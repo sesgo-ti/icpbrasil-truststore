@@ -127,15 +127,20 @@ Exemplo de JSON (ilustrativo)
 ```json
 {
         "sourceUrl": "https://letsencrypt.org/certs/isrgrootx1.pem",
-        "fingerprintSha256": "AA:BB:...:ZZ",
-        "spkiSha256_b64": "RE1JQkJJakFOQmdrcU...",
+        "fingerprintSha256": "96:BC:EC:06:26:49:76:F3:74:60:77:9A:CF:28:C5:A7:CF:E8:A3:C0:AA:E1:1A:8F:FC:EE:05:C0:BD:DF:08:C6",
+        "spkiSha256_b64": "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=",
         "format": "pem",
-        "issuer": "ISRG Root X1",
-        "subject": "ISRG Root X1",
-        "notBefore": "2015-06-04T00:00:00Z",
-        "notAfter": "2035-06-04T00:00:00Z",
-        "pem": "-----BEGIN CERTIFICATE-----\nMIIF...\n-----END CERTIFICATE-----\n"
+        "issuer": "C=US, O=Internet Security Research Group, CN=ISRG Root X1",
+        "subject": "C=US, O=Internet Security Research Group, CN=ISRG Root X1",
+        "notBefore": "2015-06-04T11:04:38Z",
+        "notAfter": "2035-06-04T11:04:38Z",
+        "pem": "-----BEGIN CERTIFICATE-----\nMIIFazCCA1OgAwIB[...]X5iItreGCc=\n-----END CERTIFICATE-----\n"
 }
+```
+
+```bash
+# Para transformar o arquivo PEM em uma única linha com \n para JSON
+jq --rawfile cert isr.pem 'isrgrootx1.pem = $cert' isrgrootx1.json > temp.json && mv temp.json isrgrootx1.json
 ```
 
 Resultado esperado
