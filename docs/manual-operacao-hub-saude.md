@@ -38,6 +38,10 @@
 ## 4. Procedimentos de Operação
 
 ### 4.1 Inicialização
+- Subir o serviço HashiCorp Vault (Cofre)
+  - [Primeiro passos](https://developer.hashicorp.com/vault/tutorials/get-started)
+  - [Instalar](https://developer.hashicorp.com/vault/install)
+  - [Documentação de Configuração](http://developer.hashicorp.com/vault/docs/configuration)
 - [Passo 1: ...]
 - [Passo 2: ...]
 
