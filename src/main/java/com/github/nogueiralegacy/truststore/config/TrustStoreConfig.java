@@ -53,8 +53,39 @@ public class TrustStoreConfig {
      */
     private Map<String, String> letsEncryptCertificates;
 
+    /**
+     * Configurações de armazenamento no MinIO
+     */
+    private StorageConfig storage;
+
     @Autowired
     private MinioClient minIOClient;
+
+    /**
+     * Configurações de armazenamento genérico (S3, MinIO, FileSystem, etc.)
+     */
+    @Data
+    public static class StorageConfig {
+        /**
+         * Nome do container de armazenamento (bucket no S3/MinIO, diretório no FileSystem)
+         */
+        private String containerName;
+
+        /**
+         * Caminho do arquivo compactado do truststore
+         */
+        private String truststoreArchivePath;
+
+        /**
+         * Caminho do arquivo de hash
+         */
+        private String hashFilePath;
+
+        /**
+         * Caminho do arquivo de última confirmação
+         */
+        private String confirmationFilePath;
+    }
 
     /**
      * Configurações de rede para download
@@ -104,6 +135,7 @@ public class TrustStoreConfig {
         validateUrls();
         validateNetworkConfig();
         validateCacheConfig();
+        validateStorageConfig();
     }
 
     /**
@@ -193,6 +225,38 @@ public class TrustStoreConfig {
         }
 
         log.debug("Configurações de cache validadas com sucesso");
+    }
+
+    /**
+     * Valida as configurações de armazenamento
+     */
+    private void validateStorageConfig() {
+        if (storage == null) {
+            throw new IllegalStateException("Configurações de storage não podem ser null. " +
+                    "Configure as propriedades 'truststore.icp-brasil.storage.*'");
+        }
+
+        if (!StringUtils.hasText(storage.containerName)) {
+            throw new IllegalStateException("Nome do container não pode ser null ou vazio. " +
+                    "Configure a propriedade 'truststore.icp-brasil.storage.container-name'");
+        }
+
+        if (!StringUtils.hasText(storage.truststoreArchivePath)) {
+            throw new IllegalStateException("Caminho do arquivo compactado não pode ser null ou vazio. " +
+                    "Configure a propriedade 'truststore.icp-brasil.storage.truststore-archive-path'");
+        }
+
+        if (!StringUtils.hasText(storage.hashFilePath)) {
+            throw new IllegalStateException("Caminho do arquivo de hash não pode ser null ou vazio. " +
+                    "Configure a propriedade 'truststore.icp-brasil.storage.hash-file-path'");
+        }
+
+        if (!StringUtils.hasText(storage.confirmationFilePath)) {
+            throw new IllegalStateException("Caminho do arquivo de confirmação não pode ser null ou vazio. " +
+                    "Configure a propriedade 'truststore.icp-brasil.storage.confirmation-file-path'");
+        }
+
+        log.debug("Configurações de storage validadas com sucesso");
     }
 
     /**

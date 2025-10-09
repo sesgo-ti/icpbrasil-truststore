@@ -13,6 +13,11 @@ truststore:
       retry-interval-seconds: 30
     cache-ttl-hours: 24
     refresh-interval-hours: 2
+    storage:
+      container-name: "staging"
+      truststore-archive-path: "truststore/ACcompactado.zip"
+      hash-file-path: "truststore/hash.txt"
+      confirmation-file-path: "truststore/ultima_confirmacao.txt"
   letsencrypt:
     certificates:
       isrg-root-x1: "https://letsencrypt.org/certs/isrgrootx1.pem"

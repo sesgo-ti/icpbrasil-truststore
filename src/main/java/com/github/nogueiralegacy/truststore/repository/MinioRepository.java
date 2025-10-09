@@ -1,5 +1,6 @@
 package com.github.nogueiralegacy.truststore.repository;
 
+import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -14,14 +15,12 @@ import java.time.Instant;
 @Service
 @Slf4j
 public class MinioRepository implements TrustStoreRepository {
-    private MinioClient minioClient;
-    private final String BUCKET_NAME = "staging";
-    private final String ZIP_OBJECT_NAME = "truststore/ACcompactado.zip";
-    private final String HASH_OBJECT_NAME = "truststore/hash.txt";
-    private final String ULTIMA_CONFIRMACAO_OBJECT_NAME = "truststore/ultima_confirmacao.txt";
+    private final MinioClient minioClient;
+    private final TrustStoreConfig trustStoreConfig;
 
-    public MinioRepository(MinioClient minioClient) {
+    public MinioRepository(MinioClient minioClient, TrustStoreConfig trustStoreConfig) {
         this.minioClient = minioClient;
+        this.trustStoreConfig = trustStoreConfig;
     }
 
     @Override
@@ -29,8 +28,8 @@ public class MinioRepository implements TrustStoreRepository {
         try {
             return minioClient.getObject(
                     GetObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
-                            .object(ZIP_OBJECT_NAME)
+                            .bucket(trustStoreConfig.getStorage().getContainerName())
+                            .object(trustStoreConfig.getStorage().getTruststoreArchivePath())
                             .build()
             );
         } catch (Exception e) {
@@ -44,15 +43,15 @@ public class MinioRepository implements TrustStoreRepository {
         try {
             byte[] hashBytes = minioClient.getObject(
                     GetObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
-                            .object(HASH_OBJECT_NAME)
+                            .bucket(trustStoreConfig.getStorage().getContainerName())
+                            .object(trustStoreConfig.getStorage().getHashFilePath())
                             .build()
             ).readAllBytes();
 
             return new String(hashBytes, StandardCharsets.UTF_8).trim();
         } catch (Exception e) {
-            log.error("Failed to retrieve zip from MinIO", e);
-            throw new RuntimeException("Failed to retrieve zip from MinIO", e);
+            log.error("Failed to retrieve hash from MinIO", e);
+            throw new RuntimeException("Failed to retrieve hash from MinIO", e);
         }
     }
 
@@ -61,8 +60,8 @@ public class MinioRepository implements TrustStoreRepository {
         try (InputStream inputStream = new ByteArrayInputStream(zip)) {
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
-                            .object(ZIP_OBJECT_NAME)
+                            .bucket(trustStoreConfig.getStorage().getContainerName())
+                            .object(trustStoreConfig.getStorage().getTruststoreArchivePath())
                             .stream(inputStream, zip.length, -1)
                             .contentType("application/zip")
                             .build()
@@ -80,8 +79,8 @@ public class MinioRepository implements TrustStoreRepository {
         try (InputStream inputStream = new ByteArrayInputStream(hashBytes)) {
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
-                            .object(HASH_OBJECT_NAME)
+                            .bucket(trustStoreConfig.getStorage().getContainerName())
+                            .object(trustStoreConfig.getStorage().getHashFilePath())
                             .stream(inputStream, hashBytes.length, -1)
                             .contentType("text/plain")
                             .build()
@@ -97,8 +96,8 @@ public class MinioRepository implements TrustStoreRepository {
         try {
             byte[] instantBytes = minioClient.getObject(
                     GetObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
-                            .object(ULTIMA_CONFIRMACAO_OBJECT_NAME)
+                            .bucket(trustStoreConfig.getStorage().getContainerName())
+                            .object(trustStoreConfig.getStorage().getConfirmationFilePath())
                             .build()
             ).readAllBytes();
 
@@ -117,15 +116,15 @@ public class MinioRepository implements TrustStoreRepository {
         try (InputStream inputStream = new ByteArrayInputStream(instantBytes)) {
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
-                            .object(ULTIMA_CONFIRMACAO_OBJECT_NAME)
+                            .bucket(trustStoreConfig.getStorage().getContainerName())
+                            .object(trustStoreConfig.getStorage().getConfirmationFilePath())
                             .stream(inputStream, instantBytes.length, -1)
                             .contentType("text/plain")
                             .build()
             );
         } catch (Exception e) {
-            log.error("Failed to upload hash to MinIO", e);
-            throw new RuntimeException("Failed to upload hash to MinIO", e);
+            log.error("Failed to upload ultima_confirmacao to MinIO", e);
+            throw new RuntimeException("Failed to upload ultima_confirmacao to MinIO", e);
         }
     }
 }
