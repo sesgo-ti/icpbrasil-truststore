@@ -1,9 +1,32 @@
+spring:
+  application:
+    name: trust-store
+
+  config.import: vault://
+
+  cloud:
+    vault:
+      scheme: https
+      token: "${VAULT_TOKEN}"
+      host: "${VAULT_HOST:hl7-fhir.saude-go.net}"
+      port: "${VAULT_PORT:8200}"
+      authentication: token
+      connection-timeout: 5000
+      read-timeout: 15000
+      skipSslValidation: true
+
+
+      kv:
+        enabled: true
+
 truststore:
   minio:
     endpoint: "${MINIO_ENDPOINT:minio.clusterb.saude-go.net}"
     access-key: "${MINIO_ACCESS_KEY}"
     secret-key: "${MINIO_SECRET_KEY}"
 
+  vault:
+    certificate-path: '{vault}:kv/certificates/#e6'
   icp-brasil:
     certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
     hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
