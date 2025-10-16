@@ -19,14 +19,12 @@ import java.util.zip.ZipInputStream;
 @Slf4j
 @Component
 public class IcpBrasilCertificateProvider implements CertificateProvider {
-    private final TrustStoreConfig trustStoreConfig;
     private final Downloader downloader;
     private final String ICP_BRASIL_ZIP_URL;
     private final String ICP_BRASIL_HASH_URL;
     private final int BUFFER_SIZE = 8192;
 
     public IcpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig, Downloader downloader) {
-        this.trustStoreConfig = trustStoreConfig;
         this.downloader = downloader;
         this.ICP_BRASIL_ZIP_URL = trustStoreConfig.getCertificateUrl();
         this.ICP_BRASIL_HASH_URL = trustStoreConfig.getHashUrl();
