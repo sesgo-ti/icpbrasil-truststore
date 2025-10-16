@@ -8,8 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 
 /**
@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Data
 @Slf4j
-@ConfigurationProperties(prefix = "truststore.icp-brasil")
+@ConfigurationProperties(prefix = "truststore")
 public class TrustStoreConfig {
 
     /**
@@ -60,6 +60,9 @@ public class TrustStoreConfig {
 
     @Autowired
     private MinioClient minIOClient;
+
+    @Autowired
+    private VaultProperties vaultProperties;
 
     /**
      * Configurações de armazenamento genérico (S3, MinIO, FileSystem, etc.)
@@ -166,14 +169,18 @@ public class TrustStoreConfig {
      */
     private void validateUrl(String urlString, String description) {
         try {
-            URL url = new URL(urlString);
-            
-            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            URI uri = new URI(urlString);
+
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
                 throw new IllegalStateException(description + " deve usar protocolo HTTPS por segurança. " +
                         "URL fornecida: " + urlString);
             }
 
-        } catch (MalformedURLException e) {
+            if (!uri.isAbsolute() || uri.getHost() == null) {
+                throw new IllegalStateException(description + " deve ser uma URL absoluta válida com host. " +
+                        "URL fornecida: " + urlString);
+            }
+        } catch (URISyntaxException e) {
             throw new IllegalStateException(description + " é inválida: " + urlString, e);
         }
     }

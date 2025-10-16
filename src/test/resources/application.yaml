@@ -15,33 +15,33 @@ spring:
       read-timeout: 15000
       skipSslValidation: true
 
-
       kv:
         enabled: true
 
 truststore:
+  certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
+  hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+  network:
+    download-timeout-seconds: 30
+    max-retries: 3
+    retry-interval-seconds: 30
+  cache-ttl-hours: 24
+  refresh-interval-hours: 2
+  storage:
+    container-name: "staging"
+    truststore-archive-path: "truststore/ACcompactado.zip"
+    hash-file-path: "truststore/hash.txt"
+    confirmation-file-path: "truststore/ultima_confirmacao.txt"
+
+  letsencrypt:
+    certificates:
+      isrg-root-x1: "https://letsencrypt.org/certs/isrgrootx1.pem"
+      lets-encrypt-e6: "https://letsencrypt.org/certs/2024/e6.pem"
+
   minio:
     endpoint: "${MINIO_ENDPOINT:minio.clusterb.saude-go.net}"
     access-key: "${MINIO_ACCESS_KEY}"
     secret-key: "${MINIO_SECRET_KEY}"
 
   vault:
-    certificate-path: '{vault}:kv/certificates/#e6'
-  icp-brasil:
-    certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
-    hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
-    network:
-      download-timeout-seconds: 30
-      max-retries: 3
-      retry-interval-seconds: 30
-    cache-ttl-hours: 24
-    refresh-interval-hours: 2
-    storage:
-      container-name: "staging"
-      truststore-archive-path: "truststore/ACcompactado.zip"
-      hash-file-path: "truststore/hash.txt"
-      confirmation-file-path: "truststore/ultima_confirmacao.txt"
-  letsencrypt:
-    certificates:
-      isrg-root-x1: "https://letsencrypt.org/certs/isrgrootx1.pem"
-      lets-encrypt-e6: "https://letsencrypt.org/certs/2024/e6.pem"
+    certificate-path: 'certificates'
