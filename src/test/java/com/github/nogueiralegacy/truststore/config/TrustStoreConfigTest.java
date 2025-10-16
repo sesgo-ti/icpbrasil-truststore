@@ -96,7 +96,7 @@ class TrustStoreConfigTest {
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 invalidConfig::validateProperties);
 
-        assertTrue(exception.getMessage().contains("é inválida"));
+        assertTrue(exception.getMessage().contains("deve usar protocolo HTTPS por segurança"));
     }
 
     @Test

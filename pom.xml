@@ -48,7 +48,7 @@
       <artifactId>spring-cloud-starter-vault-config</artifactId>
     </dependency>
 
-    <!-- Spring Boot DevTools para desenvolvimento -->
+    <!-- Spring Boot DevTools -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-devtools</artifactId>
@@ -101,7 +101,6 @@
 
   <build>
     <plugins>
-      <!-- Plugin para resolver propriedades de dependências -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -123,6 +122,7 @@
     </configuration>
 </plugin>
 
+      <!-- Plugin de compilação com aviso de depreciação -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -135,6 +135,7 @@
           </annotationProcessorPaths>
         </configuration>
       </plugin>
+
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
