@@ -33,11 +33,6 @@ truststore:
     hash-file-path: "truststore/hash.txt"
     confirmation-file-path: "truststore/ultima_confirmacao.txt"
 
-  letsencrypt:
-    certificates:
-      isrg-root-x1: "https://letsencrypt.org/certs/isrgrootx1.pem"
-      lets-encrypt-e6: "https://letsencrypt.org/certs/2024/e6.pem"
-
   minio:
     endpoint: "${MINIO_ENDPOINT:minio.clusterb.saude-go.net}"
     access-key: "${MINIO_ACCESS_KEY}"

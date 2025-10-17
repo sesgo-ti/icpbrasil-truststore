@@ -10,7 +10,6 @@ import org.springframework.util.StringUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Map;
 
 /**
  * Propriedades de configuração para o trust store ICP-Brasil.
@@ -46,12 +45,6 @@ public class TrustStoreConfig {
      * Período para recuperação de trust store atualizado em horas, inteiros positivos
      */
     private int refreshIntervalHours;
-
-    /**
-     * Certificados LetsEncrypt de CA (Certificate Authority).
-     * Necessários para validar certificado do site https://acraiz.icpbrasil.gov.br/
-     */
-    private Map<String, String> letsEncryptCertificates;
 
     /**
      * Configurações de armazenamento no MinIO
