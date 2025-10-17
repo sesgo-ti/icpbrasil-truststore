@@ -1,5 +1,6 @@
-package com.github.nogueiralegacy.truststore.model;
+package com.github.nogueiralegacy.truststore.service;
 
+import com.github.nogueiralegacy.truststore.model.CertificateParser;
 import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;

@@ -1,6 +1,7 @@
-package com.github.nogueiralegacy.truststore.model;
+package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
+import com.github.nogueiralegacy.truststore.model.CertificateParser;
 import com.github.nogueiralegacy.truststore.util.Downloader;
 import com.github.nogueiralegacy.truststore.util.HashValidator;
 import lombok.extern.slf4j.Slf4j;

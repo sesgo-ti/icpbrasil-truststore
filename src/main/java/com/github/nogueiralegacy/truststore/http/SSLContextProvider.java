@@ -1,7 +1,7 @@
 package com.github.nogueiralegacy.truststore.http;
 
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
-import com.github.nogueiralegacy.truststore.model.VaultCertificateProvider;
+import com.github.nogueiralegacy.truststore.service.VaultCertificateProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
