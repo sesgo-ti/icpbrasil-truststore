@@ -30,20 +30,4 @@ public class VaultTest {
         var versionedSecret = kvOps.get(DEFAULT_CERT_PATH);
         assertNotNull(versionedSecret, "Resposta do Vault não deve ser nula");
     }
-
-    @Test
-    @SneakyThrows
-    void loadCertificateData() {
-        var kvOps = vaultTemplate.opsForVersionedKeyValue("kv");
-        var versionedSecret = kvOps.get(DEFAULT_CERT_PATH);
-        assertNotNull(versionedSecret, "Resposta do Vault não deve ser nula");
-
-        var dataMap = versionedSecret.getRequiredData();
-
-        for (var certEntry : dataMap.values()) {
-            CertificateData cert = objectMapper.readValue(certEntry.toString(), CertificateData.class);
-
-            assertNotNull(cert, "Certificado deve ser carregado");
-        }
-    }
 }

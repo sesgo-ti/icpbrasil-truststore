@@ -111,10 +111,6 @@ public class Downloader {
         KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
         trustStore.load(null, null);
         
-        // Adiciona certificados padrão do sistema
-        TrustManagerFactory defaultTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        defaultTmf.init((KeyStore) null);
-        
         // Adiciona certificados Let's Encrypt
         addLetsEncryptCertificates(trustStore);
         
