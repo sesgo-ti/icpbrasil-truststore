@@ -18,7 +18,7 @@ import java.util.Map;
 @Slf4j
 @Component
 public class VaultCertificateProvider implements CertificateProvider {
-    private Map<String, CertificateData> certificatesData;
+    private Map<String, CertificateDTO> certificatesData;
 
     private final VaultTemplate vaultTemplate;
 
@@ -51,11 +51,11 @@ public class VaultCertificateProvider implements CertificateProvider {
         }
     }
 
-    private X509Certificate convertToX509Certificate(Map.Entry<String, CertificateData> certificateEntry) {
+    private X509Certificate convertToX509Certificate(Map.Entry<String, CertificateDTO> certificateEntry) {
         String certificateName = certificateEntry.getKey();
-        CertificateData certificateData = certificateEntry.getValue();
+        CertificateDTO certificateDTO = certificateEntry.getValue();
         
-        String pemContent = certificateData.getPem();
+        String pemContent = certificateDTO.getPem();
         if (!StringUtils.hasText(pemContent)) {
             throw new IllegalArgumentException("Certificado PEM vazio para o certificado: " + certificateName);
         }
@@ -83,8 +83,8 @@ public class VaultCertificateProvider implements CertificateProvider {
             var dataMap = versionedSecret.getRequiredData();
 
             for (var certEntry : dataMap.entrySet()) {
-                CertificateData cert = objectMapper.readValue(
-                        certEntry.getValue().toString(), CertificateData.class
+                CertificateDTO cert = objectMapper.readValue(
+                        certEntry.getValue().toString(), CertificateDTO.class
                 );
 
                 if (cert == null) {

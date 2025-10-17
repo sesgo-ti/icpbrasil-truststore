@@ -14,7 +14,7 @@ import java.time.Instant;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CertificateData {
+public class CertificateDTO {
     
     /**
      * URL de origem do certificado
