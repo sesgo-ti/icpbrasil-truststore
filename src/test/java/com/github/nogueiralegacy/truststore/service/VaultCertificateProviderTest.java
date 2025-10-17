@@ -1,4 +1,4 @@
-package com.github.nogueiralegacy.truststore.model;
+package com.github.nogueiralegacy.truststore.service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

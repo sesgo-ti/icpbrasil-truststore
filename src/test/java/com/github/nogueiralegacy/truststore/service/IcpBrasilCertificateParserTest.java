@@ -1,5 +1,6 @@
-package com.github.nogueiralegacy.truststore.model;
+package com.github.nogueiralegacy.truststore.service;
 
+import com.github.nogueiralegacy.truststore.model.CertificateParser;
 import com.github.nogueiralegacy.truststore.util.Util;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;

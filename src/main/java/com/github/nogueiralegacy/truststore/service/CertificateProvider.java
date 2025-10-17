@@ -1,4 +1,4 @@
-package com.github.nogueiralegacy.truststore.model;
+package com.github.nogueiralegacy.truststore.service;
 
 import java.security.cert.X509Certificate;
 import java.util.List;
