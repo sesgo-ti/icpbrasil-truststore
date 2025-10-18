@@ -126,12 +126,14 @@ public class TrustStoreConfig {
      */
     @PostConstruct
     public void validateProperties() {
-        log.info("Iniciando validação das propriedades do trust store ICP-Brasil");
+        log.info("Iniciando validação das propriedades de configuração do TrustStore ICP-Brasil");
 
         validateUrls();
         validateNetworkConfig();
         validateCacheConfig();
         validateStorageConfig();
+
+        log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
     }
 
     /**
