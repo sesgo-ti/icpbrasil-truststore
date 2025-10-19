@@ -78,7 +78,7 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
             }
             return zipData;
         } catch (Exception e) {
-            throw new RuntimeException("Falha ao baixar ZIP: " + icpBrasilZipUrl, e);
+            throw new RecoveryIcpBrasilResourceException("Falha ao baixar ZIP: " + icpBrasilZipUrl, e);
         }
     }
 
@@ -103,7 +103,7 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
             }
             return hashContent.split("\\s+")[0].trim();
         } catch (Exception e) {
-            throw new RuntimeException("Falha ao baixar hash: " + icpBrasilHashUrl, e);
+            throw new RecoveryIcpBrasilResourceException("Falha ao baixar hash: " + icpBrasilHashUrl, e);
         }
     }
 
@@ -158,5 +158,15 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
                 lowerFileName.endsWith(".cer") ||
                 lowerFileName.endsWith(".pem") ||
                 lowerFileName.endsWith(".der");
+    }
+
+    public static class RecoveryIcpBrasilResourceException extends RuntimeException {
+        public RecoveryIcpBrasilResourceException(String message) {
+            super(message);
+        }
+
+        public RecoveryIcpBrasilResourceException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }
