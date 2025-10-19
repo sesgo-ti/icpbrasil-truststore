@@ -26,12 +26,17 @@ public class MinioRepository implements TrustStoreRepository {
     @Override
     public InputStream recuperarZip() {
         try {
-            return minioClient.getObject(
+            var zipStream = minioClient.getObject(
                     GetObjectArgs.builder()
                             .bucket(trustStoreConfig.getStorage().getContainerName())
                             .object(trustStoreConfig.getStorage().getTruststoreArchivePath())
                             .build()
             );
+
+            if (zipStream == null) {
+                throw new RuntimeException("Zip file not found in MinIO");
+            }
+            return zipStream;
         } catch (Exception e) {
             log.error("Failed to retrieve zip from MinIO", e);
             throw new RuntimeException("Failed to retrieve zip from MinIO", e);
