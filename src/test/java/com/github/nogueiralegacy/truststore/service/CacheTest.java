@@ -2,6 +2,7 @@ package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
+import com.github.nogueiralegacy.truststore.repository.MinioRepository;
 import com.github.nogueiralegacy.truststore.util.Downloader;
 import com.github.nogueiralegacy.truststore.util.Util;
 import lombok.SneakyThrows;
@@ -33,6 +34,9 @@ class CacheTest {
     @Autowired
     Util util;
 
+    @Autowired
+    MinioRepository minioRepository;
+
     X509Certificate testCertificate;
 
     @SneakyThrows
@@ -47,9 +51,11 @@ class CacheTest {
 
         var icpBrasilCertificateProvider = new IcpBrasilCertificateProvider(
                 trustStoreConfig,
-                downloader);
+                downloader,
+                minioRepository
+        );
 
-        cache = new Cache(icpBrasilCertificateProvider.getCertificates());
+        Cache.refreshCache(icpBrasilCertificateProvider.getCertificates());
 
         testCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
@@ -58,6 +64,6 @@ class CacheTest {
     void testGetCertificateBySki() {
         String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate);
 
-        assertEquals(testCertificate, cache.getCertificateBySki(testSki));
+        assertEquals(testCertificate, Cache.getCertificateBySki(testSki));
     }
 }

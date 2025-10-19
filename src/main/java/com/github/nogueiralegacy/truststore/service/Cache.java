@@ -14,26 +14,28 @@ import java.util.Map;
 @Slf4j
 @Service
 public class Cache {
-    private Map<String, X509Certificate> skiIndex;
+    private static Map<String, X509Certificate> skiIndex;
 
-    public Cache(List<X509Certificate> certificates) {
+    public static void refreshCache(List<X509Certificate> certificates) {
+        log.info("Atualizando cache de certificados...");
         createMapSkiToCertificate(certificates);
+        log.info("Cache de certificados atualizado com {} entradas.", skiIndex.size());
     }
 
-    private void createMapSkiToCertificate(List<X509Certificate> certificates) {
-        this.skiIndex = new HashMap<>();
+    private static void createMapSkiToCertificate(List<X509Certificate> certificates) {
+        skiIndex = new HashMap<>();
 
         for (X509Certificate certificate : certificates) {
             try {
                 String ski = CertificateParser.getSubjectKeyIdentifier(certificate);
-                this.skiIndex.put(ski, certificate);
+                skiIndex.put(ski, certificate);
             } catch (RuntimeException e) {
                 log.error("Erro ao extrair Subject Key Identifier do certificado: {}", e.getMessage(), e);
             }
         }
     }
 
-    public X509Certificate getCertificateBySki(String ski) {
-        return this.skiIndex.get(ski);
+    public static X509Certificate getCertificateBySki(String ski) {
+        return skiIndex.get(ski);
     }
 }
