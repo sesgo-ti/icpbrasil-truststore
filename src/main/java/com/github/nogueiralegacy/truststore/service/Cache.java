@@ -33,6 +33,8 @@ public class Cache {
                 log.error("Erro ao extrair Subject Key Identifier do certificado: {}", e.getMessage(), e);
             }
         }
+
+        log.info("Cache ski criado com sucesso");
     }
 
     public static X509Certificate getCertificateBySki(String ski) {
