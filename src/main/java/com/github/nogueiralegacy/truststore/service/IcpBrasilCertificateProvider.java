@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -69,17 +70,7 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
             log.debug("Erro ao recuperar ZIP do MinIO: {}", e.getMessage());
         }
 
-        // Fallback para URL remota
-        log.info("Baixando ZIP da URL remota");
-        try {
-            byte[] zipData = downloader.downloadBytes(icpBrasilZipUrl);
-            if (zipData == null || zipData.length == 0) {
-                throw new IOException("Dados do ZIP vazios ou inválidos");
-            }
-            return zipData;
-        } catch (Exception e) {
-            throw new RecoveryIcpBrasilResourceException("Falha ao baixar ZIP: " + icpBrasilZipUrl, e);
-        }
+        return baixarZipIcpBrasil();
     }
 
     private String obterHashEsperado() {
@@ -94,7 +85,23 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
             log.debug("Erro ao recuperar hash do MinIO: {}", e.getMessage());
         }
 
-        // Fallback para URL remota
+        return baixarHashIcpBrasil();
+    }
+
+    public byte[] baixarZipIcpBrasil() {
+        log.info("Baixando ZIP da URL remota");
+        try {
+            byte[] zipData = downloader.downloadBytes(icpBrasilZipUrl);
+            if (zipData == null || zipData.length == 0) {
+                throw new IOException("Dados do ZIP vazios ou inválidos");
+            }
+            return zipData;
+        } catch (Exception e) {
+            throw new RecoveryIcpBrasilResourceException("Falha ao baixar ZIP: " + icpBrasilZipUrl, e);
+        }
+    }
+
+    public String baixarHashIcpBrasil() {
         log.info("Baixando hash da URL remota");
         try {
             String hashContent = downloader.downloadText(icpBrasilHashUrl);
@@ -107,12 +114,13 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
         }
     }
 
-    private void validateZipIntegrity(byte[] zipData, String expectedHash) {
+    public Instant validateZipIntegrity(byte[] zipData, String expectedHash) {
         try {
             if (!HashValidator.validateSha512(zipData, expectedHash)) {
                 throw new SecurityException("Hash do arquivo ZIP não confere com o esperado");
             }
             log.info("Integridade do ZIP validada com sucesso");
+            return Instant.now();
         } catch (SecurityException e) {
             throw e;
         } catch (Exception e) {
@@ -158,15 +166,5 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
                 lowerFileName.endsWith(".cer") ||
                 lowerFileName.endsWith(".pem") ||
                 lowerFileName.endsWith(".der");
-    }
-
-    public static class RecoveryIcpBrasilResourceException extends RuntimeException {
-        public RecoveryIcpBrasilResourceException(String message) {
-            super(message);
-        }
-
-        public RecoveryIcpBrasilResourceException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 }
