@@ -20,17 +20,10 @@ import java.util.Base64;
 @RestController
 @RequestMapping("/api/truststore")
 public class TrustStoreController {
-
-    private final Cache cache;
-    
     // Constantes para tipos de certificado
     private static final String TYPE_PEM = "pem";
     private static final String TYPE_DER = "der";
     private static final String DEFAULT_TYPE = TYPE_PEM;
-
-    public TrustStoreController(IcpBrasilCertificateProvider icpBrasilCertificateProvider) {
-        this.cache = new Cache(icpBrasilCertificateProvider.getCertificates());
-    }
 
     /**
      * Retorna o certificado com base no Subject Key Identifier (SKI).
@@ -45,7 +38,7 @@ public class TrustStoreController {
                                            @RequestParam(defaultValue = DEFAULT_TYPE) String type) {
         try {
             log.info("Buscando certificado para SKI: {}", ski);
-            X509Certificate cert = cache.getCertificateBySki(ski);
+            X509Certificate cert = Cache.getCertificateBySki(ski);
 
             if (cert == null) {
                 log.warn("Certificado não encontrado para SKI: {}", ski);
