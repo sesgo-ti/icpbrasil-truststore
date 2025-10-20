@@ -29,8 +29,6 @@ class CacheTest {
     @MockitoBean
     Downloader downloader;
 
-    Cache cache;
-
     @Autowired
     Util util;
 
