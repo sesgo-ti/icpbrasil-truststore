@@ -87,6 +87,7 @@ public class TrustStoreService {
     }
 
     public void verificarSincronizacaoRepositorioLocal() {
+        log.info("Iniciando verificação de sincronização do repositório local");
         try {
             String hashIcpBrasil = icpBrasilCertificateProvider.baixarHashIcpBrasil();
             String hashLocal = minioRepository.recuperarHash();
@@ -94,7 +95,7 @@ public class TrustStoreService {
                 log.warn("O repositório local está desatualizado. Iniciando atualização.");
                 reposicaoArtefatosRepositorioLocal();
             } else {
-                log.info("O repositório local está sincronizado com a fonte ICP-Brasil.");
+                log.info("O repositório local está sincronizado com a fonte ICP-Brasil");
             }
 
         } catch (Exception e) {
