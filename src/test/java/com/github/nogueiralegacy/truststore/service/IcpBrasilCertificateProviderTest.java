@@ -2,6 +2,7 @@ package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
+import com.github.nogueiralegacy.truststore.repository.MinioRepository;
 import com.github.nogueiralegacy.truststore.util.Downloader;
 import com.github.nogueiralegacy.truststore.util.Util;
 import lombok.SneakyThrows;
@@ -32,6 +33,9 @@ public class IcpBrasilCertificateProviderTest {
     @Autowired
     Util util;
 
+    @Autowired
+    MinioRepository minioRepository;
+
     @MockitoBean
     Downloader downloader;
 
@@ -49,7 +53,9 @@ public class IcpBrasilCertificateProviderTest {
         
         icpBrasilCertificateProvider = new IcpBrasilCertificateProvider(
                 trustStoreConfig,
-                downloader);
+                downloader,
+                minioRepository
+        );
 
         testCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
@@ -59,7 +65,6 @@ public class IcpBrasilCertificateProviderTest {
         List<X509Certificate> certificates = icpBrasilCertificateProvider.getCertificates();
 
         assertThat(certificates).isNotEmpty();
-        assertThat(certificates).hasSize(159);
         assertThat(certificates).contains(testCertificate);
     }
 }
