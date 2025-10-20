@@ -1,6 +1,5 @@
 package com.github.nogueiralegacy.truststore.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,9 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class VaultTest {
     @Autowired
     private VaultTemplate vaultTemplate;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     private final String DEFAULT_CERT_PATH = "certificates";
 
