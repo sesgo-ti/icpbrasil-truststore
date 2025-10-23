@@ -47,6 +47,7 @@
 
 ### 4.2 Procedimentos Normais de Uso
 - [Manual de Gestão de Certificados Confiáveis](manual-gestao-certificados-confiaveis.md)
+- [Manual de Configuração do Certificado Vault](manual-configuracao-certificado-vault.md)
 - [Exemplo de entrada de dados]
 - [Exemplo de saída de dados]
 
