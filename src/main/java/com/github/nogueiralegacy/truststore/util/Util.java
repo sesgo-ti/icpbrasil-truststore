@@ -2,6 +2,7 @@ package com.github.nogueiralegacy.truststore.util;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 
@@ -10,12 +11,16 @@ import java.io.InputStream;
 public class Util {
 
     public InputStream getResource(String resourceName) throws NullPointerException {
-        if (resourceName == null) {
-           log.error("resourceName não pode ser null");
+        if (!StringUtils.hasText(resourceName)) {
+           log.error("resourceName não pode ser null ou vazio");
+           throw new IllegalArgumentException("resourceName não pode ser null ou vazio");
         }
+        
         InputStream is = this.getClass().getClassLoader().getResourceAsStream(resourceName);
         if (is == null) {
-            log.warn("Recurso {} não encontrado", resourceName);
+            String errorMsg = "Recurso não encontrado: " + resourceName;
+            log.error(errorMsg);
+            throw new RuntimeException(errorMsg);
         }
 
         return is;
