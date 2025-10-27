@@ -13,7 +13,6 @@ spring:
       authentication: token
       connection-timeout: 5000
       read-timeout: 15000
-      skipSslValidation: true
 
       kv:
         enabled: true
@@ -39,4 +38,5 @@ truststore:
     secret-key: "${MINIO_SECRET_KEY}"
 
   vault:
-    certificate-path: 'certificates'
+    certificate-path: 'certificates'  # Path dos certificados confiáveis no Vault
+    ssl-certificate-path: 'classpath:vault-ssl-cert.pem'  # Certificado SSL do Vault
