@@ -17,6 +17,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Provedor de certificados confiáveis ARMAZENADOS no Vault como dados de aplicação.
+ * 
+ * IMPORTANTE: Não confundir com VaultCertificateManager:
+ * - VaultCertificateProvider: Busca certificados CONFIÁVEIS armazenados no Vault (dados)
+ * - VaultCertificateManager: Carrega certificado SSL do SERVIÇO Vault (infraestrutura)
+ * 
+ * Este provider busca certificados de terceiros que a aplicação deve confiar,
+ * armazenados no key-value store do Vault para gestão centralizada.
+ */
 @Slf4j
 @Component
 public class VaultCertificateProvider implements CertificateProvider {
@@ -43,13 +53,13 @@ public class VaultCertificateProvider implements CertificateProvider {
                 return List.of();
             }
 
-            log.info("Convertendo certificados do Vault em certificados X509");
+            log.info("Convertendo {} certificados confiáveis em X509", certificatesData.size());
             return certificatesData.entrySet().stream()
                     .map(this::convertToX509Certificate)
                     .toList();            
         } catch (Exception e) {
-            log.error("Erro ao converter certificados do Vault em certificados X509: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro no parse de certificados do Vault para certificados X509", e);
+            log.error("Erro ao converter certificados confiáveis: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro no parse de certificados confiáveis do Vault", e);
         }
     }
 
@@ -71,17 +81,17 @@ public class VaultCertificateProvider implements CertificateProvider {
     }
 
     private void loadCertificatesFromVault() {
-        if (certificatesData != null) {
-            log.info("Atualizando certificados do Vault");
-        }
-
         try {
-            log.info("Carregando certificados do Vault");
+            if (certificatesData != null) {
+                log.info("Atualizando certificados confiáveis armazenados no Vault");
+            } else {
+                log.info("Buscando certificados confiáveis no Vault (path: {})", DEFAULT_CERT_PATH);
+            }
+            
             certificatesData = new HashMap<>();
 
             var kvOps = vaultTemplate.opsForVersionedKeyValue("kv");
             var versionedSecret = kvOps.get(DEFAULT_CERT_PATH);
-
             var dataMap = versionedSecret.getRequiredData();
 
             for (var certEntry : dataMap.entrySet()) {
@@ -90,18 +100,20 @@ public class VaultCertificateProvider implements CertificateProvider {
                 );
 
                 if (cert == null) {
-                    throw new IOException("Certificado nulo encontrado no Vault: " + certEntry.getKey());
+                    throw new IOException("Certificado nulo encontrado: " + certEntry.getKey());
                 }
 
                 certificatesData.put(certEntry.getKey(), cert);
             }
+            
             if (certificatesData.isEmpty()) {
-                log.warn("Nenhum certificado encontrado no Vault no caminho: {}", DEFAULT_CERT_PATH);
+                log.warn("Nenhum certificado confiável encontrado no path: {}", DEFAULT_CERT_PATH);
+            } else {
+                log.info("Carregados {} certificados confiáveis do Vault", certificatesData.size());
             }
-            log.info("Quantidade de certificados carregados do Vault: {}", certificatesData.size());
         } catch (Exception e) {
-            log.error("Erro ao carregar certificados do Vault: {}", e.getMessage(), e);
-            throw new RuntimeException("Falha ao carregar certificados do Vault", e);
+            log.error("Erro ao buscar certificados confiáveis no Vault: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao carregar certificados confiáveis do Vault", e);
         }
     }
 }
