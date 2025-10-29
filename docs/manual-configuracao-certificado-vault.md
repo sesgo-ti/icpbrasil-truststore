@@ -1,23 +1,27 @@
 # Configuração do Certificado SSL do Vault
 
+## Variáveis
+
+- URL_VAULT: `https://hl7-fhir.saude-go.net:8200`
+
 ## Problema
 
-A aplicação Trust Store precisa se conectar com o Vault (https://hl7-fhir.saude-go.net:8200) para carregar certificados confiáveis de outros serviços. No entanto, a JVM não reconhece o certificado SSL do Vault como confiável, causando o erro:
+A aplicação Trust Store precisa se conectar com o Vault (URL_VAULT) para carregar certificados confiáveis de outros serviços. No entanto, a JVM não reconhece o certificado SSL do Vault como confiável, causando o erro:
 
 ```
 PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
 ```
 
+## Solução
+
+Para resolver este problema de forma segura, a aplicação não deve confiar nos certificados do sistema operacional ou da JVM. Em vez disso, o operador vai configurar explicitamente o certificado do Vault na aplicação.
+
 ## Arquitetura da Solução
 
 A aplicação usa **dois tipos de certificados**:
 
-1. **Certificado SSL do Vault** - Para conectar com o Vault (deve estar nos resources)
+1. **Certificado SSL do Vault** - Para conectar com o Vault
 2. **Certificados confiáveis de outros serviços** - Armazenados no Vault e carregados dinamicamente
-
-## Solução
-
-Para resolver este problema de forma segura, o certificado SSL do Vault deve ser colocado nos resources da aplicação.
 
 ## Passos para Configuração
 
@@ -27,31 +31,51 @@ Execute o seguinte comando para baixar o certificado SSL do Vault:
 
 ```bash
 # Baixar o certificado SSL do servidor
-openssl s_client -connect hl7-fhir.saude-go.net:8200 -showcerts < /dev/null 2>/dev/null | openssl x509 -outform PEM > vault-ssl-cert.pem
+openssl s_client -connect $URL_VAULT -showcerts < /dev/null 2>/dev/null | openssl x509 -outform PEM > vault-ssl-cert.pem
 ```
 
-### 2. Colocar o Certificado SSL nos Resources
+### 2. Criar um truststore somente com o certificado do Vault
 
-1. Copie o arquivo `vault-ssl-cert.pem` para o diretório `src/main/resources/`
-2. O arquivo deve estar no formato PEM (texto)
+Com o certificado baixado, crie um truststore Java (JKS) contendo apenas este certificado:
 
-### 3. Verificar a Configuração
-
-O arquivo `application.yaml` já está configurado para usar o certificado SSL:
-
-```yaml
-truststore:
-  vault:
-    certificate-path: 'certificates'  # Path dos certificados confiáveis no Vault
-    ssl-certificate-path: 'classpath:vault-ssl-cert.pem'  # Certificado SSL do Vault
-```
-
-### 4. Testar a Aplicação
-
-Após colocar o certificado nos resources, execute os testes da aplicação:
+> A ferramenta `keytool` vem com o JDK.
 
 ```bash
-mvn clean test
+keytool -importcert \
+  -file vault-ssl-cert.pem \
+  -alias vault-ssl-cert \
+  -keystore mytruststore.jks \
+  -storepass changeit \
+  -storetype PKCS12
+```
+
+### 3. Testar
+
+**AMBIENTE DE TESTE:**
+
+1. Copie o arquivo `mytruststore.jks` para o diretório `src/test/resources/` do projeto
+    ```bash
+    cp mytruststore.jks src/test/resources/
+    ```
+2. Rode os testes automatizados para garantir que a aplicação consegue se conectar ao Vault usando o certificado configurado:
+
+    ```bash
+    mvn clean test
+    ```
+   
+### 4. Executar a aplicação com o truststore customizado
+
+**AMBIENTE DE PRODUÇÃO:**
+- Configure as propriedades da JVM
+    - `javax.net.ssl.trustStore`: caminho para o arquivo `mytruststore.jks`
+    - `javax.net.ssl.trustStorePassword`: senha do truststore (ex: `changeit`)
+
+Exemplo: 
+```bash 
+java \
+  -Djavax.net.ssl.trustStore=mytruststore.jks \
+  -Djavax.net.ssl.trustStorePassword=changeit \
+  -jar target/trust-store-1.0.jar
 ```
 
 ## Segurança
@@ -69,17 +93,11 @@ Quando o certificado do Vault for renovado:
 
 ## Troubleshooting
 
-### Erro: "Certificado SSL do Vault não encontrado"
+### Aplicação travada ou falhando ao conectar com o Vault
 
-- Verifique se o arquivo `vault-ssl-cert.pem` existe em `src/main/resources/`
-- Verifique se o caminho no `application.yaml` está correto
-
-### Erro: "Certificado SSL inválido"
-
-- Verifique se o arquivo está no formato PEM correto
-- Execute `openssl x509 -in vault-ssl-cert.pem -text -noout` para validar
+- Verifique se está acessando o serviço dentro da rede correta (VPN)
 
 ### Erro: "Certificado SSL expirado"
 
-- Baixe um novo certificado SSL do Vault
-- Substitua o arquivo nos resources
+- Baixe um novo certificado SSL do Vault válido
+- Atualize o truststore com o novo certificado seguindo os passos acima
