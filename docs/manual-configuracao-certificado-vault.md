@@ -31,7 +31,7 @@ Execute o seguinte comando para baixar o certificado SSL do Vault:
 
 ```bash
 # Baixar o certificado SSL do servidor
-openssl s_client -connect $URL_VAULT -showcerts < /dev/null 2>/dev/null | openssl x509 -outform PEM > vault-ssl-cert.pem
+openssl s_client -connect hl7-fhir.saude-go.net:8200 -showcerts < /dev/null 2>/dev/null | openssl x509 -outform PEM > vault-ssl-cert.pem
 ```
 
 ### 2. Criar um truststore somente com o certificado do Vault
@@ -47,6 +47,14 @@ keytool -importcert \
   -keystore mytruststore.jks \
   -storepass changeit \
   -storetype PKCS12
+  
+  # Responda "y" ou "yes" quando solicitado para confiar no certificado
+```
+
+Verifique se o certificado desajado foi adicionado corretamente:
+
+```bash
+keytool -list -keystore mytruststore.jks -storepass changeit
 ```
 
 ### 3. Testar
