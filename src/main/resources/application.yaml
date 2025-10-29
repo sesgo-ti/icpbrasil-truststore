@@ -39,4 +39,3 @@ truststore:
 
   vault:
     certificate-path: 'certificates'  # Path dos certificados confiáveis no Vault
-    ssl-certificate-path: 'classpath:vault-ssl-cert.pem'  # Certificado SSL do Vault
