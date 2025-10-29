@@ -5,7 +5,6 @@ import com.github.nogueiralegacy.truststore.service.VaultCertificateProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -26,7 +25,6 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@DependsOn({"vaultClientHttpRequestFactory"})
 public class TrustStoreManager {
     
     private final VaultCertificateProvider vaultCertificateProvider;
