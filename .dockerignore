@@ -1,0 +1,27 @@
+# Build artifacts (Maven)
+target/
+*.class
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Ambiente e segurança
+.env*
+*.local
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+*.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
