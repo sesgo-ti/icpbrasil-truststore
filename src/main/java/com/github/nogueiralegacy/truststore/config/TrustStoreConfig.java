@@ -37,9 +37,14 @@ public class TrustStoreConfig {
     private NetworkConfig network;
 
     /**
-     * TTL do cache de consulta em horas (padrão 24 horas, intervalo [1, 168])
+     * TTL crítico do cache em horas (usado para alertas, inteiros positivos)
      */
-    private int cacheTtlHours;
+    private int cacheTtlCriticalHours;
+
+    /**
+     * TTL máximo do cache em horas (usado para alertas, inteiros positivos)
+     */
+    private int cacheTtlMaxHours;
 
     /**
      * Período para recuperação de trust store atualizado em horas, inteiros positivos
@@ -214,16 +219,36 @@ public class TrustStoreConfig {
      * Valida as configurações de cache
      */
     private void validateCacheConfig() {
-        // Validar TTL do cache (1-168 horas)
-        if (cacheTtlHours < 24 || cacheTtlHours > 168) {
-            throw new IllegalStateException("TTL do cache deve estar entre 1 e 168 horas. " +
-                    "Valor atual: " + cacheTtlHours);
+        if (cacheTtlCriticalHours < 24 || cacheTtlCriticalHours > 168) {
+            throw new IllegalStateException("TTL crítico do cache deve estar entre 24 e 168 horas. " +
+                    "Valor atual: " + cacheTtlCriticalHours + "horas");
         }
 
+        if (cacheTtlMaxHours < 72 || cacheTtlMaxHours > 720) {
+            throw new IllegalStateException("TTL máximo do cache deve estar entre 168 e 720 horas. " +
+                    "Valor atual: " + cacheTtlMaxHours + "horas");
+        }
+
+        if (cacheTtlMaxHours <= cacheTtlCriticalHours) {
+            throw new IllegalStateException("TTL máximo do cache deve ser maior que o TTL crítico do cache. " +
+                    "TTL Máximo em horas: " + cacheTtlMaxHours +
+                    ", TTL Crítico em horas: " + cacheTtlCriticalHours);
+        }
+
+//        // Validar TTL do cache (1-168 horas)
+//        if (cacheTtlHours < 24 || cacheTtlHours > 168) {
+//            throw new IllegalStateException("TTL do cache deve estar entre 1 e 168 horas. " +
+//                    "Valor atual: " + cacheTtlHours);
+//        }
+
         // Validar intervalo de refresh (deve ser positivo)
-        if (refreshIntervalHours < 1) {
-            throw new IllegalStateException("Intervalo de refresh deve ser pelo menos 1 hora. " +
-                    "Valor atual: " + refreshIntervalHours);
+        if (refreshIntervalHours < 1 || refreshIntervalHours > cacheTtlCriticalHours) {
+            String errorMsg = "Intervalo de refresh deve estar entre 1 e TTL Crítico (" +
+                    cacheTtlCriticalHours +
+                    "). Valor atual: " +
+                    refreshIntervalHours + " horas";
+
+            throw new IllegalStateException(errorMsg);
         }
 
         log.debug("Configurações de cache validadas com sucesso");
@@ -262,16 +287,23 @@ public class TrustStoreConfig {
     }
 
     /**
-     * Retorna o TTL do cache em milissegundos
-     */
-    public long getCacheTtlMillis() {
-        return cacheTtlHours * 60 * 60 * 1000L;
-    }
-
-    /**
      * Retorna o intervalo de refresh em milissegundos
      */
     public long getRefreshIntervalMillis() {
         return refreshIntervalHours * 60 * 60 * 1000L;
+    }
+
+    /**
+     * Retorna o TTL crítico do cache em milissegundos
+     */
+    public long getCacheTtlCriticalMillis() {
+        return cacheTtlCriticalHours * 60 * 60 * 1000L;
+    }
+
+    /**
+     * Retorna o TTL máximo do cache em milissegundos
+     */
+    public long getCacheTtlMaxMillis() {
+        return cacheTtlMaxHours * 60 * 60 * 1000L;
     }
 }

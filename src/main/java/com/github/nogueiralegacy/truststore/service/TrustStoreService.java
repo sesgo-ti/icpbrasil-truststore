@@ -1,5 +1,6 @@
 package com.github.nogueiralegacy.truststore.service;
 
+import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.repository.MinioRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -19,11 +20,15 @@ import java.time.Instant;
 public class TrustStoreService {
     private final MinioRepository minioRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
+    private final TrustStoreConfig trustStoreConfig;
+    private final long valor = 1000 * 5;
 
     public TrustStoreService(MinioRepository minioRepository,
-                             IcpBrasilCertificateProvider icpBrasilCertificateProvider) {
+                             IcpBrasilCertificateProvider icpBrasilCertificateProvider,
+                             TrustStoreConfig trustStoreConfig) {
         this.minioRepository = minioRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
+        this.trustStoreConfig = trustStoreConfig;
     }
 
     public void assegurarDisponibilidade() {
@@ -103,7 +108,7 @@ public class TrustStoreService {
         }
     }
 
-    @Scheduled(fixedRateString = "#{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
+    @Scheduled(fixedRate = valor)
     public void refresh() {
         log.info("Iniciando verificação automática de sincronização do repositório local");
         assegurarDisponibilidade();
