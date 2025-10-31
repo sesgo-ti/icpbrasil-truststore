@@ -33,7 +33,8 @@ class TrustStoreConfigTest {
 
         testTrustStoreConfig.setNetwork(networkConfig);
 
-        testTrustStoreConfig.setCacheTtlHours(24);
+        testTrustStoreConfig.setCacheTtlCriticalHours(72);
+        testTrustStoreConfig.setCacheTtlMaxHours(168);
         testTrustStoreConfig.setRefreshIntervalHours(1);
     }
 
@@ -143,16 +144,29 @@ class TrustStoreConfigTest {
     }
 
     @Test
-    void testValidateCacheConfig_ComCacheTtlInvalido_DeveLancarExcecao() {
+    void testValidateCacheConfig_ComCacheTtlCriticoInvalido_DeveLancarExcecao() {
         // Given
         // Valor inválido
-        testTrustStoreConfig.setCacheTtlHours(200); // Maior que 168
+        testTrustStoreConfig.setCacheTtlCriticalHours(200); // Maior que 168
 
         // When & Then
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 testTrustStoreConfig::validateProperties);
 
-        assertTrue(exception.getMessage().contains("TTL do cache deve estar entre 1 e 168 horas"));
+        assertTrue(exception.getMessage().contains("TTL crítico do cache deve estar entre 24 e 168 horas"));
+    }
+
+    @Test
+    void testValidateCacheConfig_ComCacheTtlMaxInvalido_DeveLancarExcecao() {
+        // Given
+        // Valor inválido
+        testTrustStoreConfig.setCacheTtlMaxHours(1000); // Maior que 720
+
+        // When & Then
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                testTrustStoreConfig::validateProperties);
+
+        assertTrue(exception.getMessage().contains("TTL máximo do cache deve estar entre 168 e 720 horas"));
     }
 
     @Test
@@ -165,7 +179,7 @@ class TrustStoreConfigTest {
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 testTrustStoreConfig::validateProperties);
 
-        assertTrue(exception.getMessage().contains("Intervalo de refresh deve ser pelo menos 1 hora"));
+        assertTrue(exception.getMessage().contains("Intervalo de refresh deve estar entre 1 e TTL Crítico"));
     }
 
     @Test
@@ -187,13 +201,23 @@ class TrustStoreConfigTest {
     }
 
     @Test
-    void testGetCacheTtlMillis_DeveRetornarValorCorreto() {
+    void testGetCacheTtlCriticalMillis_DeveRetornarValorCorreto() {
         // When
-        long cacheTtlMillis = trustStoreConfig.getCacheTtlMillis();
+        long cacheTtlMillis = trustStoreConfig.getCacheTtlCriticalMillis();
 
         // Then
-        assertEquals(86400000L, cacheTtlMillis); // 24 horas = 86400000 milissegundos
+        assertEquals(259200000L, cacheTtlMillis); // 24 horas = 86400000 milissegundos
     }
+
+    @Test
+    void testGetCacheTtlMaxMillis_DeveRetornarValorCorreto() {
+        // When
+        long cacheTtlMillis = trustStoreConfig.getCacheTtlMaxMillis();
+
+        // Then
+        assertEquals(604800000L, cacheTtlMillis); // 24 horas = 86400000 milissegundos
+    }
+
 
     @Test
     void testGetRefreshIntervalMillis_DeveRetornarValorCorreto() {
@@ -218,7 +242,8 @@ class TrustStoreConfigTest {
         assertEquals(30, trustStoreConfig.getNetwork().getDownloadTimeoutSeconds());
         assertEquals(3, trustStoreConfig.getNetwork().getMaxRetries());
         assertEquals(30, trustStoreConfig.getNetwork().getRetryIntervalSeconds());
-        assertEquals(24, trustStoreConfig.getCacheTtlHours());
+        assertEquals(72, trustStoreConfig.getCacheTtlCriticalHours());
+        assertEquals(168, trustStoreConfig.getCacheTtlMaxHours());
         assertEquals(2, trustStoreConfig.getRefreshIntervalHours());
     }
 }
