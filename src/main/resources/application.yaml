@@ -24,7 +24,7 @@ truststore:
     download-timeout-seconds: 60
     max-retries: 3
     retry-interval-seconds: 30
-  cache-ttl-hours: 24
+  cache-ttl-hours: 72
   refresh-interval-hours: 2
   storage:
     container-name: "staging"
