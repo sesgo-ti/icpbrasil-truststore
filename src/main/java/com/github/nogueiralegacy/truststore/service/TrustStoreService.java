@@ -1,5 +1,6 @@
 package com.github.nogueiralegacy.truststore.service;
 
+import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.repository.MinioRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
