@@ -1,6 +1,5 @@
 package com.github.nogueiralegacy.truststore.service;
 
-import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.repository.MinioRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -20,15 +19,11 @@ import java.time.Instant;
 public class TrustStoreService {
     private final MinioRepository minioRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
-    private final TrustStoreConfig trustStoreConfig;
-    private final long valor = 1000 * 5;
 
     public TrustStoreService(MinioRepository minioRepository,
-                             IcpBrasilCertificateProvider icpBrasilCertificateProvider,
-                             TrustStoreConfig trustStoreConfig) {
+                             IcpBrasilCertificateProvider icpBrasilCertificateProvider) {
         this.minioRepository = minioRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
-        this.trustStoreConfig = trustStoreConfig;
     }
 
     public void assegurarDisponibilidade() {
@@ -108,7 +103,17 @@ public class TrustStoreService {
         }
     }
 
-    @Scheduled(fixedRate = valor)
+    /**
+     * Executa a verificação automática periódica de sincronização do repositório local.
+     *
+     * <p><strong>NOTA:</strong> Este método usa SpEL diretamente em vez de {@link TrustStoreConfig}
+     * porque {@code @Scheduled(fixedRate)} requer uma constante em tempo de compilação.
+     * Variáveis de instância causam erro "Attribute value must be constant".</p>
+     *
+     * <p>A expressão {@code #{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}} lê a
+     * propriedade do application.yaml e converte horas para milissegundos (padrão: 2 horas).</p>
+     */
+    @Scheduled(fixedRateString = "#{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
     public void refresh() {
         log.info("Iniciando verificação automática de sincronização do repositório local");
         assegurarDisponibilidade();
