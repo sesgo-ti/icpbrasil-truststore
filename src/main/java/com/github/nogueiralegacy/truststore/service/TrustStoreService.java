@@ -20,11 +20,14 @@ import java.time.Instant;
 public class TrustStoreService {
     private final MinioRepository minioRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
+    private final TrustStoreConfig trustStoreConfig;
 
     public TrustStoreService(MinioRepository minioRepository,
-                             IcpBrasilCertificateProvider icpBrasilCertificateProvider) {
+                             IcpBrasilCertificateProvider icpBrasilCertificateProvider,
+                             TrustStoreConfig trustStoreConfig) {
         this.minioRepository = minioRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
+        this.trustStoreConfig = trustStoreConfig;
     }
 
     public void assegurarDisponibilidade() {
@@ -97,10 +100,53 @@ public class TrustStoreService {
                 reposicaoArtefatosRepositorioLocal();
             } else {
                 log.info("O repositório local está sincronizado com a fonte ICP-Brasil");
+                minioRepository.armazenarUltimaConfirmacao(Instant.now());
             }
 
         } catch (Exception e) {
             log.error("Erro ao verificar sincronização do repositório local", e);
+        }
+    }
+
+    public void assegurrarNaoExpiracaoCache() {
+        try {
+            Instant ultimaConfirmacao = minioRepository.recuperarUltimaConfirmacao();
+            long idadeCache = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
+
+            if (idadeCache <= trustStoreConfig.getRefreshIntervalMillis()) {
+                log.info("Cache está atualizado e válido");
+                Cache.setCacheValid(true);
+                return;
+            }
+
+            // Falha na atualização do cache, mas ainda estável
+            if (idadeCache <= trustStoreConfig.getCacheTtlCriticalMillis()) {
+                log.warn("Falha na atualização do cache, utilizando cache local válido");
+                Cache.setCacheValid(true);
+                return;
+            }
+
+            // Cache passaou do tempo crítico de vida. Estado crítico
+            if (idadeCache <= trustStoreConfig.getCacheTtlMaxMillis()) {
+                log.error("Cache crítico - falha prolongada na atualização do cache, utilizando cache local válido");
+
+                // TODO: Implementar notificação ao operador (e-mail, SMS, etc.)
+                log.info("Operador notificado sobre estado crítico do cache");
+                Cache.setCacheValid(true);
+                return;
+            }
+
+            // Cache expirou completamente
+            if (idadeCache > trustStoreConfig.getCacheTtlMaxMillis()) {
+                log.error("Cache expirado - não há como garantir segurança");
+
+                // TODO: Implementar notificação ao operador (e-mail, SMS, etc.)
+                log.info("Operador notificado sobre expiração do cache");
+                Cache.setCacheValid(false);
+            }
+        } catch (Exception e) {
+            log.error("Erro ao assegurar não expiração do cache", e);
+            Cache.setCacheValid(false);
         }
     }
 
@@ -116,12 +162,22 @@ public class TrustStoreService {
      */
     @Scheduled(fixedRateString = "#{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
     public void refresh() {
-        log.info("Iniciando verificação automática de sincronização do repositório local");
-        assegurarDisponibilidade();
+        try {
+            log.info("Iniciando verificação automática de sincronização do repositório local");
+            assegurarDisponibilidade();
 
-        verificarSincronizacaoRepositorioLocal();
-
-        Cache.refreshCache(icpBrasilCertificateProvider.getCertificates());
+            verificarSincronizacaoRepositorioLocal();
+        } catch (Exception e) {
+            log.error("Erro durante a verificação automática de sincronização do repositório local", e);
+        } finally {
+            assegurrarNaoExpiracaoCache();
+            if (Cache.isCacheValid()) {
+                var certificates = icpBrasilCertificateProvider.getCertificates();
+                Cache.refreshCache(certificates);
+            } else {
+                log.warn("Cache inválido, não será atualizado");
+            }
+        }
     }
 
     public enum DisponibilidadeRepositorio {

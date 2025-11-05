@@ -52,7 +52,7 @@ class CacheTest {
                 downloader,
                 minioRepository
         );
-
+        Cache.setCacheValid(true);
         Cache.refreshCache(icpBrasilCertificateProvider.getCertificates());
 
         testCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
