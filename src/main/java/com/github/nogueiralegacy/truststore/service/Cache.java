@@ -1,7 +1,6 @@
 package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -10,16 +9,27 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Getter
 @Slf4j
 @Service
 public class Cache {
-    private static Map<String, X509Certificate> skiIndex;
+    private static boolean isCacheValid = false;
+    private static Map<String, X509Certificate> skiIndex = new HashMap<>();
 
+    /**\
+     * Se a cache estiver válida, atualiza o cache de certificados
+     * Se a cache estiver inválida, não faz nada
+     *
+     * @param certificates Lista de certificados para atualizar o cache
+     */
     public static void refreshCache(List<X509Certificate> certificates) {
-        log.info("Atualizando cache de certificados...");
-        createMapSkiToCertificate(certificates);
-        log.info("Cache de certificados atualizado com {} entradas.", skiIndex.size());
+        if (isCacheValid) {
+            log.info("Atualizando cache de certificados...");
+            createMapSkiToCertificate(certificates);
+            log.info("Cache de certificados atualizado com {} entradas.", skiIndex.size());
+            return;
+        }
+
+        log.warn("Cache inválido, não foi possível atualizar.");
     }
 
     private static void createMapSkiToCertificate(List<X509Certificate> certificates) {
@@ -39,5 +49,16 @@ public class Cache {
 
     public static X509Certificate getCertificateBySki(String ski) {
         return skiIndex.get(ski);
+    }
+
+    public static void setCacheValid(boolean cacheValid) {
+        isCacheValid = cacheValid;
+        if (!cacheValid) {
+            skiIndex.clear();
+        }
+    }
+
+    public static boolean isCacheValid() {
+        return isCacheValid;
     }
 }

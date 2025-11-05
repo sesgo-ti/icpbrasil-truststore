@@ -1,7 +1,10 @@
 package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
-import org.bouncycastle.asn1.*;
+import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.asn1.ASN1TaggedObject;
+import org.bouncycastle.asn1.DERIA5String;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 
