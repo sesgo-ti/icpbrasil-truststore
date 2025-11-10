@@ -9,7 +9,6 @@ variables:
   IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/icp-brasil-trust-store
   HARBOR_USERNAME: $CI_REGISTRY_USER
   HARBOR_PASSWORD: $CI_REGISTRY_PASSWORD
-  TRUSTSTORE_FILE: mytruststore.jks
 
 #-------------------------------------------
 # Etapa 1 - Build e Push da Imagem
@@ -34,48 +33,44 @@ build-push:
     - fhir
 
 #-------------------------------------------
-# Etapa 2 - Deploy remoto (via SSH e docker-compose.prod.yml)
+# Etapa 2 - Deploy remoto via SSH
 #-------------------------------------------
 deploy-prod:
   image: alpine:3.20
   stage: deploy
+  tags:
+    - fhir
 
   before_script:
     - apk add --no-cache openssh-client docker-cli docker-compose
     - mkdir -p ~/.ssh
     - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+    - ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts
     - echo "$MYTRUSTSTORE_BASE64" | base64 -d > mytruststore.jks
 
   script:
-    - echo "Copiando arquivos para $DEPLOY_USER@$DEPLOY_HOST..."
-    - scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no docker-compose.prod.yml mytruststore.jks $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/
+    - echo "Criando diretório remoto..."
+    - ssh -i ~/.ssh/id_ed25519 $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_PATH"
 
-    - echo "Executando deploy remoto..."
-    - |
-      ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST << 'EOF'
-      set -e
-      echo "Diretório de trabalho: $DEPLOY_PATH"
-      cd $DEPLOY_PATH
+    - echo "Copiando arquivos para o servidor remoto..."
+    - scp -i ~/.ssh/id_ed25519 docker-compose.prod.yml mytruststore.jks $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/
 
-      echo "Login no Harbor..."
-      echo "$HARBOR_PASSWORD" | docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" --password-stdin
-
-      echo "Atualizando imagem..."
-      docker compose -f docker-compose.prod.yml pull
-
-      echo "Subindo containers..."
-      docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-      echo "Limpando imagens antigas..."
-      docker image prune -af || true
-
-      echo "Containers ativos:"
+    - echo "Executando atualização remota da aplicação..."
+    - ssh -i ~/.ssh/id_ed25519 $DEPLOY_USER@$DEPLOY_HOST "
+      set -e;
+      cd $DEPLOY_PATH;
+      echo 'Login no Harbor...';
+      echo \"$HARBOR_PASSWORD\" | docker login $HARBOR_REGISTRY -u $HARBOR_USERNAME --password-stdin;
+      echo 'Atualizando imagens...';
+      docker compose -f docker-compose.prod.yml pull;
+      echo 'Subindo containers...';
+      docker compose -f docker-compose.prod.yml up -d --remove-orphans;
+      echo 'Limpando imagens antigas...';
+      docker image prune -af || true;
+      echo 'Containers ativos:';
       docker ps
-      EOF
+      "
 
   after_script:
     - rm -f mytruststore.jks ~/.ssh/id_ed25519
-  tags:
-    - fhir
