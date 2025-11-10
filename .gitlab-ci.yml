@@ -1,0 +1,34 @@
+stages:
+  - build
+
+# Variáveis globais
+variables:
+  HARBOR_REGISTRY: harbor.saude-go.net
+  HARBOR_PROJECT: bigdata
+  IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/icp-brasil-trust-store
+  HARBOR_USERNAME: $CI_REGISTRY_USER
+  HARBOR_PASSWORD: $CI_REGISTRY_PASSWORD
+#----------------------BUILD E PUSH DA IMAGEM--------------------------------
+build-push:
+  image: docker:20.10.16
+  stage: build
+  services:
+    - name: docker:20.10.16-dind
+      alias: docker
+  before_script:
+    - echo "Fazendo login no Harbor..."
+    - echo $HARBOR_PASSWORD | docker login $HARBOR_REGISTRY -u $HARBOR_USERNAME --password-stdin
+    - echo "Login no Harbor realizado com sucesso!"
+  after_script:
+    - echo "Fazendo logout do Harbor..."
+    - docker logout $HARBOR_REGISTRY
+    - echo "Logout do Harbor realizado com sucesso!"
+  tags:
+    - fhir
+  script:
+    - docker build -t $IMAGE_NAME:$CI_PIPELINE_ID -t $IMAGE_NAME:latest .
+    - docker push $IMAGE_NAME:$CI_PIPELINE_ID
+    - docker push $IMAGE_NAME:latest
+  only:
+    changes:
+      - Dockerfile
