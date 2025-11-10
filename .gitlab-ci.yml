@@ -29,6 +29,3 @@ build-push:
     - docker build -t $IMAGE_NAME:$CI_PIPELINE_ID -t $IMAGE_NAME:latest .
     - docker push $IMAGE_NAME:$CI_PIPELINE_ID
     - docker push $IMAGE_NAME:latest
-  only:
-    changes:
-      - Dockerfile
