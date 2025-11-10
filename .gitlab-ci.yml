@@ -61,3 +61,5 @@ deploy-prod:
 
   after_script:
     - rm -f mytruststore.jks
+  tags:
+    - fhir
