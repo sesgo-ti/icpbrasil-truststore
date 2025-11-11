@@ -16,7 +16,7 @@ services:
       VAULT_PORT: ${VAULT_PORT:-8200}
 
       # Configuração do MinIO
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio.clusterb.saude-go.net}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
 
