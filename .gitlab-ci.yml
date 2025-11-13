@@ -1,0 +1,113 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  # Registry configuration
+  HARBOR_REGISTRY: harbor.saude-go.net
+  HARBOR_PROJECT: bigdata
+  IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/icp-brasil-trust-store
+  HARBOR_USERNAME: $CI_REGISTRY_USER
+  HARBOR_PASSWORD: $CI_REGISTRY_PASSWORD
+  
+  # Default values (can be overridden in GitLab CI/CD Variables)
+  VAULT_HOST: hl7-fhir.saude-go.net
+  VAULT_PORT: "8200"
+  MINIO_ENDPOINT: minio.clusterb.saude-go.net
+  TRUSTSTORE_PASSWORD: changeit
+
+#-------------------------------------------
+# Etapa 1 - Build e Push da Imagem
+#-------------------------------------------
+build-push:
+  image: docker:20.10.16
+  stage: build
+  services:
+    - name: docker:20.10.16-dind
+  before_script:
+    - echo "Login no Harbor..."
+    - echo "$HARBOR_PASSWORD" | docker login "$HARBOR_REGISTRY" -u "$HARBOR_USERNAME" --password-stdin
+  script:
+    - echo "Build da imagem Docker..."
+    - docker build -t $IMAGE_NAME:$CI_PIPELINE_ID -t $IMAGE_NAME:latest .
+    - echo "Push da imagem para o Harbor..."
+    - docker push $IMAGE_NAME:$CI_PIPELINE_ID
+    - docker push $IMAGE_NAME:latest
+  after_script:
+    - docker logout $HARBOR_REGISTRY
+  tags:
+    - fhir
+
+#-------------------------------------------
+# Etapa 2 - Deploy remoto via SSH
+#-------------------------------------------
+deploy-prod:
+  image: alpine:3.20
+  stage: deploy
+  tags:
+    - fhir
+
+  before_script:
+    - apk add --no-cache openssh-client docker-cli docker-compose
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts
+    - echo "$MYTRUSTSTORE_BASE64" | base64 -d > mytruststore.jks
+
+  script:
+    - echo "Validando variáveis de ambiente obrigatórias..."
+    - |
+      MISSING_VARS=""
+      [ -z "$VAULT_TOKEN" ] && MISSING_VARS="$MISSING_VARS VAULT_TOKEN"
+      [ -z "$MINIO_ACCESS_KEY" ] && MISSING_VARS="$MISSING_VARS MINIO_ACCESS_KEY"
+      [ -z "$MINIO_SECRET_KEY" ] && MISSING_VARS="$MISSING_VARS MINIO_SECRET_KEY"
+      [ -z "$DEPLOY_HOST" ] && MISSING_VARS="$MISSING_VARS DEPLOY_HOST"
+      [ -z "$DEPLOY_USER" ] && MISSING_VARS="$MISSING_VARS DEPLOY_USER"
+      [ -z "$DEPLOY_PATH" ] && MISSING_VARS="$MISSING_VARS DEPLOY_PATH"
+      [ -z "$DEPLOY_SSH_KEY" ] && MISSING_VARS="$MISSING_VARS DEPLOY_SSH_KEY"
+      [ -z "$MYTRUSTSTORE_BASE64" ] && MISSING_VARS="$MISSING_VARS MYTRUSTSTORE_BASE64"
+      if [ -n "$MISSING_VARS" ]; then
+        echo "ERRO: As seguintes variáveis obrigatórias não estão configuradas:$MISSING_VARS"
+        echo "Configure essas variáveis em Settings > CI/CD > Variables no GitLab"
+        exit 1
+      fi
+      echo "Todas as variáveis obrigatórias estão configuradas!"
+
+    - echo "Criando diretório remoto..."
+    - ssh -i ~/.ssh/id_ed25519 $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_PATH"
+
+    - echo "Criando arquivo .env com variáveis de ambiente..."
+    - |
+      cat > .env.remote << EOF
+      VAULT_TOKEN=$VAULT_TOKEN
+      VAULT_HOST=${VAULT_HOST:-hl7-fhir.saude-go.net}
+      VAULT_PORT=${VAULT_PORT:-8200}
+      MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio.clusterb.saude-go.net}
+      MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY
+      MINIO_SECRET_KEY=$MINIO_SECRET_KEY
+      TRUSTSTORE_PASSWORD=${TRUSTSTORE_PASSWORD:-changeit}
+      EOF
+
+    - echo "Copiando arquivos para o servidor remoto..."
+    - scp -i ~/.ssh/id_ed25519 docker-compose.prod.yml mytruststore.jks .env.remote $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/
+    - ssh -i ~/.ssh/id_ed25519 $DEPLOY_USER@$DEPLOY_HOST "mv $DEPLOY_PATH/.env.remote $DEPLOY_PATH/.env"
+
+    - echo "Executando atualização remota da aplicação..."
+    - ssh -i ~/.ssh/id_ed25519 $DEPLOY_USER@$DEPLOY_HOST "
+      set -e;
+      cd $DEPLOY_PATH;
+      echo 'Login no Harbor...';
+      echo \"$HARBOR_PASSWORD\" | docker login $HARBOR_REGISTRY -u $HARBOR_USERNAME --password-stdin;
+      echo 'Atualizando imagens...';
+      docker compose -f docker-compose.prod.yml pull;
+      echo 'Subindo containers...';
+      docker compose -f docker-compose.prod.yml up -d --remove-orphans;
+      echo 'Limpando imagens antigas...';
+      docker image prune -af || true;
+      echo 'Containers ativos:';
+      docker ps
+      "
+
+  after_script:
+    - rm -f mytruststore.jks .env.remote ~/.ssh/id_ed25519
