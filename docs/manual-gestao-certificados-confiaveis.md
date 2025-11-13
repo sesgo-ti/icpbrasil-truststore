@@ -4,7 +4,17 @@ Objetivo: definir o processo de baixar um certificado a partir da fonte oficial,
 
 **Importante**: o fluxo definido é manual e para ser executado manualmente.
 
-Exemplo usado: certificado raiz ISRG Root X1 da Let's Encrypt, disponível em `https://letsencrypt.org/certs/isrgrootx1.pem`.
+### Convenção de Nomes Genéricos
+
+Nos comandos deste manual, você verá **`CERTNAME`** como nome genérico. Substitua por um nome simples que identifique seu certificado:
+
+- `CERTNAME` → nome base do certificado (ex: `isrgrootx1`, `e8-cross`, `vault-ssl`)
+- `CERTNAME.pem` → arquivo do certificado baixado
+- `CERTNAME.json` → arquivo JSON de registro
+
+**Exemplo usado neste manual:** certificado raiz ISRG Root X1 da Let's Encrypt
+- URL: `https://letsencrypt.org/certs/isrgrootx1.pem`
+- `CERTNAME` = `isrgrootx1`
 Este exemplo não é "acidental", pois o portal do ITI (ICP-Brasil) que disponibiliza os certificados vigentes das CAs usa um certificado da Let's Encrypt.
 Ou seja, para que uma aplicação possa baixar os certificados das CAs vigentes da ICP-Brasil, ele terá que construir um truststore com o certificado baixado. 
 Sem esse passo a segurança pode ser comprometida.
@@ -50,10 +60,14 @@ http --download "https://letsencrypt.org/certs/isrgrootx1.pem" --output "./isrgr
 ```
 
 Resultado esperado
-- Arquivo `isrgrootx1.pem` criado no diretório atual, com tamanho > 0 byte. Verifique se o OpenSSL consegue ler:
+- Arquivo `CERTNAME.pem` criado no diretório atual, com tamanho > 0 byte. Verifique se o OpenSSL consegue ler:
 
 ```bash
-openssl x509 -in "./isrgrootx1.pem" -noout -subject
+# Substitua CERTNAME pelo nome escolhido
+openssl x509 -in "CERTNAME.pem" -noout -subject
+
+# Exemplo: para isrgrootx1
+openssl x509 -in "isrgrootx1.pem" -noout -subject
 ```
 
 ### Passo 3 — Calcular o fingerprint SHA-256 do certificado
@@ -61,12 +75,14 @@ O que fazer
 - Gere o fingerprint SHA-256 localmente. Você pode calcular de duas maneiras equivalentes:
 
 ```bash
+# Substitua CERTNAME pelo nome escolhido
+
 # 3.A) Fingerprint direto via OpenSSL (formato HEX com ":" entre bytes)
-openssl x509 -in "./isrgrootx1.pem" -noout -fingerprint -sha256
+openssl x509 -in "CERTNAME.pem" -noout -fingerprint -sha256
 
 # 3.B) Hash do certificado em DER (deve bater com 3.A ignorando formatação)
-openssl x509 -in "./isrgrootx1.pem" -outform der -out "./isrgrootx1.der"
-openssl dgst -sha256 "./isrgrootx1.der"
+openssl x509 -in "CERTNAME.pem" -outform der -out "CERTNAME.der"
+openssl dgst -sha256 "CERTNAME.der"
 ```
 
 Resultado esperado
@@ -77,11 +93,13 @@ O que fazer
 - Exibir os campos principais do certificado (sujeito/issuer/validade) e compare o fingerprint calculado no Passo 3 com o valor oficial (veja Passo 1).
 
 ```bash
+# Substitua CERTNAME pelo nome escolhido
+
 # Com OpenSSL (detalhes completos)
-openssl x509 -in "./isrgrootx1.pem" -noout -text | more
+openssl x509 -in "CERTNAME.pem" -noout -text | more
 
 # Com keytool (JDK)
-keytool -printcert -v -file "./isrgrootx1.pem"
+keytool -printcert -v -file "CERTNAME.pem"
 ```
 
 Dica: ao comparar o fingerprint, ignore maiúsculas/minúsculas e separadores (`:` ou espaços). O conteúdo hexadecimal deve coincidir integralmente.
@@ -105,8 +123,14 @@ O que fazer
 - O SPKI (Subject Public Key Info) já está presente no certificado. Aqui, você deve calcular o hash SHA-256 sobre o SPKI em formato DER e codificar o resultado em Base64 — esse é o pin de SPKI usado para pinning em tempo de execução.
 
 ```bash
-# Extrai o SPKI (PUBLIC KEY), converte para DER, calcula SHA-256 e codifica em Base64
-openssl x509 -in "./isrgrootx1.pem" -noout -pubkey \
+# Substitua CERTNAME pelo nome escolhido
+openssl x509 -in "CERTNAME.pem" -noout -pubkey \
+  | openssl pkey -pubin -outform der \
+  | openssl dgst -sha256 -binary \
+  | openssl enc -base64
+
+# Exemplo: para isrgrootx1
+openssl x509 -in "isrgrootx1.pem" -noout -pubkey \
   | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
   | openssl enc -base64
@@ -118,10 +142,11 @@ Resultado esperado
 ### Passo 6 — Montar o JSON de registro
 
 O que fazer
-- Consolidar em um arquivo JSON os dados obtidos e aqueles calculados. Este arquivo será registrado (Passo 8). Monte o JSON garantindo exatidão dos valores.
+- Consolidar em um arquivo JSON os dados obtidos e aqueles calculados. Este arquivo será registrado (Passo 7). Monte o JSON garantindo exatidão dos valores.
 
 Sugestão de nome do arquivo
-- `isrgrootx1.json` (no mesmo diretório do `isrgrootx1.pem`).
+- `CERTNAME.json` (no mesmo diretório do `CERTNAME.pem`)
+- Exemplo: `isrgrootx1.json` para o certificado `isrgrootx1.pem`
 
 Exemplo de JSON (ilustrativo)
 ```json
@@ -138,9 +163,17 @@ Exemplo de JSON (ilustrativo)
 }
 ```
 
+**Como adicionar o conteúdo PEM ao JSON:**
+
 ```bash
-# Para transformar o arquivo PEM em uma única linha com \n para JSON
-jq --rawfile cert isr.pem 'isrgrootx1.pem = $cert' isrgrootx1.json > temp.json && mv temp.json isrgrootx1.json
+# Substitua CERTNAME pelo nome escolhido (ex: isrgrootx1, e8-cross, vault-ssl)
+jq --arg pem "$(cat CERTNAME.pem)" '.pem = $pem' CERTNAME.json > temp.json && mv temp.json CERTNAME.json
+```
+
+**Exemplo prático:**
+```bash
+# Para e8-cross: substitua CERTNAME por e8-cross
+jq --arg pem "$(cat e8-cross.pem)" '.pem = $pem' e8-cross.json > temp.json && mv temp.json e8-cross.json
 ```
 
 Resultado esperado
@@ -165,10 +198,15 @@ Opção A — Registrar no Cofre (HashiCorp Vault)
 
 Como registrar no Cofre (HashCorp Vault)
 - Use a UI do HashCorp Vault ou a CLI (`vault kv patch`) para gravar os campos definidos no JSON do Passo 6 no caminho definido (ex.: `kv/certificates`).
+
 ```bash
-# Exemplo usando CLI
+# Substitua CERTNAME pelo nome escolhido
+vault kv patch /kv/certificates CERTNAME=@CERTNAME.json
+
+# Exemplo: para isrgrootx1
 vault kv patch /kv/certificates isrgrootx1=@isrgrootx1.json
 ```
+
 - Garanta que a auditoria do Cofre esteja habilitada e que as políticas de acesso estejam corretas.
 
 Opção B — Fallback: registrar em arquivo (filesystem)
@@ -178,8 +216,16 @@ Opção B — Fallback: registrar em arquivo (filesystem)
         - Salve apenas o JSON de registro (com `pem`) no diretório. 
 
 Como registrar no filesystem (fallback)
-- Crie um diretório padronizado (ex.: `registries/certificates/isrg-root-x1`).
-- Salve o JSON de registro montado no Passo 6 como `isrgrootx1.json` no diretório.
+
+```bash
+# Crie diretório e salve o JSON
+mkdir -p registries/certificates/CERTNAME
+cp CERTNAME.json registries/certificates/CERTNAME/
+
+# Exemplo: para isrgrootx1
+mkdir -p registries/certificates/isrgrootx1
+cp isrgrootx1.json registries/certificates/isrgrootx1/
+```
 
 Resultado esperado
 - Certificado e metadados armazenados de forma segura, com registro auditável completo no Vault; quando indisponível, registro de fallback consistente e versionável no filesystem.
