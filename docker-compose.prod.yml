@@ -1,33 +1,25 @@
-# IMPORTANTE: Antes de executar, você deve:
-#   1. Criar o arquivo mytruststore.jks com o certificado SSL do Vault
-#   2. Garantir que mytruststore.jks está no diretório do projeto
-#
-# Para criar o truststore, siga: docs/manual-configuracao-certificado-vault.md
-#
-# Existe uma cópia do arquivo no diretório src/test/resources/mytruststore.jks para testes
-
 services:
   icp-brasil-trust-store:
-    build: .
-    container_name: icp-brasil-trust-store-dev
+    image: harbor.saude-go.net/bigdata/icp-brasil-trust-store:latest
+    container_name: icp-brasil-trust-store-prod
     ports:
-      - "8080:8080"
-    
+      - "8085:8080"
+
     # Monta o truststore como volume read-only para segurança
     volumes:
       - ./mytruststore.jks:/app/config/mytruststore.jks:ro
-    
+
     environment:
       # Configuração do Vault
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_HOST: ${VAULT_HOST:-hl7-fhir.saude-go.net}
       VAULT_PORT: ${VAULT_PORT:-8200}
-      
+
       # Configuração do MinIO
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio.clusterb.saude-go.net}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      
+
       # Configuração do TrustStore (CRÍTICO para conexão HTTPS com Vault)
       # Esta é a mesma configuração usada nos testes (pom.xml)
       JAVA_OPTS: >-
