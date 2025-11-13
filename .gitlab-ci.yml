@@ -2,15 +2,15 @@ stages:
   - build
   - deploy
 
-# Variáveis globais
 variables:
+  # Registry configuration
   HARBOR_REGISTRY: harbor.saude-go.net
   HARBOR_PROJECT: bigdata
   IMAGE_NAME: $HARBOR_REGISTRY/$HARBOR_PROJECT/icp-brasil-trust-store
   HARBOR_USERNAME: $CI_REGISTRY_USER
   HARBOR_PASSWORD: $CI_REGISTRY_PASSWORD
   
-  # Valores padrão para variáveis de ambiente (podem ser sobrescritos no GitLab)
+  # Default values (can be overridden in GitLab CI/CD Variables)
   VAULT_HOST: hl7-fhir.saude-go.net
   VAULT_PORT: "8200"
   MINIO_ENDPOINT: minio.clusterb.saude-go.net
@@ -56,6 +56,24 @@ deploy-prod:
     - echo "$MYTRUSTSTORE_BASE64" | base64 -d > mytruststore.jks
 
   script:
+    - echo "Validando variáveis de ambiente obrigatórias..."
+    - |
+      MISSING_VARS=""
+      [ -z "$VAULT_TOKEN" ] && MISSING_VARS="$MISSING_VARS VAULT_TOKEN"
+      [ -z "$MINIO_ACCESS_KEY" ] && MISSING_VARS="$MISSING_VARS MINIO_ACCESS_KEY"
+      [ -z "$MINIO_SECRET_KEY" ] && MISSING_VARS="$MISSING_VARS MINIO_SECRET_KEY"
+      [ -z "$DEPLOY_HOST" ] && MISSING_VARS="$MISSING_VARS DEPLOY_HOST"
+      [ -z "$DEPLOY_USER" ] && MISSING_VARS="$MISSING_VARS DEPLOY_USER"
+      [ -z "$DEPLOY_PATH" ] && MISSING_VARS="$MISSING_VARS DEPLOY_PATH"
+      [ -z "$DEPLOY_SSH_KEY" ] && MISSING_VARS="$MISSING_VARS DEPLOY_SSH_KEY"
+      [ -z "$MYTRUSTSTORE_BASE64" ] && MISSING_VARS="$MISSING_VARS MYTRUSTSTORE_BASE64"
+      if [ -n "$MISSING_VARS" ]; then
+        echo "ERRO: As seguintes variáveis obrigatórias não estão configuradas:$MISSING_VARS"
+        echo "Configure essas variáveis em Settings > CI/CD > Variables no GitLab"
+        exit 1
+      fi
+      echo "Todas as variáveis obrigatórias estão configuradas!"
+
     - echo "Criando diretório remoto..."
     - ssh -i ~/.ssh/id_ed25519 $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_PATH"
 
