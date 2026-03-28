@@ -20,7 +20,7 @@ import static org.mockito.Mockito.when;
 @ActiveProfiles("test")
 public class MinioRepositoryTest {
     @MockitoBean
-    MinioRepository minioRepository;
+    TrustStoreRepository trustStoreRepository;
 
     @Autowired
     Util util;
@@ -38,18 +38,18 @@ public class MinioRepositoryTest {
                 StandardCharsets.UTF_8
         );
 
-        when(minioRepository.recuperarZip())
+        when(trustStoreRepository.recuperarZip())
                 .thenReturn(zipInputStream);
-        when(minioRepository.recuperarHash())
+        when(trustStoreRepository.recuperarHash())
                 .thenReturn(hashContent.split("  ")[0].trim());
-        when(minioRepository.recuperarUltimaConfirmacao())
+        when(trustStoreRepository.recuperarUltimaConfirmacao())
                 .thenReturn(Instant.parse(ultimaConfirmacaoString));
     }
 
 
     @Test
     void testRecuperarZip() {
-        try (InputStream is = minioRepository.recuperarZip()) {
+        try (InputStream is = trustStoreRepository.recuperarZip()) {
             assert is != null;
             byte[] bytes = is.readAllBytes();
             assert bytes.length > 0;
@@ -60,14 +60,14 @@ public class MinioRepositoryTest {
 
     @Test
     void testRecuperarHash() {
-        String hash = minioRepository.recuperarHash();
+        String hash = trustStoreRepository.recuperarHash();
 
         assertEquals("bbc9703e33df4be5b23e900177a3672191ca2f9c5dc68eaf129562ea43f90b89a6525b61b427212dce0b8026ec26ef2ca06ffe491ab911d0bac9722faefdfde2", hash);
     }
 
     @Test
     void testRecuperarUltimaConfirmacao() {
-        Instant ultimaConfirmacao = minioRepository.recuperarUltimaConfirmacao();
+        Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
 
         assertEquals(Instant.parse("2025-10-08T02:10:54.784822Z"), ultimaConfirmacao);
     }

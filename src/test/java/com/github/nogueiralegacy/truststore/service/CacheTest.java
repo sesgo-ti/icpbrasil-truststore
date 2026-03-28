@@ -2,7 +2,7 @@ package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
-import com.github.nogueiralegacy.truststore.repository.MinioRepository;
+import com.github.nogueiralegacy.truststore.repository.TrustStoreRepository;
 import com.github.nogueiralegacy.truststore.util.Downloader;
 import com.github.nogueiralegacy.truststore.util.Util;
 import lombok.SneakyThrows;
@@ -33,7 +33,7 @@ class CacheTest {
     Util util;
 
     @Autowired
-    MinioRepository minioRepository;
+    TrustStoreRepository trustStoreRepository;
 
     X509Certificate testCertificate;
 
@@ -50,7 +50,7 @@ class CacheTest {
         var icpBrasilCertificateProvider = new IcpBrasilCertificateProvider(
                 trustStoreConfig,
                 downloader,
-                minioRepository
+                trustStoreRepository
         );
         Cache.setCacheValid(true);
         Cache.refreshCache(icpBrasilCertificateProvider.getCertificates());

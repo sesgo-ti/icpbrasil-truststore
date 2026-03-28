@@ -2,7 +2,7 @@ package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
-import com.github.nogueiralegacy.truststore.repository.MinioRepository;
+import com.github.nogueiralegacy.truststore.repository.TrustStoreRepository;
 import com.github.nogueiralegacy.truststore.util.Downloader;
 import com.github.nogueiralegacy.truststore.util.HashValidator;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +25,14 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
     private final Downloader downloader;
     private final String icpBrasilZipUrl;
     private final String icpBrasilHashUrl;
-    private final MinioRepository minioRepository;
+    private final TrustStoreRepository trustStoreRepository;
 
     public IcpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig, Downloader downloader,
-            MinioRepository minioRepository) {
+            TrustStoreRepository trustStoreRepository) {
         this.downloader = downloader;
         this.icpBrasilZipUrl = trustStoreConfig.getCertificateUrl();
         this.icpBrasilHashUrl = trustStoreConfig.getHashUrl();
-        this.minioRepository = minioRepository;
+        this.trustStoreRepository = trustStoreRepository;
     }
 
     @Override
@@ -59,30 +59,30 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
     }
 
     private byte[] obterZipData() {
-        // Tenta primeiro do MinIO
-        try (var zipStream = minioRepository.recuperarZip()) {
+        // Tenta primeiro do repositório local
+        try (var zipStream = trustStoreRepository.recuperarZip()) {
             byte[] zipData = IOUtils.toByteArray(zipStream);
             if (zipData != null && zipData.length > 0) {
                 log.info("ZIP obtido do repositório local");
                 return zipData;
             }
         } catch (Exception e) {
-            log.debug("Erro ao recuperar ZIP do MinIO: {}", e.getMessage());
+            log.debug("Erro ao recuperar ZIP do repositório local: {}", e.getMessage());
         }
 
         return baixarZipIcpBrasil();
     }
 
     private String obterHashEsperado() {
-        // Tenta primeiro do MinIO
+        // Tenta primeiro do repositório local
         try {
-            String hash = minioRepository.recuperarHash();
+            String hash = trustStoreRepository.recuperarHash();
             if (StringUtils.hasText(hash)) {
                 log.info("Hash obtido do repositório local");
                 return hash;
             }
         } catch (Exception e) {
-            log.debug("Erro ao recuperar hash do MinIO: {}", e.getMessage());
+            log.debug("Erro ao recuperar hash do repositório local: {}", e.getMessage());
         }
 
         return baixarHashIcpBrasil();

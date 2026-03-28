@@ -5,6 +5,7 @@ import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -14,6 +15,7 @@ import java.time.Instant;
 
 @Service
 @Slf4j
+@ConditionalOnProperty(name = "truststore.storage.type", havingValue = "minio")
 public class MinioRepository implements TrustStoreRepository {
     private final MinioClient minioClient;
     private final TrustStoreConfig trustStoreConfig;

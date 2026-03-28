@@ -65,9 +65,14 @@ public class TrustStoreConfig {
     @Data
     public static class StorageConfig {
         /**
-         * Nome do container de armazenamento (bucket no S3/MinIO, diretório no FileSystem)
+         * Nome do container de armazenamento (bucket no S3/MinIO)
          */
         private String containerName;
+
+        /**
+         * Diretório base para armazenamento no filesystem (usado quando storage.type=filesystem)
+         */
+        private String filesystemBaseDir;
 
         /**
          * Caminho do arquivo compactado do truststore
