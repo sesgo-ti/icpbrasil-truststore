@@ -32,9 +32,9 @@ truststore-icpbrasil:
   # Estratégia de Armazenamento
   # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3/MinIO)
   storage:
-    type: "${STORAGE_TYPE:filesystem}"  # Opções: filesystem | minio
-    filesystem-base-dir: "${STORAGE_FILESYSTEM_DIR:.data/truststore-icpbrasil}"
-    bucket-name: "${MINIO_BUCKET:staging}" # Nome do bucket (necessário para storage.type=minio)
+    type: "filesystem"  # Opções: filesystem | minio
+    filesystem-base-dir: ".data/truststore-icpbrasil"
+    bucket-name: "staging" # Nome do bucket (necessário para storage.type=minio)
     truststore-archive-path: "ACcompactado.zip"
     hash-file-path: "hash.txt"
     confirmation-file-path: "ultima_confirmacao.txt"
@@ -42,9 +42,13 @@ truststore-icpbrasil:
   # Credenciais para MinIO (Aplicável apenas se storage.type=minio)
   # [Resultado]: Conexão com serviço de objetos S3
   minio:
-    endpoint: "${MINIO_ENDPOINT:http://localhost:9000}"
+    endpoint: "${MINIO_ENDPOINT:localhost:9000}"
     access-key: "${MINIO_ACCESS_KEY:admin}"
     secret-key: "${MINIO_SECRET_KEY:password}"
+    # PEM da CA que assinou o cert do servidor MinIO (classpath: ou file:).
+    # Quando não definido, usa o trustManager global.
+    # Exemplo de uso externo: MINIO_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
+    ca-cert-path: "${MINIO_CA_CERT_PATH:file:/etc/ssl/certs/ca-certificates.crt}"
 
   # Diretório de Certificados Confiáveis Fixos
   # [Resultado]: Local onde o sistema busca certificados adicionais (JSON) no classpath ou disco

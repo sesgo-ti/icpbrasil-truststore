@@ -9,15 +9,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * Gerenciador do Trust Store principal da aplicação para validar conexões
  * a outros serviços.
- * 
+ * <p>
  * Usa o {@link CertificateProvider} do filesystem para obter certificados confiáveis
  * de terceiros (ex: Let's Encrypt) e monta o SSLContext para conexões HTTPS.
  */
@@ -32,20 +35,45 @@ public class TrustStoreManager {
     }
     
     /**
-     * Cria o SSL Context principal EXCLUSIVAMENTE com certificados confiáveis do provider.
-     * Este SSL Context é usado para validar conexões HTTPS a serviços externos.
+     * Cria o X509TrustManager com os certificados confiáveis do provider.
+     * Exposto como bean para ser reutilizado por outros clientes HTTP (ex: MinIO).
+     */
+    @Bean
+    public X509TrustManager trustManager() {
+        try {
+            log.info("Criando TrustManager com certificados confiáveis");
+
+            KeyStore trustStore = createTrustStore();
+            addTrustedCertificates(trustStore);
+
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(trustStore);
+
+            return Arrays.stream(tmf.getTrustManagers())
+                    .filter(tm -> tm instanceof X509TrustManager)
+                    .map(tm -> (X509TrustManager) tm)
+                    .findFirst()
+                    .orElseThrow(() -> new TrustStoreCreationException("Nenhum X509TrustManager encontrado", null));
+
+        } catch (TrustStoreCreationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Erro crítico ao criar TrustManager: {}", e.getMessage(), e);
+            throw new TrustStoreCreationException("Falha na criação do TrustManager", e);
+        }
+    }
+
+    /**
+     * Cria o SSL Context principal usando o TrustManager já construído.
      * IMPORTANTE: Não inclui certificados do sistema Java padrão por questões de segurança.
      */
     @Bean
-    public SSLContext sslContext() {
+    public SSLContext sslContext(X509TrustManager trustManager) {
         try {
             log.info("Criando SSL context principal com certificados confiáveis");
-            
-            KeyStore trustStore = createTrustStore();
-            addTrustedCertificates(trustStore);
-            
-            return buildSSLContext(trustStore);
-            
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[]{trustManager}, null);
+            return sslContext;
         } catch (Exception e) {
             log.error("Erro crítico ao criar SSL context principal: {}", e.getMessage(), e);
             throw new TrustStoreCreationException("Falha na criação do Trust Store principal", e);
@@ -94,16 +122,6 @@ public class TrustStoreManager {
             log.error("Erro ao adicionar certificado confiável {} ao TrustStore: {}", subject, e.getMessage(), e);
             throw new CertificateAdditionException("Falha ao adicionar certificado confiável: " + subject, e);
         }
-    }
-    
-    private SSLContext buildSSLContext(KeyStore trustStore) throws Exception {
-        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(trustStore);
-
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(null, tmf.getTrustManagers(), null);
-        
-        return sslContext;
     }
     
     /**
