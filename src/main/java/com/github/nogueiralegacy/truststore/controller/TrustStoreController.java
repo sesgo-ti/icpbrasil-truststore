@@ -2,6 +2,7 @@ package com.github.nogueiralegacy.truststore.controller;
 
 import com.github.nogueiralegacy.truststore.service.Cache;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import java.util.Base64;
 @Slf4j
 @RestController
 @RequestMapping("/api/truststore")
+@ConditionalOnProperty(prefix = "truststore.rest", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class TrustStoreController {
     // Constantes para tipos de certificado
     private static final String TYPE_PEM = "pem";

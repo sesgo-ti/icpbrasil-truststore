@@ -3,18 +3,11 @@ package com.github.nogueiralegacy.truststore.service;
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
 import com.github.nogueiralegacy.truststore.repository.TrustStoreRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 import java.time.Instant;
-
-@EnableScheduling
-//Para o cron job não rodar em testes
-@Profile("!test")
 @Slf4j
 @Service
 public class TrustStoreService {
@@ -150,17 +143,6 @@ public class TrustStoreService {
         }
     }
 
-    /**
-     * Executa a verificação automática periódica de sincronização do repositório local.
-     *
-     * <p><strong>NOTA:</strong> Este método usa SpEL diretamente em vez de {@link TrustStoreConfig}
-     * porque {@code @Scheduled(fixedRate)} requer uma constante em tempo de compilação.
-     * Variáveis de instância causam erro "Attribute value must be constant".</p>
-     *
-     * <p>A expressão {@code #{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}} lê a
-     * propriedade do application.yaml e converte horas para milissegundos (padrão: 2 horas).</p>
-     */
-    @Scheduled(fixedRateString = "#{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
     public void refresh() {
         try {
             log.info("Iniciando verificação automática de sincronização do repositório local");
