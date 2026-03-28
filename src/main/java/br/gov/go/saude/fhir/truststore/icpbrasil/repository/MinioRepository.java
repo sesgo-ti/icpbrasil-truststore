@@ -15,7 +15,7 @@ import java.time.Instant;
 
 @Service
 @Slf4j
-@ConditionalOnProperty(name = "truststore.storage.type", havingValue = "minio")
+@ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "minio")
 public class MinioRepository implements TrustStoreRepository {
     private final MinioClient minioClient;
     private final TrustStoreConfig trustStoreConfig;

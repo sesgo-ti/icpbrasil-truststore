@@ -25,7 +25,7 @@ import java.time.Instant;
  */
 @Service
 @Slf4j
-@ConditionalOnProperty(name = "truststore.storage.type", havingValue = "filesystem", matchIfMissing = true)
+@ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "filesystem", matchIfMissing = true)
 public class FilesystemTrustStoreRepository implements TrustStoreRepository {
 
     private final Path baseDir;
