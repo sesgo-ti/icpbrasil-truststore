@@ -2,28 +2,51 @@ spring:
   application:
     name: trust-store-icpbrasil
 
+# Configurações do TrustStore ICP-Brasil
 truststore-icpbrasil:
+  # URLs Oficiais da ICP-Brasil para download dos certificados e hash
+  # [Resultado]: Define de onde o sistema baixa as atualizações
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
   hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+
+  # Configurações de Rede e Resiliência
+  # [Resultado]: Controla o comportamento em caso de falha na conexão
   network:
-    download-timeout-seconds: 60
-    max-retries: 3
-    retry-interval-seconds: 30
-  cache-ttl-critical-hours: 72
-  cache-ttl-max-hours: 168
-  refresh-interval-hours: 2
+    download-timeout-seconds: 60  # Tempo máximo de espera pelo download (30-300s)
+    max-retries: 3                # Número de tentativas em caso de erro (1-10)
+    retry-interval-seconds: 30    # Tempo entre tentativas (10-300s)
+
+  # Ciclo de Vida do Cache e Alertas
+  # [Resultado]: Controla quando o cache é considerado inválido ou crítico
+  refresh-interval-hours: 2       # Frequência de verificação de novas atualizações (Horas)
+  cache-ttl-critical-hours: 72    # Tempo sem atualização para entrar em estado CRÍTICO (Horas)
+  cache-ttl-max-hours: 168        # Tempo máximo de vida do cache antes de expirar (Horas)
+
+  # Ativação de Componentes Opcionais
+  # [Resultado]: Permite desligar partes do sistema se usado apenas como biblioteca
+  rest:
+    enabled: false                 # Expõe o endpoint /certificate para consulta externa
+  scheduling:
+    enabled: true                 # Ativa a rotina automática (Cron) de atualização em background
+
+  # Estratégia de Armazenamento
+  # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3/MinIO)
   storage:
-    type: "${STORAGE_TYPE:filesystem}"
+    type: "${STORAGE_TYPE:filesystem}"  # Opções: filesystem | minio
     filesystem-base-dir: "${STORAGE_FILESYSTEM_DIR:.data/truststore-icpbrasil}"
-    container-name: "staging"
+    bucket-name: "${MINIO_BUCKET:staging}" # Nome do bucket (necessário para storage.type=minio)
     truststore-archive-path: "ACcompactado.zip"
     hash-file-path: "hash.txt"
     confirmation-file-path: "ultima_confirmacao.txt"
 
+  # Credenciais para MinIO (Aplicável apenas se storage.type=minio)
+  # [Resultado]: Conexão com serviço de objetos S3
   minio:
-    endpoint: "${MINIO_ENDPOINT:minio.clusterb.saude-go.net}"
-    access-key: "${MINIO_ACCESS_KEY}"
-    secret-key: "${MINIO_SECRET_KEY}"
+    endpoint: "${MINIO_ENDPOINT:http://localhost:9000}"
+    access-key: "${MINIO_ACCESS_KEY:admin}"
+    secret-key: "${MINIO_SECRET_KEY:password}"
 
+  # Diretório de Certificados Confiáveis Fixos
+  # [Resultado]: Local onde o sistema busca certificados adicionais (JSON) no classpath ou disco
   trusted-certs:
     dir: "${TRUSTED_CERTS_DIR:classpath:registries/certificates}"

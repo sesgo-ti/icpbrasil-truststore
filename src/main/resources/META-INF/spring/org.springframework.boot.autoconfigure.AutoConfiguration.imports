@@ -1,1 +1,1 @@
-com.github.nogueiralegacy.truststore.config.TrustStoreAutoConfiguration
+br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreAutoConfiguration

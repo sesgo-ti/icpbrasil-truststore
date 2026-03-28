@@ -19,7 +19,7 @@ truststore-icpbrasil:
   storage:
     type: filesystem
     filesystem-base-dir: "target/test-truststore-icpbrasil"
-    container-name: "staging"
+    bucket-name: "staging"
     truststore-archive-path: "ACcompactado.zip"
     hash-file-path: "hash.txt"
     confirmation-file-path: "ultima_confirmacao.txt"
