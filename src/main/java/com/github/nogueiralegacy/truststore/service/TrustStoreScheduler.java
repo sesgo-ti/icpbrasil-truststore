@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @EnableScheduling
-@ConditionalOnProperty(prefix = "truststore.scheduling", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "truststore-icpbrasil.scheduling", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TrustStoreScheduler {
     private final TrustStoreService trustStoreService;
 
@@ -24,7 +24,7 @@ public class TrustStoreScheduler {
     /**
      * Executa a verificação automática periódica de sincronização do repositório local.
      */
-    @Scheduled(fixedRateString = "#{${truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
+    @Scheduled(fixedRateString = "#{${truststore-icpbrasil.refresh-interval-hours:2} * 60 * 60 * 1000}")
     public void scheduleRefresh() {
         log.info("Executando atualização agendada do TrustStore");
         trustStoreService.refresh();

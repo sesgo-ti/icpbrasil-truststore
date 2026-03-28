@@ -17,8 +17,8 @@ import java.util.Base64;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/truststore")
-@ConditionalOnProperty(prefix = "truststore.rest", name = "enabled", havingValue = "true", matchIfMissing = false)
+@RequestMapping("/certificate")
+@ConditionalOnProperty(prefix = "truststore-icpbrasil.rest", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class TrustStoreController {
     // Constantes para tipos de certificado
     private static final String TYPE_PEM = "pem";

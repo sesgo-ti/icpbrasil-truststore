@@ -1,8 +1,8 @@
 spring:
   application:
-    name: trust-store
+    name: trust-store-icpbrasil
 
-truststore:
+truststore-icpbrasil:
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
   hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
   network:
@@ -18,7 +18,7 @@ truststore:
     enabled: false
   storage:
     type: filesystem
-    filesystem-base-dir: "target/test-truststore"
+    filesystem-base-dir: "target/test-truststore-icpbrasil"
     container-name: "staging"
     truststore-archive-path: "ACcompactado.zip"
     hash-file-path: "hash.txt"

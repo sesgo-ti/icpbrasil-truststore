@@ -23,7 +23,7 @@ import java.security.cert.X509Certificate;
 @Validated
 @Configuration
 @ConditionalOnProperty(name = "truststore.storage.type", havingValue = "minio")
-@ConfigurationProperties(prefix = "truststore.minio")
+@ConfigurationProperties(prefix = "truststore-icpbrasil.minio")
 public class MinioProperties {
     @NotBlank(message = "MinIO Enpoint must be provided")
     private String endpoint;

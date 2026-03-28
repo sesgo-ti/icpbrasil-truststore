@@ -10,7 +10,7 @@
   </parent>
 
   <groupId>com.github.nogueiralegacy</groupId>
-  <artifactId>trust-store</artifactId>
+  <artifactId>trust-store-icpbrasil</artifactId>
   <version>1.0</version>
   <packaging>jar</packaging>
 
