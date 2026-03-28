@@ -1,9 +1,9 @@
 package com.github.nogueiralegacy.truststore.http;
 
 import com.github.nogueiralegacy.truststore.model.CertificateParser;
-import com.github.nogueiralegacy.truststore.service.VaultCertificateProvider;
-import lombok.RequiredArgsConstructor;
+import com.github.nogueiralegacy.truststore.service.CertificateProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -16,31 +16,33 @@ import java.util.List;
 
 /**
  * Gerenciador do Trust Store principal da aplicação para validar conexões
- * a outros serviços (não ao Vault).
+ * a outros serviços.
  * 
- * IMPORTANTE: Depende explicitamente do VaultClientHttpRequestFactory estar inicializado
- * pois precisa buscar certificados confiáveis do Vault, que por sua vez requer
- * o certificado SSL do Vault estar carregado primeiro.
+ * Usa o {@link CertificateProvider} do filesystem para obter certificados confiáveis
+ * de terceiros (ex: Let's Encrypt) e monta o SSLContext para conexões HTTPS.
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TrustStoreManager {
     
-    private final VaultCertificateProvider vaultCertificateProvider;
+    private final CertificateProvider certificateProvider;
+
+    public TrustStoreManager(@Qualifier("filesystemCertificateProvider") CertificateProvider certificateProvider) {
+        this.certificateProvider = certificateProvider;
+    }
     
     /**
-     * Cria o SSL Context principal EXCLUSIVAMENTE com certificados confiáveis do Vault.
-     * Este SSL Context é usado para validar outros serviços (não o Vault).
+     * Cria o SSL Context principal EXCLUSIVAMENTE com certificados confiáveis do provider.
+     * Este SSL Context é usado para validar conexões HTTPS a serviços externos.
      * IMPORTANTE: Não inclui certificados do sistema Java padrão por questões de segurança.
      */
     @Bean
     public SSLContext sslContext() {
         try {
-            log.info("Criando SSL context principal com certificados confiáveis do Vault");
+            log.info("Criando SSL context principal com certificados confiáveis");
             
             KeyStore trustStore = createTrustStore();
-            addTrustedCertificatesFromVault(trustStore);
+            addTrustedCertificates(trustStore);
             
             return buildSSLContext(trustStore);
             
@@ -57,28 +59,29 @@ public class TrustStoreManager {
         return trustStore;
     }
     
-    private void addTrustedCertificatesFromVault(KeyStore trustStore) {
+    private void addTrustedCertificates(KeyStore trustStore) {
         try {
-            List<X509Certificate> certificates = vaultCertificateProvider.getCertificates();
+            List<X509Certificate> certificates = certificateProvider.getCertificates();
             
             if (certificates.isEmpty()) {
-                log.error("Nenhum certificado confiável encontrado no Vault - TrustStore ficará vazio!");
-                throw new TrustStoreCreationException("TrustStore não pode ser criado sem certificados do Vault", null);
+                log.error("Nenhum certificado confiável encontrado - TrustStore ficará vazio!");
+                throw new TrustStoreCreationException("TrustStore não pode ser criado sem certificados confiáveis", null);
             }
 
             for (X509Certificate certificate : certificates) {
                 addCertificateToTrustStore(trustStore, certificate);
             }
             
-            log.info("Adicionados {} certificados confiáveis do Vault ao TrustStore principal", certificates.size());
+            log.info("Adicionados {} certificados confiáveis ao TrustStore principal", certificates.size());
             
         } catch (TrustStoreCreationException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Erro crítico ao carregar certificados confiáveis do Vault: {}", e.getMessage(), e);
-            throw new TrustStoreCreationException("Falha ao carregar certificados do Vault", e);
+            log.error("Erro crítico ao carregar certificados confiáveis: {}", e.getMessage(), e);
+            throw new TrustStoreCreationException("Falha ao carregar certificados confiáveis", e);
         }
     }
+
     
     private void addCertificateToTrustStore(KeyStore trustStore, X509Certificate certificate) {
         try {

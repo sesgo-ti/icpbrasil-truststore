@@ -1,10 +1,8 @@
 package com.github.nogueiralegacy.truststore.config;
 
-import io.minio.MinioClient;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
@@ -56,11 +54,10 @@ public class TrustStoreConfig {
      */
     private StorageConfig storage;
 
-    @Autowired
-    private MinioClient minIOClient;
-
-    @Autowired
-    private VaultProperties vaultProperties;
+    /**
+     * Configurações de certificados confiáveis (filesystem)
+     */
+    private TrustedCertsConfig trustedCerts;
 
     /**
      * Configurações de armazenamento genérico (S3, MinIO, FileSystem, etc.)
@@ -86,6 +83,17 @@ public class TrustStoreConfig {
          * Caminho do arquivo de última confirmação
          */
         private String confirmationFilePath;
+    }
+
+    /**
+     * Configurações de certificados confiáveis no filesystem
+     */
+    @Data
+    public static class TrustedCertsConfig {
+        /**
+         * Diretório contendo os arquivos JSON de certificados confiáveis
+         */
+        private String dir;
     }
 
     /**
