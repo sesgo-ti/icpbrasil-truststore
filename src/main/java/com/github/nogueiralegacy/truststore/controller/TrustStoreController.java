@@ -1,7 +1,6 @@
 package com.github.nogueiralegacy.truststore.controller;
 
 import com.github.nogueiralegacy.truststore.service.Cache;
-import com.github.nogueiralegacy.truststore.service.IcpBrasilCertificateProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,8 +12,7 @@ import java.security.cert.X509Certificate;
 import java.util.Base64;
 
 /**
- * Controller REST para gerenciar e consultar certificados do truststore.
- * Fornece endpoints para interagir com certificados armazenados no Vault.
+ * Controller REST para gerenciar e consultar certificados vigentes ICP-Brasil.
  */
 @Slf4j
 @RestController

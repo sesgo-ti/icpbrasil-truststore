@@ -2,21 +2,6 @@ spring:
   application:
     name: trust-store
 
-  config.import: vault://
-
-  cloud:
-    vault:
-      scheme: https
-      token: "${VAULT_TOKEN}"
-      host: "${VAULT_HOST:hl7-fhir.saude-go.net}"
-      port: "${VAULT_PORT:8200}"
-      authentication: token
-      connection-timeout: 5000
-      read-timeout: 15000
-
-      kv:
-        enabled: true
-
 truststore:
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
   hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
@@ -38,5 +23,5 @@ truststore:
     access-key: "${MINIO_ACCESS_KEY}"
     secret-key: "${MINIO_SECRET_KEY}"
 
-  vault:
-    certificate-path: 'certificates'  # Path dos certificados confiáveis no Vault
+  trusted-certs:
+    dir: "${TRUSTED_CERTS_DIR:classpath:registries/certificates}"

@@ -9,7 +9,6 @@ import java.time.Instant;
 
 /**
  * Modelo que representa os dados de um certificado conforme definido no manual de gestão.
- * Este formato é usado para armazenar certificados no Vault.
  */
 @Data
 @NoArgsConstructor
