@@ -16,7 +16,7 @@ import java.net.URISyntaxException;
  */
 @Data
 @Slf4j
-@ConfigurationProperties(prefix = "truststore")
+@ConfigurationProperties(prefix = "truststore-icpbrasil")
 public class TrustStoreConfig {
 
     /**
@@ -293,7 +293,7 @@ public class TrustStoreConfig {
 
         if (!StringUtils.hasText(storage.confirmationFilePath)) {
             throw new IllegalStateException("Caminho do arquivo de confirmação não pode ser null ou vazio. " +
-                    "Configure a propriedade 'truststore.icp-brasil.storage.confirmation-file-path'");
+                    "Configure a propriedade 'truststore-icpbrasil.storage.confirmation-file-path'");
         }
 
         log.debug("Configurações de storage validadas com sucesso");
