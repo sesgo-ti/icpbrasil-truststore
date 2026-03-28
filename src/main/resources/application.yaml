@@ -13,10 +13,12 @@ truststore:
   cache-ttl-max-hours: 168
   refresh-interval-hours: 2
   storage:
+    type: "${STORAGE_TYPE:filesystem}"
+    filesystem-base-dir: "${STORAGE_FILESYSTEM_DIR:.data/truststore}"
     container-name: "staging"
-    truststore-archive-path: "truststore/ACcompactado.zip"
-    hash-file-path: "truststore/hash.txt"
-    confirmation-file-path: "truststore/ultima_confirmacao.txt"
+    truststore-archive-path: "ACcompactado.zip"
+    hash-file-path: "hash.txt"
+    confirmation-file-path: "ultima_confirmacao.txt"
 
   minio:
     endpoint: "${MINIO_ENDPOINT:minio.clusterb.saude-go.net}"

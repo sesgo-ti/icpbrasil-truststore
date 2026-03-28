@@ -1,7 +1,7 @@
 package com.github.nogueiralegacy.truststore.service;
 
 import com.github.nogueiralegacy.truststore.config.TrustStoreConfig;
-import com.github.nogueiralegacy.truststore.repository.MinioRepository;
+import com.github.nogueiralegacy.truststore.repository.TrustStoreRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -18,14 +18,14 @@ import java.time.Instant;
 @Slf4j
 @Service
 public class TrustStoreService {
-    private final MinioRepository minioRepository;
+    private final TrustStoreRepository trustStoreRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
     private final TrustStoreConfig trustStoreConfig;
 
-    public TrustStoreService(MinioRepository minioRepository,
+    public TrustStoreService(TrustStoreRepository trustStoreRepository,
                              IcpBrasilCertificateProvider icpBrasilCertificateProvider,
                              TrustStoreConfig trustStoreConfig) {
-        this.minioRepository = minioRepository;
+        this.trustStoreRepository = trustStoreRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
         this.trustStoreConfig = trustStoreConfig;
     }
@@ -67,18 +67,18 @@ public class TrustStoreService {
     public void carregarArtefatosNoRepositorioLocal(byte[] zipData, String hash, Instant ultimaConfirmacao) throws RuntimeException {
         log.info("Carregando artefatos no repositório local");
         try {
-            minioRepository.armazenarZip(zipData);
-            minioRepository.armazenarHash(hash);
-            minioRepository.armazenarUltimaConfirmacao(ultimaConfirmacao);
+            trustStoreRepository.armazenarZip(zipData);
+            trustStoreRepository.armazenarHash(hash);
+            trustStoreRepository.armazenarUltimaConfirmacao(ultimaConfirmacao);
         } catch (Exception e) {
             throw new RuntimeException("Falha ao carregar artefatos no repositório local", e);
         }
     }
 
     public DisponibilidadeRepositorio verificarDisponibilidadeRepositorioLocal() {
-        try (InputStream zipStream = minioRepository.recuperarZip()) {
-            String hash = minioRepository.recuperarHash();
-            Instant ultimaConfirmacao = minioRepository.recuperarUltimaConfirmacao();
+        try (InputStream zipStream = trustStoreRepository.recuperarZip()) {
+            String hash = trustStoreRepository.recuperarHash();
+            Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
 
             boolean disponivel = zipStream != null && StringUtils.hasText(hash) && ultimaConfirmacao != null;
 
@@ -94,13 +94,13 @@ public class TrustStoreService {
         log.info("Iniciando verificação de sincronização do repositório local");
         try {
             String hashIcpBrasil = icpBrasilCertificateProvider.baixarHashIcpBrasil();
-            String hashLocal = minioRepository.recuperarHash();
+            String hashLocal = trustStoreRepository.recuperarHash();
             if (!hashIcpBrasil.equals(hashLocal)) {
                 log.warn("O repositório local está desatualizado. Iniciando atualização.");
                 reposicaoArtefatosRepositorioLocal();
             } else {
                 log.info("O repositório local está sincronizado com a fonte ICP-Brasil");
-                minioRepository.armazenarUltimaConfirmacao(Instant.now());
+                trustStoreRepository.armazenarUltimaConfirmacao(Instant.now());
             }
 
         } catch (Exception e) {
@@ -110,7 +110,7 @@ public class TrustStoreService {
 
     public void assegurrarNaoExpiracaoCache() {
         try {
-            Instant ultimaConfirmacao = minioRepository.recuperarUltimaConfirmacao();
+            Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
             long idadeCache = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
 
             if (idadeCache <= trustStoreConfig.getRefreshIntervalMillis()) {

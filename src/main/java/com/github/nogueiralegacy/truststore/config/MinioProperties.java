@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
 import okhttp3.OkHttpClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import java.security.cert.X509Certificate;
 @Setter
 @Validated
 @Configuration
+@ConditionalOnProperty(name = "truststore.storage.type", havingValue = "minio")
 @ConfigurationProperties(prefix = "truststore.minio")
 public class MinioProperties {
     @NotBlank(message = "MinIO Enpoint must be provided")

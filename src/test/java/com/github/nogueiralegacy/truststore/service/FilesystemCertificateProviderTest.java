@@ -50,7 +50,7 @@ class FilesystemCertificateProviderTest {
         // Then
         assertNotNull(certificates);
         assertFalse(certificates.isEmpty());
-        assertEquals(1, certificates.size());
+        assertEquals(3, certificates.size());
     }
 
     @Test
