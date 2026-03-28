@@ -12,6 +12,10 @@ truststore:
   cache-ttl-critical-hours: 72
   cache-ttl-max-hours: 168
   refresh-interval-hours: 2
+  scheduling:
+    enabled: false
+  rest:
+    enabled: false
   storage:
     type: filesystem
     filesystem-base-dir: "target/test-truststore"
