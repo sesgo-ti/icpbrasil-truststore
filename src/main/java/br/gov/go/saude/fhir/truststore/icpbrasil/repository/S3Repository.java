@@ -2,12 +2,15 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.repository;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.S3Properties;
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
-import io.minio.GetObjectArgs;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -18,12 +21,13 @@ import java.time.Instant;
 @Slf4j
 @ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
 public class S3Repository implements TrustStoreRepository {
-    private final MinioClient minioClient;
+
+    private final S3Client s3Client;
     private final TrustStoreConfig trustStoreConfig;
     private final S3Properties s3Properties;
 
-    public S3Repository(MinioClient minioClient, TrustStoreConfig trustStoreConfig, S3Properties s3Properties) {
-        this.minioClient = minioClient;
+    public S3Repository(S3Client s3Client, TrustStoreConfig trustStoreConfig, S3Properties s3Properties) {
+        this.s3Client = s3Client;
         this.trustStoreConfig = trustStoreConfig;
         this.s3Properties = s3Properties;
     }
@@ -31,110 +35,117 @@ public class S3Repository implements TrustStoreRepository {
     @Override
     public InputStream recuperarZip() {
         try {
-            var zipStream = minioClient.getObject(
-                    GetObjectArgs.builder()
+            byte[] bytes = s3Client.getObject(
+                    GetObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
-                            .object(trustStoreConfig.getStorage().getTruststoreArchivePath())
-                            .build()
-            );
+                            .key(trustStoreConfig.getStorage().getTruststoreArchivePath())
+                            .build(),
+                    ResponseTransformer.toBytes()
+            ).asByteArray();
 
-            if (zipStream == null) {
-                throw new RuntimeException("Zip file not found in S3");
-            }
-            return zipStream;
+            return new ByteArrayInputStream(bytes);
+        } catch (NoSuchKeyException e) {
+            log.warn("Zip não encontrado no S3: {}", trustStoreConfig.getStorage().getTruststoreArchivePath());
+            return null;
         } catch (Exception e) {
-            log.error("Failed to retrieve zip from S3", e);
-            throw new RuntimeException("Failed to retrieve zip from S3", e);
+            log.error("Falha ao recuperar zip do S3", e);
+            throw new RuntimeException("Falha ao recuperar zip do S3", e);
         }
     }
 
     @Override
     public String recuperarHash() {
         try {
-            byte[] hashBytes = minioClient.getObject(
-                    GetObjectArgs.builder()
+            return s3Client.getObject(
+                    GetObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
-                            .object(trustStoreConfig.getStorage().getHashFilePath())
-                            .build()
-            ).readAllBytes();
-
-            return new String(hashBytes, StandardCharsets.UTF_8).trim();
+                            .key(trustStoreConfig.getStorage().getHashFilePath())
+                            .build(),
+                    ResponseTransformer.toBytes()
+            ).asUtf8String().trim();
+        } catch (NoSuchKeyException e) {
+            log.warn("Hash não encontrado no S3: {}", trustStoreConfig.getStorage().getHashFilePath());
+            return null;
         } catch (Exception e) {
-            log.error("Failed to retrieve hash from S3", e);
-            throw new RuntimeException("Failed to retrieve hash from S3", e);
+            log.error("Falha ao recuperar hash do S3", e);
+            throw new RuntimeException("Falha ao recuperar hash do S3", e);
         }
     }
 
     @Override
     public void armazenarZip(byte[] zip) {
-        try (InputStream inputStream = new ByteArrayInputStream(zip)) {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
-                            .object(trustStoreConfig.getStorage().getTruststoreArchivePath())
-                            .stream(inputStream, zip.length, -1)
+                            .key(trustStoreConfig.getStorage().getTruststoreArchivePath())
                             .contentType("application/zip")
-                            .build()
+                            .contentLength((long) zip.length)
+                            .build(),
+                    RequestBody.fromBytes(zip)
             );
         } catch (Exception e) {
-            log.error("Failed to upload zip to S3", e);
-            throw new RuntimeException("Failed to upload zip to S3", e);
+            log.error("Falha ao armazenar zip no S3", e);
+            throw new RuntimeException("Falha ao armazenar zip no S3", e);
         }
     }
 
     @Override
     public void armazenarHash(String hash) {
         byte[] hashBytes = hash.getBytes(StandardCharsets.UTF_8);
-
-        try (InputStream inputStream = new ByteArrayInputStream(hashBytes)) {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
-                            .object(trustStoreConfig.getStorage().getHashFilePath())
-                            .stream(inputStream, hashBytes.length, -1)
+                            .key(trustStoreConfig.getStorage().getHashFilePath())
                             .contentType("text/plain")
-                            .build()
+                            .contentLength((long) hashBytes.length)
+                            .build(),
+                    RequestBody.fromBytes(hashBytes)
             );
         } catch (Exception e) {
-            log.error("Failed to upload hash to S3", e);
-            throw new RuntimeException("Failed to upload hash to S3", e);
+            log.error("Falha ao armazenar hash no S3", e);
+            throw new RuntimeException("Falha ao armazenar hash no S3", e);
         }
     }
 
     @Override
     public Instant recuperarUltimaConfirmacao() {
         try {
-            byte[] instantBytes = minioClient.getObject(
-                    GetObjectArgs.builder()
+            String value = s3Client.getObject(
+                    GetObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
-                            .object(trustStoreConfig.getStorage().getConfirmationFilePath())
-                            .build()
-            ).readAllBytes();
+                            .key(trustStoreConfig.getStorage().getConfirmationFilePath())
+                            .build(),
+                    ResponseTransformer.toBytes()
+            ).asUtf8String().trim();
 
-            String instantString = new String(instantBytes, StandardCharsets.UTF_8);
-            return Instant.parse(instantString.trim());
+            return Instant.parse(value);
+        } catch (NoSuchKeyException e) {
+            log.warn("Confirmação não encontrada no S3: {}", trustStoreConfig.getStorage().getConfirmationFilePath());
+            return null;
         } catch (Exception e) {
-            log.error("Failed to retrieve ultima_confirmacao from S3", e);
-            throw new RuntimeException("Failed to retrieve ultima_confirmacao from S3", e);
+            log.error("Falha ao recuperar ultima_confirmacao do S3", e);
+            throw new RuntimeException("Falha ao recuperar ultima_confirmacao do S3", e);
         }
     }
 
     @Override
     public void armazenarUltimaConfirmacao(Instant instant) {
         byte[] instantBytes = instant.toString().getBytes(StandardCharsets.UTF_8);
-
-        try (InputStream inputStream = new ByteArrayInputStream(instantBytes)) {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
-                            .object(trustStoreConfig.getStorage().getConfirmationFilePath())
-                            .stream(inputStream, instantBytes.length, -1)
+                            .key(trustStoreConfig.getStorage().getConfirmationFilePath())
                             .contentType("text/plain")
-                            .build()
+                            .contentLength((long) instantBytes.length)
+                            .build(),
+                    RequestBody.fromBytes(instantBytes)
             );
         } catch (Exception e) {
-            log.error("Failed to upload ultima_confirmacao to S3", e);
-            throw new RuntimeException("Failed to upload ultima_confirmacao to S3", e);
+            log.error("Falha ao armazenar ultima_confirmacao no S3", e);
+            throw new RuntimeException("Falha ao armazenar ultima_confirmacao no S3", e);
         }
     }
 }

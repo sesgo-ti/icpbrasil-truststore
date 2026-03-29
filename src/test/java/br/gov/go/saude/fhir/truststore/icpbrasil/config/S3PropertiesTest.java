@@ -1,28 +1,24 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.config;
 
-import io.minio.MinioClient;
-import io.minio.messages.Bucket;
-import lombok.SneakyThrows;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.util.List;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SpringBootTest
-@Disabled("Teste de integração com MinIO — requer storage.type=minio e servidor MinIO acessível")
+@Disabled("Teste de integração com S3 — requer storage.type=s3 e servidor S3 acessível")
 public class S3PropertiesTest {
+
     @Autowired
-    MinioClient minioClient;
+    S3Client s3Client;
 
-    @SneakyThrows
     @Test
-    void testConnectionWithMinIO() {
-        List<Bucket> buckets =  minioClient.listBuckets();
-
-        assertFalse(buckets.isEmpty());
+    void testConnectionWithS3() {
+        ListBucketsResponse response = s3Client.listBuckets();
+        assertFalse(response.buckets().isEmpty());
     }
 }
