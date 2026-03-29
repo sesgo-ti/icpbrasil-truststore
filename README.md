@@ -93,7 +93,8 @@ As credenciais S3 são lidas de variáveis de ambiente:
 
 | Variável | Descrição |
 |---|---|
-| `S3_ENDPOINT` | URL do servidor S3 |
+| `S3_ENDPOINT` | URL completa do servidor S3 (ex: `https://s3.amazonaws.com`) |
+| `S3_REGION` | Região (ex: `us-east-1`, `sa-east-1`) |
 | `S3_ACCESS_KEY` | Chave de acesso |
 | `S3_SECRET_KEY` | Chave secreta |
 | `S3_BUCKET` | Nome do bucket |

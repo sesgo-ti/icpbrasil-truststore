@@ -1,11 +1,9 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.config;
 
-import io.minio.MinioClient;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.OkHttpClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -14,15 +12,21 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import java.io.InputStream;
+import java.net.URI;
 import java.security.KeyStore;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Arrays;
 
 /**
@@ -30,8 +34,8 @@ import java.util.Arrays;
  *
  * <p>Ativado quando {@code truststore-icpbrasil.storage.type=s3}.</p>
  *
- * <p>Quando {@code ca-cert-path} é definido, o OkHttpClient é construído com um
- * KeyStore exclusivo para aquele certificado, isolando a confiança do S3
+ * <p>Quando {@code ca-cert-path} é definido, o cliente é construído com um
+ * TrustManager exclusivo para aquele certificado CA, isolando a confiança do S3
  * do SSLContext principal da aplicação.
  * Quando omitido, usa o trustManager global.</p>
  */
@@ -47,6 +51,9 @@ public class S3Properties {
     @NotBlank(message = "S3 endpoint must be provided")
     private String endpoint;
 
+    @NotBlank(message = "S3 region must be provided")
+    private String region;
+
     @NotBlank(message = "S3 access key must be provided")
     private String accessKey;
 
@@ -59,38 +66,36 @@ public class S3Properties {
     /**
      * Caminho para o certificado PEM da CA usada pelo servidor S3 (classpath: ou file:).
      * Quando não definido, usa o trustManager global.
-     * Exemplo: MINIO_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
+     * Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
      */
     private String caCertPath;
 
-    @Bean
-    public MinioClient minioClient(SSLContext sslContext, X509TrustManager trustManager) {
-        OkHttpClient httpClient = buildHttpClient(sslContext, trustManager);
+    @Bean(destroyMethod = "close")
+    public S3Client s3Client(X509TrustManager trustManager) {
+        var httpClientBuilder = ApacheHttpClient.builder()
+                .connectionTimeout(Duration.ofSeconds(10))
+                .socketTimeout(Duration.ofSeconds(60));
 
-        return MinioClient.builder()
-                .endpoint(endpoint)
-                .credentials(accessKey, secretKey)
-                .httpClient(httpClient)
-                .build();
-    }
-
-    /**
-     * Constrói o OkHttpClient com a estratégia TLS adequada:
-     * - ca-cert-path definido → KeyStore dedicado com o cert da CA do servidor S3
-     * - ca-cert-path ausente  → usa o trustManager global
-     */
-    private OkHttpClient buildHttpClient(SSLContext sslContext, X509TrustManager trustManager) {
         if (StringUtils.hasText(caCertPath)) {
             log.info("S3: usando CA dedicada para TLS: {}", caCertPath);
-            return buildHttpClientWithDedicatedTrust(caCertPath);
+            TrustManager[] dedicatedTrustManagers = buildDedicatedTrustManagers(caCertPath);
+            httpClientBuilder.tlsTrustManagersProvider(() -> dedicatedTrustManagers);
+        } else {
+            log.info("S3: usando trustManager global para TLS");
+            httpClientBuilder.tlsTrustManagersProvider(() -> new TrustManager[]{trustManager});
         }
-        log.info("S3: usando trustManager global para TLS");
-        return new OkHttpClient.Builder()
-                .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
+
+        return S3Client.builder()
+                .endpointOverride(URI.create(endpoint))
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .forcePathStyle(true)
+                .httpClientBuilder(httpClientBuilder)
                 .build();
     }
 
-    private OkHttpClient buildHttpClientWithDedicatedTrust(String certPath) {
+    private TrustManager[] buildDedicatedTrustManagers(String certPath) {
         try {
             Resource resource = new DefaultResourceLoader().getResource(certPath);
 
@@ -109,21 +114,10 @@ public class S3Properties {
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(keyStore);
 
-            X509TrustManager dedicatedTm = Arrays.stream(tmf.getTrustManagers())
+            return Arrays.stream(tmf.getTrustManagers())
                     .filter(tm -> tm instanceof X509TrustManager)
-                    .map(tm -> (X509TrustManager) tm)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Nenhum X509TrustManager encontrado"));
+                    .toArray(TrustManager[]::new);
 
-            SSLContext dedicatedSslContext = SSLContext.getInstance("TLS");
-            dedicatedSslContext.init(null, new TrustManager[]{dedicatedTm}, null);
-
-            return new OkHttpClient.Builder()
-                    .sslSocketFactory(dedicatedSslContext.getSocketFactory(), dedicatedTm)
-                    .build();
-
-        } catch (IllegalStateException e) {
-            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Falha ao carregar certificado CA do S3: " + certPath, e);
         }
