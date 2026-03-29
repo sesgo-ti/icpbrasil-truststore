@@ -1,23 +1,8 @@
 spring:
   application:
-    name: trust-store
+    name: trust-store-icpbrasil
 
-  config.import: vault://
-
-  cloud:
-    vault:
-      scheme: https
-      token: "${VAULT_TOKEN}"
-      host: "${VAULT_HOST:hl7-fhir.saude-go.net}"
-      port: "${VAULT_PORT:8200}"
-      authentication: token
-      connection-timeout: 5000
-      read-timeout: 15000
-
-      kv:
-        enabled: true
-
-truststore:
+truststore-icpbrasil:
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
   hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
   network:
@@ -27,16 +12,24 @@ truststore:
   cache-ttl-critical-hours: 72
   cache-ttl-max-hours: 168
   refresh-interval-hours: 2
+  scheduling:
+    enabled: false
+  rest:
+    enabled: false
   storage:
-    container-name: "staging"
-    truststore-archive-path: "truststore/ACcompactado.zip"
-    hash-file-path: "truststore/hash.txt"
-    confirmation-file-path: "truststore/ultima_confirmacao.txt"
+    type: filesystem
+    truststore-archive-path: "ACcompactado.zip"
+    hash-file-path: "hash.txt"
+    confirmation-file-path: "ultima_confirmacao.txt"
 
-  minio:
-    endpoint: "${MINIO_ENDPOINT:minio.clusterb.saude-go.net}"
-    access-key: "${MINIO_ACCESS_KEY}"
-    secret-key: "${MINIO_SECRET_KEY}"
+  filesystem:
+    base-dir: "target/test-truststore-icpbrasil"
 
-  vault:
-    certificate-path: 'certificates'  # Path dos certificados confiáveis no Vault
+  s3:
+    endpoint: "${S3_ENDPOINT:minio.clusterb.saude-go.net}"
+    access-key: "${S3_ACCESS_KEY:admin}"
+    secret-key: "${S3_SECRET_KEY:password}"
+    bucket: "${S3_BUCKET:staging}"
+
+  trusted-certs:
+    dir: "classpath:registries/certificates"

@@ -9,9 +9,9 @@
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
 
-  <groupId>com.github.nogueiralegacy</groupId>
-  <artifactId>trust-store</artifactId>
-  <version>1.0</version>
+  <groupId>br.gov.go.saude.fhir</groupId>
+  <artifactId>trust-store-icpbrasil</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <properties>
@@ -20,7 +20,6 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <surefire.version>3.2.5</surefire.version>
-    <spring-cloud.version>2024.0.0</spring-cloud.version>
   </properties>
 
   <dependencies>
@@ -40,12 +39,6 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-
-    <!-- Vault Starter -->
-    <dependency>
-      <groupId>org.springframework.cloud</groupId>
-      <artifactId>spring-cloud-starter-vault-config</artifactId>
     </dependency>
 
     <!-- Spring Boot DevTools -->
@@ -85,19 +78,14 @@
       <version>8.5.7</version>
     </dependency>
 
-  </dependencies>
+    <!-- Gerador de Metadados para Autocomplete no IDE -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
 
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>org.springframework.cloud</groupId>
-        <artifactId>spring-cloud-dependencies</artifactId>
-        <version>${spring-cloud.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  </dependencies>
 
   <build>
     <plugins>
@@ -117,16 +105,6 @@
     <groupId>org.apache.maven.plugins</groupId>
     <artifactId>maven-surefire-plugin</artifactId>
     <version>${surefire.version}</version>
-    <configuration>
-    <!-- Configuração do TrustStore para os testes -->
-        <argLine>
-            -XX:+EnableDynamicAgentLoading 
-            --add-opens java.base/java.lang=ALL-UNNAMED
-            -Djavax.net.ssl.trustStore=${project.build.testOutputDirectory}/mytruststore.jks
-            -Djavax.net.ssl.trustStorePassword=changeit
-            -Djavax.net.ssl.trustStoreType=JKS
-        </argLine>
-    </configuration>
 </plugin>
 
       <!-- Plugin de compilação com aviso de depreciação -->
@@ -139,6 +117,10 @@
               <groupId>org.projectlombok</groupId>
               <artifactId>lombok</artifactId>
             </path>
+            <path>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot-configuration-processor</artifactId>
+            </path>
           </annotationProcessorPaths>
         </configuration>
       </plugin>
@@ -146,6 +128,17 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>repackage</id>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+            <configuration>
+              <skip>true</skip>
+            </configuration>
+          </execution>
+        </executions>
         <configuration>
           <excludes>
             <exclude>
