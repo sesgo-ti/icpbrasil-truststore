@@ -5,6 +5,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -18,10 +19,10 @@ import java.time.Instant;
  * Implementação do repositório de artefatos do truststore usando o sistema de arquivos local.
  *
  * <p>Armazena o ZIP de certificados ICP-Brasil, hash e timestamp de última confirmação
- * em um diretório configurável no disco local. Alternativa ao MinIO para ambientes
+ * em um diretório configurável no disco local. Alternativa ao S3 para ambientes
  * com infraestrutura mínima.</p>
  *
- * <p>Ativado quando {@code truststore.storage.type=filesystem} (padrão).</p>
+ * <p>Ativado quando {@code truststore-icpbrasil.storage.type=filesystem} (padrão).</p>
  */
 @Service
 @Slf4j
@@ -34,11 +35,15 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
     private final Path confirmationPath;
 
     public FilesystemTrustStoreRepository(TrustStoreConfig trustStoreConfig) {
-        TrustStoreConfig.StorageConfig storage = trustStoreConfig.getStorage();
-        this.baseDir = Path.of(storage.getFilesystemBaseDir()).normalize();
-        this.zipPath = baseDir.resolve(storage.getTruststoreArchivePath());
-        this.hashPath = baseDir.resolve(storage.getHashFilePath());
-        this.confirmationPath = baseDir.resolve(storage.getConfirmationFilePath());
+        TrustStoreConfig.FilesystemConfig filesystem = trustStoreConfig.getFilesystem();
+        if (filesystem == null || !StringUtils.hasText(filesystem.getBaseDir())) {
+            throw new IllegalStateException(
+                    "[Erro de Configuração] Filesystem base-dir não configurado. Propriedade: 'truststore-icpbrasil.filesystem.base-dir'");
+        }
+        this.baseDir = Path.of(filesystem.getBaseDir()).normalize();
+        this.zipPath = baseDir.resolve(trustStoreConfig.getStorage().getTruststoreArchivePath());
+        this.hashPath = baseDir.resolve(trustStoreConfig.getStorage().getHashFilePath());
+        this.confirmationPath = baseDir.resolve(trustStoreConfig.getStorage().getConfirmationFilePath());
     }
 
     @PostConstruct

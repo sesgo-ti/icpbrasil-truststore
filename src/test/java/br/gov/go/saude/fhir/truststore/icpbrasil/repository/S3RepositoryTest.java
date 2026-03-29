@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
-public class MinioRepositoryTest {
+public class S3RepositoryTest {
     @MockitoBean
     TrustStoreRepository trustStoreRepository;
 

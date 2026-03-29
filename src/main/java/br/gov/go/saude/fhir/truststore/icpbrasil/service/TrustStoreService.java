@@ -28,7 +28,7 @@ public class TrustStoreService {
                 .equals(DisponibilidadeRepositorio.DISPONIVEL)) {
             log.info("Artefatos estão disponíveis no repositório local");
         } else {
-            log.warn("Artefatos não estão disponíveis no resppositório local");
+            log.warn("Artefatos não estão disponíveis no repositório local");
             log.info("Iniciando processo de download e armazenamento dos artefatos do truststore no repositório local");
             try {
                 reposicaoArtefatosRepositorioLocal();

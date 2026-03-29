@@ -36,7 +36,7 @@ public class TrustStoreManager {
     
     /**
      * Cria o X509TrustManager com os certificados confiáveis do provider.
-     * Exposto como bean para ser reutilizado por outros clientes HTTP (ex: MinIO).
+     * Exposto como bean para ser reutilizado por outros clientes HTTP (ex: S3/MinIO).
      */
     @Bean
     public X509TrustManager trustManager() {
