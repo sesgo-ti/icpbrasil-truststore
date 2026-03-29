@@ -57,9 +57,15 @@ public class TrustStoreConfig {
 
     /**
      * Estratégia de Armazenamento.
-     * [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3/MinIO).
+     * [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível).
      */
     private StorageConfig storage;
+
+    /**
+     * Configurações específicas para armazenamento no filesystem local.
+     * Ativado quando storage.type=filesystem.
+     */
+    private FilesystemConfig filesystem;
 
     /**
      * Diretório de Certificados Confiáveis Fixos.
@@ -68,19 +74,14 @@ public class TrustStoreConfig {
     private TrustedCertsConfig trustedCerts;
 
     /**
-     * Configurações de armazenamento genérico (S3, MinIO, FileSystem, etc.)
+     * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
      */
     @Data
     public static class StorageConfig {
         /**
-         * Nome do bucket de armazenamento (necessário para storage.type=minio).
+         * Tipo de armazenamento (filesystem | s3).
          */
-        private String bucketName;
-
-        /**
-         * Diretório base para armazenamento no filesystem (usado quando storage.type=filesystem).
-         */
-        private String filesystemBaseDir;
+        private String type;
 
         /**
          * Caminho do arquivo compactado do truststore.
@@ -96,6 +97,17 @@ public class TrustStoreConfig {
          * Caminho do arquivo de última confirmação.
          */
         private String confirmationFilePath;
+    }
+
+    /**
+     * Configurações específicas para o storage filesystem local.
+     */
+    @Data
+    public static class FilesystemConfig {
+        /**
+         * Diretório base onde os artefatos são armazenados no disco.
+         */
+        private String baseDir;
     }
 
     /**
@@ -275,8 +287,8 @@ public class TrustStoreConfig {
             throw new IllegalStateException("[Erro de Configuração] Storage: As configurações de armazenamento não podem ser nulas. Propriedade: 'truststore-icpbrasil.storage.*'");
         }
 
-        if (!StringUtils.hasText(storage.getBucketName())) {
-            throw new IllegalStateException("[Erro de Configuração] Nome do Bucket: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.bucket-name'");
+        if ("filesystem".equalsIgnoreCase(storage.getType()) && (filesystem == null || !StringUtils.hasText(filesystem.getBaseDir()))) {
+            throw new IllegalStateException("[Erro de Configuração] Filesystem Base Dir: Não pode ser nulo ou vazio quando storage.type=filesystem. Propriedade: 'truststore-icpbrasil.filesystem.base-dir'");
         }
 
         if (!StringUtils.hasText(storage.truststoreArchivePath)) {

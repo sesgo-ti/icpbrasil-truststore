@@ -34,6 +34,17 @@ class TrustStoreConfigTest {
         testTrustStoreConfig.setCacheTtlCriticalHours(72);
         testTrustStoreConfig.setCacheTtlMaxHours(168);
         testTrustStoreConfig.setRefreshIntervalHours(1);
+
+        TrustStoreConfig.StorageConfig storageConfig = new TrustStoreConfig.StorageConfig();
+        storageConfig.setType("filesystem");
+        storageConfig.setTruststoreArchivePath("ACcompactado.zip");
+        storageConfig.setHashFilePath("hash.txt");
+        storageConfig.setConfirmationFilePath("ultima_confirmacao.txt");
+        testTrustStoreConfig.setStorage(storageConfig);
+
+        TrustStoreConfig.FilesystemConfig filesystemConfig = new TrustStoreConfig.FilesystemConfig();
+        filesystemConfig.setBaseDir("target/test-data");
+        testTrustStoreConfig.setFilesystem(filesystemConfig);
     }
 
     @Test
@@ -243,5 +254,36 @@ class TrustStoreConfigTest {
         assertEquals(72, trustStoreConfig.getCacheTtlCriticalHours());
         assertEquals(168, trustStoreConfig.getCacheTtlMaxHours());
         assertEquals(2, trustStoreConfig.getRefreshIntervalHours());
+
+        // Storage & Filesystem
+        assertNotNull(trustStoreConfig.getStorage());
+        assertEquals("filesystem", trustStoreConfig.getStorage().getType());
+        assertEquals("target/test-truststore-icpbrasil", trustStoreConfig.getFilesystem().getBaseDir());
+        assertEquals("ACcompactado.zip", trustStoreConfig.getStorage().getTruststoreArchivePath());
+    }
+
+    @Test
+    void testValidateStorageConfig_FilesystemSemBaseDir_DeveLancarExcecao() {
+        // Given
+        testTrustStoreConfig.getStorage().setType("filesystem");
+        testTrustStoreConfig.setFilesystem(null);
+
+        // When & Then
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                testTrustStoreConfig::validateProperties);
+
+        assertTrue(exception.getMessage().contains("Filesystem Base Dir: Não pode ser nulo ou vazio"));
+    }
+
+    @Test
+    void testValidateStorageConfig_StorageNulo_DeveLancarExcecao() {
+        // Given
+        testTrustStoreConfig.setStorage(null);
+
+        // When & Then
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                testTrustStoreConfig::validateProperties);
+
+        assertTrue(exception.getMessage().contains("Storage: As configurações de armazenamento não podem ser nulas"));
     }
 }

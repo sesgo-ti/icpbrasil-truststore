@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SpringBootTest
 @Disabled("Teste de integração com MinIO — requer storage.type=minio e servidor MinIO acessível")
-public class MinioPropertiesTest {
+public class S3PropertiesTest {
     @Autowired
     MinioClient minioClient;
 

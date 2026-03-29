@@ -26,37 +26,40 @@ import java.security.cert.X509Certificate;
 import java.util.Arrays;
 
 /**
- * Configuração do cliente MinIO com suporte a TLS via CA dedicada.
+ * Configuração do cliente S3-compatível (AWS S3, MinIO, Digital Ocean Spaces, etc.).
+ *
+ * <p>Ativado quando {@code truststore-icpbrasil.storage.type=s3}.</p>
  *
  * <p>Quando {@code ca-cert-path} é definido, o OkHttpClient é construído com um
- * KeyStore exclusivo contendo apenas aquele certificado — isolando a confiança do MinIO
- * do SSLContext principal da aplicação.</p>
- *
- * <p>Quando {@code ca-cert-path} é omitido, o trustManager global é utilizado.</p>
+ * KeyStore exclusivo para aquele certificado, isolando a confiança do S3
+ * do SSLContext principal da aplicação.
+ * Quando omitido, usa o trustManager global.</p>
  */
 @Slf4j
 @Getter
 @Setter
 @Validated
 @Configuration
-@ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "minio")
-@ConfigurationProperties(prefix = "truststore-icpbrasil.minio")
-public class MinioProperties {
+@ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
+@ConfigurationProperties(prefix = "truststore-icpbrasil.s3")
+public class S3Properties {
 
-    @NotBlank(message = "MinIO Endpoint must be provided")
+    @NotBlank(message = "S3 endpoint must be provided")
     private String endpoint;
 
-    @NotBlank(message = "MinIO Access Key must be provided")
+    @NotBlank(message = "S3 access key must be provided")
     private String accessKey;
 
-    @NotBlank(message = "MinIO Secret Key must be provided")
+    @NotBlank(message = "S3 secret key must be provided")
     private String secretKey;
 
+    @NotBlank(message = "S3 bucket must be provided")
+    private String bucket;
+
     /**
-     * Caminho para o certificado PEM da CA usada pelo servidor MinIO.
-     * Suporta prefixos classpath: e file:.
-     * Quando não definido, o trustManager global é utilizado.
-     * Exemplo: classpath:infra/k8s-ca.pem
+     * Caminho para o certificado PEM da CA usada pelo servidor S3 (classpath: ou file:).
+     * Quando não definido, usa o trustManager global.
+     * Exemplo: MINIO_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
      */
     private String caCertPath;
 
@@ -72,16 +75,16 @@ public class MinioProperties {
     }
 
     /**
-     * Constrói o OkHttpClient com a estratégia de TLS adequada:
-     * - ca-cert-path definido → KeyStore dedicado só com o cert da CA do MinIO
-     * - ca-cert-path ausente  → usa o trustManager global (certs do classpath/filesystem)
+     * Constrói o OkHttpClient com a estratégia TLS adequada:
+     * - ca-cert-path definido → KeyStore dedicado com o cert da CA do servidor S3
+     * - ca-cert-path ausente  → usa o trustManager global
      */
     private OkHttpClient buildHttpClient(SSLContext sslContext, X509TrustManager trustManager) {
         if (StringUtils.hasText(caCertPath)) {
-            log.info("MinIO: usando CA dedicada para TLS: {}", caCertPath);
+            log.info("S3: usando CA dedicada para TLS: {}", caCertPath);
             return buildHttpClientWithDedicatedTrust(caCertPath);
         }
-        log.info("MinIO: usando trustManager global para TLS");
+        log.info("S3: usando trustManager global para TLS");
         return new OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
                 .build();
@@ -96,12 +99,12 @@ public class MinioProperties {
                 caCert = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
             }
 
-            log.info("MinIO: CA carregada — subject: {}, válido até: {}",
+            log.info("S3: CA carregada — subject: {}, válido até: {}",
                     caCert.getSubjectX500Principal().getName(), caCert.getNotAfter());
 
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             keyStore.load(null, null);
-            keyStore.setCertificateEntry("minio-ca", caCert);
+            keyStore.setCertificateEntry("s3-ca", caCert);
 
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(keyStore);
@@ -122,8 +125,7 @@ public class MinioProperties {
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalStateException("Falha ao carregar certificado CA do MinIO: " + certPath, e);
+            throw new IllegalStateException("Falha ao carregar certificado CA do S3: " + certPath, e);
         }
     }
 }
-

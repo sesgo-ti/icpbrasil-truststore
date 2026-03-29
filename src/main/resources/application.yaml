@@ -30,25 +30,29 @@ truststore-icpbrasil:
     enabled: true                 # Ativa a rotina automática (Cron) de atualização em background
 
   # Estratégia de Armazenamento
-  # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3/MinIO)
+  # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível)
   storage:
-    type: "filesystem"  # Opções: filesystem | minio
-    filesystem-base-dir: ".data/truststore-icpbrasil"
-    bucket-name: "staging" # Nome do bucket (necessário para storage.type=minio)
+    type: "filesystem"  # Opções: filesystem | s3
     truststore-archive-path: "ACcompactado.zip"
     hash-file-path: "hash.txt"
     confirmation-file-path: "ultima_confirmacao.txt"
 
-  # Credenciais para MinIO (Aplicável apenas se storage.type=minio)
+  # Configurações para armazenamento no Filesystem Local
+  # [Resultado]: Local onde os artefatos são mantidos em disco
+  filesystem:
+    base-dir: "${STORAGE_FILESYSTEM_DIR:.data/truststore-icpbrasil}"
+
+  # Configurações para S3-compatible Storage (MinIO, AWS S3, etc.)
   # [Resultado]: Conexão com serviço de objetos S3
-  minio:
-    endpoint: "${MINIO_ENDPOINT:localhost:9000}"
-    access-key: "${MINIO_ACCESS_KEY:admin}"
-    secret-key: "${MINIO_SECRET_KEY:password}"
-    # PEM da CA que assinou o cert do servidor MinIO (classpath: ou file:).
+  s3:
+    endpoint: "${S3_ENDPOINT:localhost:9000}"
+    access-key: "${S3_ACCESS_KEY:admin}"
+    secret-key: "${S3_SECRET_KEY:password}"
+    bucket: "${S3_BUCKET:staging}"
+    # PEM da CA que assinou o cert do servidor S3 (classpath: ou file:).
     # Quando não definido, usa o trustManager global.
-    # Exemplo de uso externo: MINIO_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
-    ca-cert-path: "${MINIO_CA_CERT_PATH:file:/etc/ssl/certs/ca-certificates.crt}"
+    # Exemplo de uso externo: S3_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
+    ca-cert-path: "${S3_CA_CERT_PATH:file:/etc/ssl/certs/ca-certificates.crt}"
 
   # Diretório de Certificados Confiáveis Fixos
   # [Resultado]: Local onde o sistema busca certificados adicionais (JSON) no classpath ou disco
