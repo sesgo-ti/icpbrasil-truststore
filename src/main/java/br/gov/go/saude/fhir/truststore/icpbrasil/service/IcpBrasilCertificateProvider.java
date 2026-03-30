@@ -12,7 +12,6 @@ import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -62,16 +61,12 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
 
     private byte[] obterZipData() {
         // Tenta primeiro do repositório local
-        Optional<InputStream> zipOpt = trustStoreRepository.recuperarZip();
+        Optional<byte[]> zipOpt = trustStoreRepository.recuperarZip();
         if (zipOpt.isPresent()) {
-            try (var zipStream = zipOpt.get()) {
-                byte[] zipData = IOUtils.toByteArray(zipStream);
-                if (zipData != null && zipData.length > 0) {
-                    log.info("ZIP obtido do repositório local");
-                    return zipData;
-                }
-            } catch (Exception e) {
-                log.debug("Erro ao recuperar ZIP do repositório local: {}", e.getMessage());
+            byte[] zipData = zipOpt.get();
+            if (zipData.length > 0) {
+                log.info("ZIP obtido do repositório local");
+                return zipData;
             }
         }
 
