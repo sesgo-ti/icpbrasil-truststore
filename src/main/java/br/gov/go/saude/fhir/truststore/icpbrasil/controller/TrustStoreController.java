@@ -2,6 +2,7 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.controller;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.service.Cache;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,12 @@ import java.util.Base64;
  * Controller REST para gerenciar e consultar certificados vigentes ICP-Brasil.
  */
 @Slf4j
+@ConditionalOnProperty(
+    prefix = "truststore-icpbrasil.rest",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 @RestController
 @RequestMapping("/certificate")
 public class TrustStoreController {

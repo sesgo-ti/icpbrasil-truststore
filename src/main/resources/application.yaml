@@ -1,6 +1,22 @@
 spring:
   application:
     name: trust-store-icpbrasil
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
 
 # Configurações do TrustStore ICP-Brasil
 truststore-icpbrasil:

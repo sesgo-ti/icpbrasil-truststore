@@ -107,6 +107,13 @@
       <optional>true</optional>
     </dependency>
 
+    <!-- Actuator (opcional — não transitivo para consumidores da biblioteca) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <optional>true</optional>
+    </dependency>
+
   </dependencies>
 
   <build>
@@ -172,4 +179,29 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>standalone</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>repackage</id>
+                <goals><goal>repackage</goal></goals>
+                <configuration>
+                  <skip>false</skip>
+                  <classifier>standalone</classifier>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
 </project>

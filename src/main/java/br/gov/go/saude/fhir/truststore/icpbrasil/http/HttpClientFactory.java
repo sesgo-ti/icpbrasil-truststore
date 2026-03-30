@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -20,7 +19,7 @@ import java.net.URL;
 @RequiredArgsConstructor
 public class HttpClientFactory {
 
-    private final SSLContext sslContext;
+    private final TrustStoreManager trustStoreManager;
     private final TrustStoreConfig trustStoreConfig;
 
     /**
@@ -30,13 +29,13 @@ public class HttpClientFactory {
         try {
             URL targetUrl = new URL(url);
             HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
-            
+
             configureConnection(connection);
             configureSSL(connection);
-            
+
             log.debug("Conexão HTTP criada para: {}", url);
             return connection;
-            
+
         } catch (IOException e) {
             log.error("Erro ao criar conexão para {}: {}", url, e.getMessage());
             throw new ConnectionCreationException("Falha ao criar conexão HTTP", e);
@@ -45,14 +44,12 @@ public class HttpClientFactory {
 
     private void configureConnection(HttpURLConnection connection) throws IOException {
         TrustStoreConfig.NetworkConfig networkConfig = trustStoreConfig.getNetwork();
-        
+
         connection.setConnectTimeout(networkConfig.getDownloadTimeoutMillis());
         connection.setReadTimeout(networkConfig.getDownloadTimeoutMillis());
-        // Somente requisições GET
         connection.setRequestMethod("GET");
         connection.setInstanceFollowRedirects(true);
-        
-        // Headers de segurança e identificação
+
         connection.setRequestProperty("User-Agent", "TrustStore-Downloader/1.0");
         connection.setRequestProperty("Accept", "*/*");
         connection.setRequestProperty("Connection", "close");
@@ -60,7 +57,7 @@ public class HttpClientFactory {
 
     private void configureSSL(HttpURLConnection connection) throws ConnectionCreationException {
         if (connection instanceof HttpsURLConnection httpsConnection) {
-            httpsConnection.setSSLSocketFactory(sslContext.getSocketFactory());
+            httpsConnection.setSSLSocketFactory(trustStoreManager.getSslContext().getSocketFactory());
             log.debug("SSL Context configurado para conexão HTTPS");
             return;
         }
