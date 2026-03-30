@@ -14,8 +14,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.security.cert.X509Certificate;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @Slf4j
@@ -61,5 +62,51 @@ class CacheTest {
         String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate);
 
         assertEquals(testCertificate, Cache.getCertificateBySki(testSki));
+    }
+
+    @Test
+    void testGetAllCertificates() {
+        Map<String, X509Certificate> all = Cache.getAllCertificates();
+
+        assertFalse(all.isEmpty());
+
+        String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate);
+        assertEquals(testCertificate, all.get(testSki));
+    }
+
+    @Test
+    void testGetRootCertificates() {
+        Map<String, X509Certificate> roots = Cache.getRootCertificates();
+
+        assertFalse(roots.isEmpty());
+        // Quantidade de roots atualmente
+        assertEquals(5, roots.size());
+
+        roots.values().forEach(cert -> {
+            assertEquals(cert.getSubjectX500Principal(), cert.getIssuerX500Principal());
+            assertDoesNotThrow(() -> cert.verify(cert.getPublicKey()));
+        });
+    }
+
+    @Test
+    void testGetRootCertificatesNaoContemIntermediarios() {
+        Map<String, X509Certificate> roots = Cache.getRootCertificates();
+        String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate);
+
+        assertNotEquals(
+                testCertificate.getSubjectX500Principal(),
+                testCertificate.getIssuerX500Principal()
+        );
+        assertFalse(roots.containsKey(testSki));
+    }
+
+    @Test
+    void testGetAllCertificatesRetornaCopiaDefensiva() {
+        Map<String, X509Certificate> all = Cache.getAllCertificates();
+        int originalSize = all.size();
+
+        all.clear();
+
+        assertEquals(originalSize, Cache.getAllCertificates().size());
     }
 }

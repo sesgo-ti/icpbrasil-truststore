@@ -11,8 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.security.cert.X509Certificate;
+import java.util.Base64;
+import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class CertificateParserTest {
@@ -98,5 +100,44 @@ class CertificateParserTest {
         AccessDescription[] accessDescriptions = CertificateParser.getCertificateAuthorityInformationAccess(certificate);
 
         assertEquals(1, accessDescriptions.length);
+    }
+
+    @SneakyThrows
+    @Test
+    void testParseBase64() {
+        byte[] derBytes = certificate.getEncoded();
+        String base64 = Base64.getEncoder().encodeToString(derBytes);
+
+        X509Certificate parsed = CertificateParser.parseBase64(base64);
+
+        assertEquals(certificate, parsed);
+    }
+
+    @Test
+    void testParseBase64InvalidThrowsException() {
+        assertThrows(IllegalArgumentException.class, () -> CertificateParser.parseBase64("!!!not-base64!!!"));
+    }
+
+    @Test
+    void testParseBase64NullThrowsException() {
+        assertThrows(IllegalArgumentException.class, () -> CertificateParser.parseBase64(null));
+    }
+
+    @Test
+    void testGetCertificatePolicies() {
+        List<String> policies = CertificateParser.getCertificatePolicies(certificate);
+
+        assertFalse(policies.isEmpty());
+        assertTrue(policies.stream().anyMatch(oid -> oid.startsWith("2.16.76.1")));
+    }
+
+    @Test
+    void testGetKeyUsage() {
+        boolean[] keyUsage = CertificateParser.getKeyUsage(certificate);
+
+        assertNotNull(keyUsage);
+        assertEquals(9, keyUsage.length);
+        assertTrue(keyUsage[0]); // digitalSignature
+        assertTrue(keyUsage[1]); // nonRepudiation
     }
 }
