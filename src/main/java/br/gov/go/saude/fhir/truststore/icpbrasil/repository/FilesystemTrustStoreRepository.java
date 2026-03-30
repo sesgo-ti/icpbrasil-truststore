@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Implementação do repositório de artefatos do truststore usando o sistema de arquivos local.
@@ -59,12 +60,12 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
     }
 
     @Override
-    public InputStream recuperarZip() {
+    public Optional<InputStream> recuperarZip() {
         if (!Files.exists(zipPath)) {
-            return null;
+            return Optional.empty();
         }
         try {
-            return new ByteArrayInputStream(Files.readAllBytes(zipPath));
+            return Optional.of(new ByteArrayInputStream(Files.readAllBytes(zipPath)));
         } catch (IOException e) {
             log.error("Falha ao recuperar ZIP do filesystem: {}", e.getMessage());
             throw new RuntimeException("Falha ao recuperar ZIP do filesystem", e);
@@ -72,12 +73,12 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
     }
 
     @Override
-    public String recuperarHash() {
+    public Optional<String> recuperarHash() {
         if (!Files.exists(hashPath)) {
-            return null;
+            return Optional.empty();
         }
         try {
-            return Files.readString(hashPath, StandardCharsets.UTF_8).trim();
+            return Optional.of(Files.readString(hashPath, StandardCharsets.UTF_8).trim());
         } catch (IOException e) {
             log.error("Falha ao recuperar hash do filesystem: {}", e.getMessage());
             throw new RuntimeException("Falha ao recuperar hash do filesystem", e);
@@ -107,13 +108,13 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
     }
 
     @Override
-    public Instant recuperarUltimaConfirmacao() {
+    public Optional<Instant> recuperarUltimaConfirmacao() {
         if (!Files.exists(confirmationPath)) {
-            return null;
+            return Optional.empty();
         }
         try {
             String content = Files.readString(confirmationPath, StandardCharsets.UTF_8).trim();
-            return Instant.parse(content);
+            return Optional.of(Instant.parse(content));
         } catch (IOException e) {
             log.error("Falha ao recuperar última confirmação do filesystem: {}", e.getMessage());
             throw new RuntimeException("Falha ao recuperar última confirmação do filesystem", e);

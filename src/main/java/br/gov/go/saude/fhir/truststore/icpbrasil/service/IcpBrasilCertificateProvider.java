@@ -12,10 +12,12 @@ import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -60,14 +62,17 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
 
     private byte[] obterZipData() {
         // Tenta primeiro do repositório local
-        try (var zipStream = trustStoreRepository.recuperarZip()) {
-            byte[] zipData = IOUtils.toByteArray(zipStream);
-            if (zipData != null && zipData.length > 0) {
-                log.info("ZIP obtido do repositório local");
-                return zipData;
+        Optional<InputStream> zipOpt = trustStoreRepository.recuperarZip();
+        if (zipOpt.isPresent()) {
+            try (var zipStream = zipOpt.get()) {
+                byte[] zipData = IOUtils.toByteArray(zipStream);
+                if (zipData != null && zipData.length > 0) {
+                    log.info("ZIP obtido do repositório local");
+                    return zipData;
+                }
+            } catch (Exception e) {
+                log.debug("Erro ao recuperar ZIP do repositório local: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.debug("Erro ao recuperar ZIP do repositório local: {}", e.getMessage());
         }
 
         return baixarZipIcpBrasil();
@@ -76,10 +81,10 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
     private String obterHashEsperado() {
         // Tenta primeiro do repositório local
         try {
-            String hash = trustStoreRepository.recuperarHash();
-            if (StringUtils.hasText(hash)) {
+            Optional<String> hashOpt = trustStoreRepository.recuperarHash();
+            if (hashOpt.filter(StringUtils::hasText).isPresent()) {
                 log.info("Hash obtido do repositório local");
-                return hash;
+                return hashOpt.get();
             }
         } catch (Exception e) {
             log.debug("Erro ao recuperar hash do repositório local: {}", e.getMessage());

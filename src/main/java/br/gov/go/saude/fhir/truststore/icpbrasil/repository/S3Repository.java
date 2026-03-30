@@ -16,6 +16,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -33,7 +34,7 @@ public class S3Repository implements TrustStoreRepository {
     }
 
     @Override
-    public InputStream recuperarZip() {
+    public Optional<InputStream> recuperarZip() {
         try {
             byte[] bytes = s3Client.getObject(
                     GetObjectRequest.builder()
@@ -43,10 +44,10 @@ public class S3Repository implements TrustStoreRepository {
                     ResponseTransformer.toBytes()
             ).asByteArray();
 
-            return new ByteArrayInputStream(bytes);
+            return Optional.of(new ByteArrayInputStream(bytes));
         } catch (NoSuchKeyException e) {
             log.debug("Zip não encontrado no S3: {}", trustStoreConfig.getStorage().getTruststoreArchivePath());
-            return null;
+            return Optional.empty();
         } catch (Exception e) {
             log.error("Falha ao recuperar zip do S3", e);
             throw new RuntimeException("Falha ao recuperar zip do S3", e);
@@ -54,18 +55,19 @@ public class S3Repository implements TrustStoreRepository {
     }
 
     @Override
-    public String recuperarHash() {
+    public Optional<String> recuperarHash() {
         try {
-            return s3Client.getObject(
+            String hash = s3Client.getObject(
                     GetObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
                             .key(trustStoreConfig.getStorage().getHashFilePath())
                             .build(),
                     ResponseTransformer.toBytes()
             ).asUtf8String().trim();
+            return Optional.of(hash);
         } catch (NoSuchKeyException e) {
             log.debug("Hash não encontrado no S3: {}", trustStoreConfig.getStorage().getHashFilePath());
-            return null;
+            return Optional.empty();
         } catch (Exception e) {
             log.error("Falha ao recuperar hash do S3", e);
             throw new RuntimeException("Falha ao recuperar hash do S3", e);
@@ -110,7 +112,7 @@ public class S3Repository implements TrustStoreRepository {
     }
 
     @Override
-    public Instant recuperarUltimaConfirmacao() {
+    public Optional<Instant> recuperarUltimaConfirmacao() {
         try {
             String value = s3Client.getObject(
                     GetObjectRequest.builder()
@@ -120,10 +122,10 @@ public class S3Repository implements TrustStoreRepository {
                     ResponseTransformer.toBytes()
             ).asUtf8String().trim();
 
-            return Instant.parse(value);
+            return Optional.of(Instant.parse(value));
         } catch (NoSuchKeyException e) {
             log.debug("Confirmação não encontrada no S3: {}", trustStoreConfig.getStorage().getConfirmationFilePath());
-            return null;
+            return Optional.empty();
         } catch (Exception e) {
             log.error("Falha ao recuperar ultima_confirmacao do S3", e);
             throw new RuntimeException("Falha ao recuperar ultima_confirmacao do S3", e);
