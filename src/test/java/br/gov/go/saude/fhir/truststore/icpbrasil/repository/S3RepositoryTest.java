@@ -11,6 +11,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
@@ -37,18 +38,17 @@ public class S3RepositoryTest {
         );
 
         when(trustStoreRepository.recuperarZip())
-                .thenReturn(zipInputStream);
+                .thenReturn(Optional.of(zipInputStream));
         when(trustStoreRepository.recuperarHash())
-                .thenReturn(hashContent.split("  ")[0].trim());
+                .thenReturn(Optional.of(hashContent.split("  ")[0].trim()));
         when(trustStoreRepository.recuperarUltimaConfirmacao())
-                .thenReturn(Instant.parse(ultimaConfirmacaoString));
+                .thenReturn(Optional.of(Instant.parse(ultimaConfirmacaoString)));
     }
 
 
     @Test
     void testRecuperarZip() {
-        try (InputStream is = trustStoreRepository.recuperarZip()) {
-            assert is != null;
+        try (InputStream is = trustStoreRepository.recuperarZip().orElseThrow()) {
             byte[] bytes = is.readAllBytes();
             assert bytes.length > 0;
         } catch (Exception e) {
@@ -58,14 +58,14 @@ public class S3RepositoryTest {
 
     @Test
     void testRecuperarHash() {
-        String hash = trustStoreRepository.recuperarHash();
+        String hash = trustStoreRepository.recuperarHash().orElseThrow();
 
         assertEquals("bbc9703e33df4be5b23e900177a3672191ca2f9c5dc68eaf129562ea43f90b89a6525b61b427212dce0b8026ec26ef2ca06ffe491ab911d0bac9722faefdfde2", hash);
     }
 
     @Test
     void testRecuperarUltimaConfirmacao() {
-        Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
+        Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao().orElseThrow();
 
         assertEquals(Instant.parse("2025-10-08T02:10:54.784822Z"), ultimaConfirmacao);
     }

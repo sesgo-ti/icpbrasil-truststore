@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -32,13 +33,14 @@ public class TrustStoreCacheHealthIndicator implements HealthIndicator {
                 .build();
         }
         try {
-            Instant ultimaConfirmacao = repository.recuperarUltimaConfirmacao();
-            if (ultimaConfirmacao == null) {
+            Optional<Instant> ultimaConfirmacaoOpt = repository.recuperarUltimaConfirmacao();
+            if (ultimaConfirmacaoOpt.isEmpty()) {
                 return Health.down()
                     .withDetail("status", "EXPIRED")
                     .withDetail("message", "Última confirmação indisponível")
                     .build();
             }
+            Instant ultimaConfirmacao = ultimaConfirmacaoOpt.get();
             long idadeMillis = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
             if (idadeMillis <= config.getCacheTtlCriticalMillis()) {
                 return Health.up()

@@ -8,6 +8,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.Optional;
 @Slf4j
 @Service
 public class TrustStoreService {
@@ -74,11 +75,14 @@ public class TrustStoreService {
     }
 
     public DisponibilidadeRepositorio verificarDisponibilidadeRepositorioLocal() {
-        try (InputStream zipStream = trustStoreRepository.recuperarZip()) {
-            String hash = trustStoreRepository.recuperarHash();
-            Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
+        Optional<InputStream> zipOpt = trustStoreRepository.recuperarZip();
+        try (InputStream zipStream = zipOpt.orElse(null)) {
+            Optional<String> hashOpt = trustStoreRepository.recuperarHash();
+            Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
 
-            boolean disponivel = zipStream != null && StringUtils.hasText(hash) && ultimaConfirmacao != null;
+            boolean disponivel = zipOpt.isPresent()
+                    && hashOpt.filter(StringUtils::hasText).isPresent()
+                    && confirmacaoOpt.isPresent();
 
             return disponivel ? DisponibilidadeRepositorio.DISPONIVEL :
                     DisponibilidadeRepositorio.INDISPONIVEL;
@@ -92,7 +96,7 @@ public class TrustStoreService {
         log.info("Iniciando verificação de sincronização do repositório local");
         try {
             String hashIcpBrasil = icpBrasilCertificateProvider.baixarHashIcpBrasil();
-            String hashLocal = trustStoreRepository.recuperarHash();
+            String hashLocal = trustStoreRepository.recuperarHash().orElse(null);
             if (!hashIcpBrasil.equals(hashLocal)) {
                 log.warn("O repositório local está desatualizado. Iniciando atualização.");
                 reposicaoArtefatosRepositorioLocal();
@@ -108,12 +112,13 @@ public class TrustStoreService {
 
     public void assegurrarNaoExpiracaoCache() {
         try {
-            Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
-            if (ultimaConfirmacao == null) {
+            Optional<Instant> ultimaConfirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
+            if (ultimaConfirmacaoOpt.isEmpty()) {
                 log.warn("Última confirmação não encontrada. Cache será marcado como inválido.");
                 Cache.setCacheValid(false);
                 return;
             }
+            Instant ultimaConfirmacao = ultimaConfirmacaoOpt.get();
             long idadeCache = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
 
             if (idadeCache <= trustStoreConfig.getRefreshIntervalMillis()) {

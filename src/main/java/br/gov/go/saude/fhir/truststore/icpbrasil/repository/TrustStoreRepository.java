@@ -2,17 +2,18 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.repository;
 
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.Optional;
 
 public interface TrustStoreRepository {
-    InputStream recuperarZip();
+    Optional<InputStream> recuperarZip();
 
-    String recuperarHash();
+    Optional<String> recuperarHash();
 
     void armazenarZip(byte[] zip);
 
     void armazenarHash(String hash);
 
-    Instant recuperarUltimaConfirmacao();
+    Optional<Instant> recuperarUltimaConfirmacao();
 
     void armazenarUltimaConfirmacao(Instant instant);
 }
