@@ -342,6 +342,26 @@ public class CertificateParser {
         return keyUsage;
     }
 
+    /**
+     * Verifica se o certificado é auto-assinado (raiz).
+     * Um certificado é considerado auto-assinado quando subject e issuer são iguais
+     * e a assinatura é verificável com a própria chave pública.
+     */
+    public static boolean isSelfSigned(X509Certificate certificate) {
+        if (certificate.getSubjectX500Principal() == null || certificate.getIssuerX500Principal() == null) {
+            return false;
+        }
+        if (!certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal())) {
+            return false;
+        }
+        try {
+            certificate.verify(certificate.getPublicKey());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static class X509ExtensionUtils {
 
         private static <T> Optional<T> getExtensionValue(
