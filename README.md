@@ -100,7 +100,7 @@ As credenciais S3 são lidas de variáveis de ambiente:
 | `S3_BUCKET` | Nome do bucket |
 | `S3_CA_CERT_PATH` | Caminho do certificado CA do servidor S3 (opcional) |
 
-`S3_CA_CERT_PATH` é necessário quando a CA que assinou o certificado TLS do servidor S3 **não está** entre as CAs embutidas em `registries/certificates/`. Quando definido, a biblioteca cria um `SSLContext` dedicado exclusivamente para a conexão S3. Quando omitido, usa o `SSLContext` global da aplicação.
+`S3_CA_CERT_PATH` é necessário apenas para endpoints S3 privados (MinIO, etc.) cujo certificado TLS foi assinado por uma CA não reconhecida pela JVM. Quando definido, o cliente S3 usa um `TrustManager` dedicado com exclusivamente aquela CA. Quando omitido, o AWS SDK usa o JVM default truststore (`cacerts`) — suficiente para AWS S3 e outros provedores públicos.
 
 ### Atualização agendada
 
@@ -135,21 +135,29 @@ truststore-icpbrasil:
 
 ## Contexto SSL e segurança
 
-A biblioteca cria um bean `SSLContext` customizado usando **exclusivamente** os certificados embutidos em `registries/certificates/` (atualmente raízes Let's Encrypt). A truststore padrão da JVM é intencionalmente ignorada em todas as conexões de saída.
+A biblioteca cria um bean `SSLContext` customizado usando **exclusivamente** os certificados embutidos em `registries/certificates/`. Esse contexto é usado apenas para o download do bundle ICP-Brasil — não é aplicado globalmente à JVM.
 
-Isso é necessário porque sistemas ICP-Brasil operam em um ambiente de confiança controlado. Depender da truststore padrão da JVM introduziria confiança implícita em CAs de terceiros o que não é desejado.
+O isolamento é intencional: o endpoint `acraiz.icpbrasil.gov.br` (de onde o bundle é baixado) é a raiz de confiança para validação de assinaturas digitais governamentais. Usar a truststore padrão da JVM para essa conexão exporia o download a um MITM com qualquer uma das ~150 CAs comerciais presentes no `cacerts`.
+
+**Certificados embutidos em `registries/certificates/`:**
+
+| Arquivo | Tipo | Propósito |
+|---|---|---|
+| `isrgrootx1.json` | Raiz (ISRG Root X1) | Âncora de confiança para cadeia E7 |
+| `isrgrootx2.json` | Raiz (ISRG Root X2) | Âncora de confiança para cadeia E7 |
+| `letsencrypt_e7.json` | Intermediário (E7) | Necessário porque o servidor `acraiz.icpbrasil.gov.br` não envia o intermediário no TLS handshake |
 
 O comportamento por contexto é o seguinte:
 
 | Contexto | Trust utilizado |
 |---|---|
-| Conexões gerais da aplicação | Apenas CAs de `registries/certificates/` |
-| Conexão S3 sem `S3_CA_CERT_PATH` | Mesmo `SSLContext` global |
-| Conexão S3 com `S3_CA_CERT_PATH` | `SSLContext` dedicado com apenas aquela CA |
+| Download do bundle ICP-Brasil | Apenas CAs de `registries/certificates/` |
+| Conexão S3 sem `S3_CA_CERT_PATH` | JVM default truststore (`cacerts`) |
+| Conexão S3 com `S3_CA_CERT_PATH` | `TrustManager` dedicado com apenas aquela CA |
 
-Para adicionar uma CA ao trust global da aplicação, inclua o arquivo JSON com o campo `pem` em `registries/certificates/` e reconstrua o artefato.
+Para adicionar uma CA ao trust do download ICP-Brasil, inclua o arquivo JSON com o campo `pem` em `registries/certificates/` e reconstrua o artefato.
 
-Para configurar a CA da conexão S3:
+Para configurar a CA da conexão S3 privado:
 
 ```bash
 export S3_CA_CERT_PATH=file:/etc/ssl/certs/minha-ca.crt

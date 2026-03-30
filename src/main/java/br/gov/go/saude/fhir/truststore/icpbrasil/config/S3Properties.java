@@ -37,7 +37,8 @@ import java.util.Arrays;
  * <p>Quando {@code ca-cert-path} é definido, o cliente é construído com um
  * TrustManager exclusivo para aquele certificado CA, isolando a confiança do S3
  * do SSLContext principal da aplicação.
- * Quando omitido, usa o trustManager global.</p>
+ * Quando omitido, usa o JVM default truststore (cacerts), que contém as CAs
+ * públicas padrão necessárias para AWS S3 e outros endpoints com CA reconhecida.</p>
  */
 @Slf4j
 @Getter
@@ -65,13 +66,14 @@ public class S3Properties {
 
     /**
      * Caminho para o certificado PEM da CA usada pelo servidor S3 (classpath: ou file:).
-     * Quando não definido, usa o trustManager global.
-     * Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/ca-certificates.crt
+     * Necessário apenas para endpoints S3 privados (MinIO, etc.) com CA não reconhecida pela JVM.
+     * Quando não definido, o AWS SDK usa o JVM default truststore automaticamente.
+     * Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/minha-ca.crt
      */
     private String caCertPath;
 
     @Bean(destroyMethod = "close")
-    public S3Client s3Client(X509TrustManager trustManager) {
+    public S3Client s3Client() {
         var httpClientBuilder = ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(10))
                 .socketTimeout(Duration.ofSeconds(60));
@@ -81,8 +83,7 @@ public class S3Properties {
             TrustManager[] dedicatedTrustManagers = buildDedicatedTrustManagers(caCertPath);
             httpClientBuilder.tlsTrustManagersProvider(() -> dedicatedTrustManagers);
         } else {
-            log.info("S3: usando trustManager global para TLS");
-            httpClientBuilder.tlsTrustManagersProvider(() -> new TrustManager[]{trustManager});
+            log.info("S3: usando JVM default truststore para TLS");
         }
 
         return S3Client.builder()
