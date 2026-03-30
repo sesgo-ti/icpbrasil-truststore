@@ -60,10 +60,10 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
 
     @Override
     public InputStream recuperarZip() {
+        if (!Files.exists(zipPath)) {
+            return null;
+        }
         try {
-            if (!Files.exists(zipPath)) {
-                throw new RuntimeException("Arquivo ZIP não encontrado: " + zipPath);
-            }
             return new ByteArrayInputStream(Files.readAllBytes(zipPath));
         } catch (IOException e) {
             log.error("Falha ao recuperar ZIP do filesystem: {}", e.getMessage());
@@ -73,10 +73,10 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
 
     @Override
     public String recuperarHash() {
+        if (!Files.exists(hashPath)) {
+            return null;
+        }
         try {
-            if (!Files.exists(hashPath)) {
-                throw new RuntimeException("Arquivo de hash não encontrado: " + hashPath);
-            }
             return Files.readString(hashPath, StandardCharsets.UTF_8).trim();
         } catch (IOException e) {
             log.error("Falha ao recuperar hash do filesystem: {}", e.getMessage());
@@ -108,10 +108,10 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
 
     @Override
     public Instant recuperarUltimaConfirmacao() {
+        if (!Files.exists(confirmationPath)) {
+            return null;
+        }
         try {
-            if (!Files.exists(confirmationPath)) {
-                throw new RuntimeException("Arquivo de confirmação não encontrado: " + confirmationPath);
-            }
             String content = Files.readString(confirmationPath, StandardCharsets.UTF_8).trim();
             return Instant.parse(content);
         } catch (IOException e) {

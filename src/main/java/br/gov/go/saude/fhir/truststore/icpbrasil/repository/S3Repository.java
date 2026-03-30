@@ -45,7 +45,7 @@ public class S3Repository implements TrustStoreRepository {
 
             return new ByteArrayInputStream(bytes);
         } catch (NoSuchKeyException e) {
-            log.warn("Zip não encontrado no S3: {}", trustStoreConfig.getStorage().getTruststoreArchivePath());
+            log.debug("Zip não encontrado no S3: {}", trustStoreConfig.getStorage().getTruststoreArchivePath());
             return null;
         } catch (Exception e) {
             log.error("Falha ao recuperar zip do S3", e);
@@ -64,7 +64,7 @@ public class S3Repository implements TrustStoreRepository {
                     ResponseTransformer.toBytes()
             ).asUtf8String().trim();
         } catch (NoSuchKeyException e) {
-            log.warn("Hash não encontrado no S3: {}", trustStoreConfig.getStorage().getHashFilePath());
+            log.debug("Hash não encontrado no S3: {}", trustStoreConfig.getStorage().getHashFilePath());
             return null;
         } catch (Exception e) {
             log.error("Falha ao recuperar hash do S3", e);
@@ -122,7 +122,7 @@ public class S3Repository implements TrustStoreRepository {
 
             return Instant.parse(value);
         } catch (NoSuchKeyException e) {
-            log.warn("Confirmação não encontrada no S3: {}", trustStoreConfig.getStorage().getConfirmationFilePath());
+            log.debug("Confirmação não encontrada no S3: {}", trustStoreConfig.getStorage().getConfirmationFilePath());
             return null;
         } catch (Exception e) {
             log.error("Falha ao recuperar ultima_confirmacao do S3", e);
