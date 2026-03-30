@@ -52,8 +52,7 @@
 - [Exemplo de saída de dados]
 
 ### 4.3 Monitoramento e Controle
-- **Indicadores de Funcionamento:** [Preencher]
-- **Logs e Alertas:** [Localização e interpretação]
+- [Manual de Monitoramento — Trust Store ICP-Brasil](manual-monitoramento.md)
 
 ---
 
