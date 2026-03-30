@@ -14,6 +14,7 @@ public class TrustStoreService {
     private final TrustStoreRepository trustStoreRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
     private final TrustStoreConfig trustStoreConfig;
+    private boolean artefatosCarregadosNestaExecucao = false;
 
     public TrustStoreService(TrustStoreRepository trustStoreRepository,
                              IcpBrasilCertificateProvider icpBrasilCertificateProvider,
@@ -24,12 +25,15 @@ public class TrustStoreService {
     }
 
     public void assegurarDisponibilidade() {
-        if (verificarDisponibilidadeRepositorioLocal()
-                .equals(DisponibilidadeRepositorio.DISPONIVEL)) {
+        if (verificarDisponibilidadeRepositorioLocal().equals(DisponibilidadeRepositorio.DISPONIVEL)) {
+            artefatosCarregadosNestaExecucao = true;
             log.info("Artefatos estão disponíveis no repositório local");
         } else {
-            log.warn("Artefatos não estão disponíveis no repositório local");
-            log.info("Iniciando processo de download e armazenamento dos artefatos do truststore no repositório local");
+            if (artefatosCarregadosNestaExecucao) {
+                log.warn("Repositório local removido inesperadamente. Iniciando reposição automática.");
+            } else {
+                log.info("Repositório local vazio. Iniciando download inicial dos artefatos ICP-Brasil.");
+            }
             try {
                 reposicaoArtefatosRepositorioLocal();
             } catch (Exception e1) {
@@ -63,6 +67,7 @@ public class TrustStoreService {
             trustStoreRepository.armazenarZip(zipData);
             trustStoreRepository.armazenarHash(hash);
             trustStoreRepository.armazenarUltimaConfirmacao(ultimaConfirmacao);
+            artefatosCarregadosNestaExecucao = true;
         } catch (Exception e) {
             throw new RuntimeException("Falha ao carregar artefatos no repositório local", e);
         }
@@ -104,6 +109,11 @@ public class TrustStoreService {
     public void assegurrarNaoExpiracaoCache() {
         try {
             Instant ultimaConfirmacao = trustStoreRepository.recuperarUltimaConfirmacao();
+            if (ultimaConfirmacao == null) {
+                log.warn("Última confirmação não encontrada. Cache será marcado como inválido.");
+                Cache.setCacheValid(false);
+                return;
+            }
             long idadeCache = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
 
             if (idadeCache <= trustStoreConfig.getRefreshIntervalMillis()) {
