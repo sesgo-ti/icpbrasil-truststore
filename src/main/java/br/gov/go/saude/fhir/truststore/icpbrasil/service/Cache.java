@@ -71,26 +71,11 @@ public class Cache {
         Map<String, X509Certificate> roots = new HashMap<>();
         for (Map.Entry<String, X509Certificate> entry : skiIndex.entrySet()) {
             X509Certificate cert = entry.getValue();
-            if (isSelfSigned(cert)) {
+            if (CertificateParser.isSelfSigned(cert)) {
                 roots.put(entry.getKey(), cert);
             }
         }
         return roots;
-    }
-
-    private static boolean isSelfSigned(X509Certificate cert) {
-        if (cert.getSubjectX500Principal() == null || cert.getIssuerX500Principal() == null) {
-            return false;
-        }
-        if (!cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) {
-            return false;
-        }
-        try {
-            cert.verify(cert.getPublicKey());
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     public static void setCacheValid(boolean cacheValid) {
