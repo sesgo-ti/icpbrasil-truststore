@@ -12,8 +12,6 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
@@ -34,7 +32,7 @@ public class S3Repository implements TrustStoreRepository {
     }
 
     @Override
-    public Optional<InputStream> recuperarZip() {
+    public Optional<byte[]> recuperarZip() {
         try {
             byte[] bytes = s3Client.getObject(
                     GetObjectRequest.builder()
@@ -44,7 +42,7 @@ public class S3Repository implements TrustStoreRepository {
                     ResponseTransformer.toBytes()
             ).asByteArray();
 
-            return Optional.of(new ByteArrayInputStream(bytes));
+            return Optional.of(bytes);
         } catch (NoSuchKeyException e) {
             log.debug("Zip não encontrado no S3: {}", trustStoreConfig.getStorage().getTruststoreArchivePath());
             return Optional.empty();
