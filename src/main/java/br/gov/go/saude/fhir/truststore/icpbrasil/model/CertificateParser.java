@@ -13,8 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.util.HexFormat;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 
 @Slf4j
@@ -66,6 +65,31 @@ public class CertificateParser {
             log.error("Erro ao criar InputStream a partir dos dados do certificado: {}", e.getMessage());
             throw new CertificateParsingException("Erro ao processar dados do certificado", e);
         }
+    }
+
+    /**
+     * Faz o parse de um certificado X.509 a partir de uma String codificada em Base64 (DER).
+     *
+     * @param base64 String Base64 contendo o certificado no formato DER
+     * @return Certificado X509 parseado
+     * @throws CertificateParsingException Se houver erro no parsing do certificado
+     * @throws IllegalArgumentException Se a String for nula, vazia ou não for Base64 válido
+     */
+    public static X509Certificate parseBase64(String base64) throws CertificateParsingException {
+        if (base64 == null || base64.isBlank()) {
+            log.error("Erro ao carregar certificado: string Base64 é nula ou vazia");
+            throw new IllegalArgumentException("String Base64 do certificado não pode ser nula ou vazia");
+        }
+
+        byte[] derBytes;
+        try {
+            derBytes = Base64.getDecoder().decode(base64);
+        } catch (IllegalArgumentException e) {
+            log.error("Erro ao decodificar Base64 do certificado: {}", e.getMessage());
+            throw new IllegalArgumentException("String não é Base64 válido", e);
+        }
+
+        return parse(derBytes);
     }
 
     /**
@@ -272,6 +296,51 @@ public class CertificateParser {
                 });
     }
 
+
+    /**
+     * Retorna os OIDs das Certificate Policies (OID 2.5.29.32) do certificado.
+     *
+     * @param certificate Certificado X.509
+     * @return Lista de OIDs das políticas (ex: "2.16.76.1.2.3.8")
+     */
+    public static List<String> getCertificatePolicies(X509Certificate certificate) {
+        return X509ExtensionUtils.getExtensionValue(
+                        certificate,
+                        "2.5.29.32",
+                        octets -> {
+                            org.bouncycastle.asn1.x509.CertificatePolicies policies =
+                                    org.bouncycastle.asn1.x509.CertificatePolicies.getInstance(octets);
+                            List<String> oids = new ArrayList<>();
+                            for (org.bouncycastle.asn1.x509.PolicyInformation info : policies.getPolicyInformation()) {
+                                oids.add(info.getPolicyIdentifier().getId());
+                            }
+                            return oids;
+                        })
+                .orElseThrow(() -> {
+                    log.error("Extensão Certificate Policies (2.5.29.32) não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão Certificate Policies (2.5.29.32) não encontrada no certificado");
+                });
+    }
+
+    /**
+     * Retorna o Key Usage (OID 2.5.29.15) do certificado.
+     * <p>
+     * O array retornado possui 9 posições correspondendo a:
+     * [0] digitalSignature, [1] nonRepudiation, [2] keyEncipherment,
+     * [3] dataEncipherment, [4] keyAgreement, [5] keyCertSign,
+     * [6] cRLSign, [7] encipherOnly, [8] decipherOnly.
+     *
+     * @param certificate Certificado X.509
+     * @return Array de 9 booleanos indicando quais usos estão ativos
+     */
+    public static boolean[] getKeyUsage(X509Certificate certificate) {
+        boolean[] keyUsage = certificate.getKeyUsage();
+        if (keyUsage == null) {
+            log.error("Extensão Key Usage (2.5.29.15) não encontrada no certificado");
+            throw new IllegalArgumentException("Extensão Key Usage (2.5.29.15) não encontrada no certificado");
+        }
+        return keyUsage;
+    }
 
     private static class X509ExtensionUtils {
 
