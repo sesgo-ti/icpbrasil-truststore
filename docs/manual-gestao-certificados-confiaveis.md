@@ -48,14 +48,15 @@ Resultado esperado
 O que fazer
 - Baixe o arquivo e salve localmente com nome claro (neste caso, `isrgrootx1.pem`).
 
-```bash
-# Usando PowerShell nativo
+```powershell
 Invoke-WebRequest -Uri "https://letsencrypt.org/certs/isrgrootx1.pem" -OutFile "./isrgrootx1.pem"
+```
 
-# Usando curl (bash)
+```bash
 curl -L "https://letsencrypt.org/certs/isrgrootx1.pem" -o "./isrgrootx1.pem"
+```
 
-# HTTPie
+```bash
 http --download "https://letsencrypt.org/certs/isrgrootx1.pem" --output "./isrgrootx1.pem"
 ```
 
@@ -63,9 +64,10 @@ Resultado esperado
 - Arquivo `CERTNAME.pem` criado no diretório atual, com tamanho > 0 byte. Verifique se o OpenSSL consegue ler:
 
 ```bash
-# Substitua CERTNAME pelo nome escolhido
 openssl x509 -in "CERTNAME.pem" -noout -subject
+```
 
+```bash
 # Exemplo: para isrgrootx1
 openssl x509 -in "isrgrootx1.pem" -noout -subject
 ```
@@ -74,14 +76,19 @@ openssl x509 -in "isrgrootx1.pem" -noout -subject
 O que fazer
 - Gere o fingerprint SHA-256 localmente. Você pode calcular de duas maneiras equivalentes:
 
+3.A) Fingerprint direto via OpenSSL (formato HEX com ":" entre bytes):
+
 ```bash
-# Substitua CERTNAME pelo nome escolhido
-
-# 3.A) Fingerprint direto via OpenSSL (formato HEX com ":" entre bytes)
 openssl x509 -in "CERTNAME.pem" -noout -fingerprint -sha256
+```
 
-# 3.B) Hash do certificado em DER (deve bater com 3.A ignorando formatação)
+3.B) Hash do certificado em DER (deve bater com 3.A ignorando formatação):
+
+```bash
 openssl x509 -in "CERTNAME.pem" -outform der -out "CERTNAME.der"
+```
+
+```bash
 openssl dgst -sha256 "CERTNAME.der"
 ```
 
@@ -92,13 +99,15 @@ Resultado esperado
 O que fazer
 - Exibir os campos principais do certificado (sujeito/issuer/validade) e compare o fingerprint calculado no Passo 3 com o valor oficial (veja Passo 1).
 
+Com OpenSSL (detalhes completos):
+
 ```bash
-# Substitua CERTNAME pelo nome escolhido
-
-# Com OpenSSL (detalhes completos)
 openssl x509 -in "CERTNAME.pem" -noout -text | more
+```
 
-# Com keytool (JDK)
+Com keytool (JDK):
+
+```bash
 keytool -printcert -v -file "CERTNAME.pem"
 ```
 
@@ -123,13 +132,15 @@ O que fazer
 - O SPKI (Subject Public Key Info) já está presente no certificado. Aqui, você deve calcular o hash SHA-256 sobre o SPKI em formato DER e codificar o resultado em Base64 — esse é o pin de SPKI usado para pinning em tempo de execução.
 
 ```bash
-# Substitua CERTNAME pelo nome escolhido
 openssl x509 -in "CERTNAME.pem" -noout -pubkey \
   | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
   | openssl enc -base64
+```
 
-# Exemplo: para isrgrootx1
+Exemplo para isrgrootx1:
+
+```bash
 openssl x509 -in "isrgrootx1.pem" -noout -pubkey \
   | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
@@ -200,10 +211,12 @@ Como registrar no Cofre (HashCorp Vault)
 - Use a UI do HashCorp Vault ou a CLI (`vault kv patch`) para gravar os campos definidos no JSON do Passo 6 no caminho definido (ex.: `kv/certificates`).
 
 ```bash
-# Substitua CERTNAME pelo nome escolhido
 vault kv patch /kv/certificates CERTNAME=@CERTNAME.json
+```
 
-# Exemplo: para isrgrootx1
+Exemplo para isrgrootx1:
+
+```bash
 vault kv patch /kv/certificates isrgrootx1=@isrgrootx1.json
 ```
 
@@ -218,12 +231,20 @@ Opção B — Fallback: registrar em arquivo (filesystem)
 Como registrar no filesystem (fallback)
 
 ```bash
-# Crie diretório e salve o JSON
 mkdir -p registries/certificates/CERTNAME
-cp CERTNAME.json registries/certificates/CERTNAME/
+```
 
-# Exemplo: para isrgrootx1
+```bash
+cp CERTNAME.json registries/certificates/CERTNAME/
+```
+
+Exemplo para isrgrootx1:
+
+```bash
 mkdir -p registries/certificates/isrgrootx1
+```
+
+```bash
 cp isrgrootx1.json registries/certificates/isrgrootx1/
 ```
 
