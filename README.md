@@ -1,14 +1,14 @@
 # Trust Store ICP-Brasil
 
-Biblioteca de auto-configuração Spring Boot para gerenciamento do repositório de certificados ICP-Brasil. Realiza download, verificação de integridade, cache em memória e atualização automática do bundle oficial de ACs da ICP-Brasil.
+Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de certificados das Autoridades Certificadoras (ACs) vigentes da ICP-Brasil. Realiza download do repositório oficial publicado pelo ITI, verificação de integridade por hash SHA-512, cache em memória e sincronização automática.
 
 ---
 
 ## Funcionalidades
 
-- Download do bundle de ACs ICP-Brasil (ZIP) com verificação de hash SHA-512
+- Download do acervo de ACs vigentes da ICP-Brasil (ZIP publicado pelo ITI) com verificação de hash SHA-512
 - Cache em memória com TTL configurável e limiares de criticidade
-- Atualização agendada em background
+- Sincronização automática em background
 - Dois backends de armazenamento: filesystem local ou S3-compatível (MinIO, AWS S3, etc.)
 - Endpoint REST opcional para consulta de certificados por SKI
 - `SSLContext` e `X509TrustManager` com trust exclusivo nas CAs embutidas
@@ -37,14 +37,9 @@ Adicione a dependência:
 
 A biblioteca se auto-configura via mecanismo de auto-configuração do Spring Boot — nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
-Na inicialização, verifica se o bundle está disponível e realiza o download caso necessário. O cache em memória é populado com objetos `X509Certificate` indexados por SKI.
+Na inicialização, verifica se o acervo de ACs da ICP-Brasil já está disponível localmente. Se não, baixa do repositório oficial do ITI. O cache em memória é populado com os certificados das ACs vigentes, indexados por SKI.
 
-**Beans expostos:**
-
-| Bean | Tipo |
-|---|---|
-| `sslContext` | `javax.net.ssl.SSLContext` |
-| `x509TrustManager` | `javax.net.ssl.X509TrustManager` |
+Para um exemplo de integração com consulta por SKI, veja [docs/exemplo-integracao.md](docs/exemplo-integracao.md).
 
 **Configuração mínima:**
 
@@ -95,8 +90,8 @@ curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado
 
 | Propriedade | Padrão | Descrição |
 |---|---|---|
-| `certificate-url` | URL oficial ICP-Brasil | URL do ZIP de certificados (HTTPS obrigatório) |
-| `hash-url` | URL oficial ICP-Brasil | URL do hash SHA-512 |
+| `certificate-url` | Repositório ITI | URL do ZIP com as ACs vigentes da ICP-Brasil (HTTPS obrigatório) |
+| `hash-url` | Repositório ITI | URL do hash SHA-512 para verificação de integridade |
 | `refresh-interval-hours` | `2` | Intervalo de verificação de atualizações (1 a `cache-ttl-critical-hours`) |
 | `cache-ttl-critical-hours` | `72` | Horas sem atualização para estado CRITICAL (24–168) |
 | `cache-ttl-max-hours` | `168` | Horas até o cache expirar (72–720, deve ser > critical) |
@@ -148,13 +143,13 @@ truststore-icpbrasil:
 
 ## Contexto SSL e segurança
 
-A biblioteca cria um `SSLContext` customizado usando **exclusivamente** os certificados embutidos em `registries/certificates/`. Esse contexto é usado apenas para o download do bundle ICP-Brasil — não é aplicado globalmente à JVM.
+A biblioteca cria um `SSLContext` interno usando **exclusivamente** os certificados embutidos em `registries/certificates/`. Esse contexto é encapsulado em `TrustStoreManager` e usado apenas para o download do acervo de ACs vigentes do repositório do ITI — não é exposto como bean Spring nem aplicado globalmente à JVM.
 
 O isolamento é intencional: usar a truststore padrão da JVM para essa conexão exporia o download a um MITM com qualquer uma das ~150 CAs comerciais presentes no `cacerts`.
 
 | Contexto | Trust utilizado |
 |---|---|
-| Download do bundle ICP-Brasil | Apenas CAs de `registries/certificates/` |
+| Download do acervo de ACs (repositório ITI) | Apenas CAs de `registries/certificates/` |
 | Conexão S3 sem `S3_CA_CERT_PATH` | JVM default truststore (`cacerts`) |
 | Conexão S3 com `S3_CA_CERT_PATH` | TrustManager dedicado com aquela CA |
 
