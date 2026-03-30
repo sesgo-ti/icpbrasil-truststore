@@ -74,13 +74,18 @@ java -jar target/trust-store-icpbrasil-*-standalone.jar \
 ### Verificação
 
 ```bash
-# Saúde geral
 curl http://localhost:8080/actuator/health
+```
 
-# Certificado por SKI
+```bash
 curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
+```
+
+```bash
 curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado.der
 ```
+
+Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md).
 
 ---
 
@@ -166,13 +171,14 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 ## Build e testes
 
 ```bash
-# Testes
 ./mvnw test
+```
 
-# JAR de biblioteca (thin)
+```bash
 ./mvnw clean install
+```
 
-# JAR standalone (fat)
+```bash
 ./mvnw clean package -P standalone -DskipTests
 ```
 
