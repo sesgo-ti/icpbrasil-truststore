@@ -51,6 +51,48 @@ public class Cache {
         return skiIndex.get(ski);
     }
 
+    /**
+     * Retorna uma cópia do mapa de certificados indexados por SKI.
+     *
+     * @return Mapa SKI → X509Certificate (cópia defensiva)
+     */
+    public static Map<String, X509Certificate> getAllCertificates() {
+        return new HashMap<>(skiIndex);
+    }
+
+    /**
+     * Retorna os certificados raiz (auto-assinados) indexados por SKI.
+     * Um certificado é considerado raiz quando subject e issuer são iguais
+     * e a assinatura é verificável com a própria chave pública.
+     *
+     * @return Mapa SKI → X509Certificate contendo apenas certificados raiz
+     */
+    public static Map<String, X509Certificate> getRootCertificates() {
+        Map<String, X509Certificate> roots = new HashMap<>();
+        for (Map.Entry<String, X509Certificate> entry : skiIndex.entrySet()) {
+            X509Certificate cert = entry.getValue();
+            if (isSelfSigned(cert)) {
+                roots.put(entry.getKey(), cert);
+            }
+        }
+        return roots;
+    }
+
+    private static boolean isSelfSigned(X509Certificate cert) {
+        if (cert.getSubjectX500Principal() == null || cert.getIssuerX500Principal() == null) {
+            return false;
+        }
+        if (!cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) {
+            return false;
+        }
+        try {
+            cert.verify(cert.getPublicKey());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static void setCacheValid(boolean cacheValid) {
         isCacheValid = cacheValid;
         if (!cacheValid) {

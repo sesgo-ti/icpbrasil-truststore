@@ -66,4 +66,14 @@ public final class HashValidator {
         String calculatedHex = DigestUtils.sha256Hex(data);
         return calculatedHex.equalsIgnoreCase(expectedHex.trim());
     }
+
+    /**
+     * Calcula o hash SHA-512 de um array de bytes.
+     *
+     * @param data Array de bytes
+     * @return Hash SHA-512 em formato hexadecimal (minúsculo)
+     */
+    public static String computeSha512(byte[] data) {
+        return DigestUtils.sha512Hex(data);
+    }
 }
