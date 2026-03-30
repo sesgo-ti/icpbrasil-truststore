@@ -109,4 +109,5 @@ class CacheTest {
 
         assertEquals(originalSize, Cache.getAllCertificates().size());
     }
+
 }
