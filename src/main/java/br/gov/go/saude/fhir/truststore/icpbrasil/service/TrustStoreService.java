@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.Optional;
 @Slf4j
@@ -75,21 +74,16 @@ public class TrustStoreService {
     }
 
     public DisponibilidadeRepositorio verificarDisponibilidadeRepositorioLocal() {
-        Optional<InputStream> zipOpt = trustStoreRepository.recuperarZip();
-        try (InputStream zipStream = zipOpt.orElse(null)) {
-            Optional<String> hashOpt = trustStoreRepository.recuperarHash();
-            Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
+        Optional<byte[]> zipOpt = trustStoreRepository.recuperarZip();
+        Optional<String> hashOpt = trustStoreRepository.recuperarHash();
+        Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
 
-            boolean disponivel = zipOpt.isPresent()
-                    && hashOpt.filter(StringUtils::hasText).isPresent()
-                    && confirmacaoOpt.isPresent();
+        boolean disponivel = zipOpt.isPresent()
+                && hashOpt.filter(StringUtils::hasText).isPresent()
+                && confirmacaoOpt.isPresent();
 
-            return disponivel ? DisponibilidadeRepositorio.DISPONIVEL :
-                    DisponibilidadeRepositorio.INDISPONIVEL;
-        } catch (Exception e) {
-            log.warn("Falha ao verificar repositório local", e);
-            return DisponibilidadeRepositorio.INDISPONIVEL;
-        }
+        return disponivel ? DisponibilidadeRepositorio.DISPONIVEL :
+                DisponibilidadeRepositorio.INDISPONIVEL;
     }
 
     public void verificarSincronizacaoRepositorioLocal() {

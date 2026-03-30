@@ -1,11 +1,10 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.repository;
 
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.Optional;
 
 public interface TrustStoreRepository {
-    Optional<InputStream> recuperarZip();
+    Optional<byte[]> recuperarZip();
 
     Optional<String> recuperarHash();
 
