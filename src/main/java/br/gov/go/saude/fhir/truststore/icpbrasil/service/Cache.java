@@ -12,8 +12,8 @@ import java.util.Map;
 @Slf4j
 @Service
 public class Cache {
-    private static boolean isCacheValid = false;
-    private static Map<String, X509Certificate> skiIndex = new HashMap<>();
+    private static volatile boolean isCacheValid = false;
+    private static volatile Map<String, X509Certificate> skiIndex = new HashMap<>();
 
     /**\
      * Se a cache estiver válida, atualiza o cache de certificados
@@ -54,7 +54,7 @@ public class Cache {
     public static void setCacheValid(boolean cacheValid) {
         isCacheValid = cacheValid;
         if (!cacheValid) {
-            skiIndex.clear();
+            skiIndex = new HashMap<>();
         }
     }
 
