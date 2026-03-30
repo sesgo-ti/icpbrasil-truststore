@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
 
+import org.apache.commons.compress.utils.IOUtils;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -27,18 +29,18 @@ public class S3RepositoryTest {
     @SneakyThrows
     @BeforeEach
     void setUp() {
-        InputStream zipInputStream = util.getResource("ACcompactado.zip");
-        InputStream hashInputStream = util.getResource("hashsha512.txt");
-        InputStream ultimaConfirmacaoInputStream = util.getResource("ultima_confirmacao.txt");
-
-        String hashContent = new String(hashInputStream.readAllBytes(), StandardCharsets.UTF_8);
+        byte[] zipBytes = IOUtils.toByteArray(util.getResource("ACcompactado.zip"));
+        String hashContent = new String(
+                IOUtils.toByteArray(util.getResource("hashsha512.txt")),
+                StandardCharsets.UTF_8
+        );
         String ultimaConfirmacaoString = new String(
-                ultimaConfirmacaoInputStream.readAllBytes(),
+                IOUtils.toByteArray(util.getResource("ultima_confirmacao.txt")),
                 StandardCharsets.UTF_8
         );
 
         when(trustStoreRepository.recuperarZip())
-                .thenReturn(Optional.of(zipInputStream));
+                .thenReturn(Optional.of(zipBytes));
         when(trustStoreRepository.recuperarHash())
                 .thenReturn(Optional.of(hashContent.split("  ")[0].trim()));
         when(trustStoreRepository.recuperarUltimaConfirmacao())
@@ -48,12 +50,8 @@ public class S3RepositoryTest {
 
     @Test
     void testRecuperarZip() {
-        try (InputStream is = trustStoreRepository.recuperarZip().orElseThrow()) {
-            byte[] bytes = is.readAllBytes();
-            assert bytes.length > 0;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        byte[] bytes = trustStoreRepository.recuperarZip().orElseThrow();
+        assert bytes.length > 0;
     }
 
     @Test

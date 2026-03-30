@@ -7,9 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,12 +58,12 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
     }
 
     @Override
-    public Optional<InputStream> recuperarZip() {
+    public Optional<byte[]> recuperarZip() {
         if (!Files.exists(zipPath)) {
             return Optional.empty();
         }
         try {
-            return Optional.of(new ByteArrayInputStream(Files.readAllBytes(zipPath)));
+            return Optional.of(Files.readAllBytes(zipPath));
         } catch (IOException e) {
             log.error("Falha ao recuperar ZIP do filesystem: {}", e.getMessage());
             throw new RuntimeException("Falha ao recuperar ZIP do filesystem", e);
