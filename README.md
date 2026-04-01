@@ -105,12 +105,6 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 | `rest.enabled` | `false` | Ativa o endpoint `/certificate` |
 | `scheduling.enabled` | `true` | Ativa a rotina de atualização em background |
 | `trusted-certs.dir` | `classpath:registries/certificates` | Diretório com CAs fixas (JSON) |
-| `revocation.ocsp-timeout-seconds` | `10` | Timeout da requisição OCSP (1–60) |
-| `revocation.crl-timeout-seconds` | `10` | Timeout da requisição CRL (1–60) |
-| `revocation.max-retries` | `2` | Tentativas de conexão OCSP/CRL (0–10) |
-| `revocation.retry-interval-seconds` | `3` | Intervalo entre tentativas (1–60) |
-| `revocation.ocsp-cache-ttl-seconds` | `3600` | TTL do cache de respostas OCSP (60–86400) |
-| `revocation.crl-cache-ttl-seconds` | `3600` | TTL do cache de CRLs (60–86400) |
 
 ### Armazenamento: filesystem
 
