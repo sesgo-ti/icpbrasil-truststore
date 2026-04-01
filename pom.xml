@@ -47,6 +47,11 @@
       <optional>true</optional>
     </dependency>
 
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+    </dependency>
+
     <!-- Spring Boot Web para RestTemplate -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
