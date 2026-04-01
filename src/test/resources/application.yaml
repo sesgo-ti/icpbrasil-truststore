@@ -31,5 +31,13 @@ truststore-icpbrasil:
     secret-key: "${S3_SECRET_KEY:password}"
     bucket: "${S3_BUCKET:staging}"
 
+  revocation:
+    ocsp-timeout-seconds: 10
+    crl-timeout-seconds: 10
+    max-retries: 2
+    retry-interval-seconds: 3
+    ocsp-cache-ttl-seconds: 3600
+    crl-cache-ttl-seconds: 3600
+
   trusted-certs:
     dir: "classpath:registries/certificates"
