@@ -74,6 +74,11 @@ public class TrustStoreConfig {
     private TrustedCertsConfig trustedCerts;
 
     /**
+     * Configurações de verificação de revogação (OCSP e CRL).
+     */
+    private RevocationConfig revocation;
+
+    /**
      * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
      */
     @Data
@@ -170,6 +175,7 @@ public class TrustStoreConfig {
         validateNetworkConfig();
         validateCacheConfig();
         validateStorageConfig();
+        validateRevocationConfig();
 
         log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
     }
@@ -307,6 +313,49 @@ public class TrustStoreConfig {
     }
 
     /**
+     * Valida as configurações de revogação
+     */
+    private void validateRevocationConfig() {
+        if (revocation == null) {
+            revocation = new RevocationConfig();
+            log.info("Configurações de revogação não definidas, usando valores padrão");
+            return;
+        }
+
+        if (revocation.ocspTimeoutSeconds < 1 || revocation.ocspTimeoutSeconds > 60) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.revocation.ocsp-timeout-seconds' (Valor: '%d')",
+                    revocation.ocspTimeoutSeconds));
+        }
+
+        if (revocation.crlTimeoutSeconds < 1 || revocation.crlTimeoutSeconds > 60) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.revocation.crl-timeout-seconds' (Valor: '%d')",
+                    revocation.crlTimeoutSeconds));
+        }
+
+        if (revocation.maxRetries < 0 || revocation.maxRetries > 10) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] Revocation Max Retries: Deve ser entre 0 e 10. Propriedade: 'truststore-icpbrasil.revocation.max-retries' (Valor: '%d')",
+                    revocation.maxRetries));
+        }
+
+        if (revocation.retryIntervalSeconds < 1 || revocation.retryIntervalSeconds > 60) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] Revocation Retry Interval: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.revocation.retry-interval-seconds' (Valor: '%d')",
+                    revocation.retryIntervalSeconds));
+        }
+
+        if (revocation.ocspCacheTtlSeconds < 60 || revocation.ocspCacheTtlSeconds > 86400) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache TTL: Deve ser entre 60 e 86400 segundos. Propriedade: 'truststore-icpbrasil.revocation.ocsp-cache-ttl-seconds' (Valor: '%d')",
+                    revocation.ocspCacheTtlSeconds));
+        }
+
+        if (revocation.crlCacheTtlSeconds < 60 || revocation.crlCacheTtlSeconds > 86400) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache TTL: Deve ser entre 60 e 86400 segundos. Propriedade: 'truststore-icpbrasil.revocation.crl-cache-ttl-seconds' (Valor: '%d')",
+                    revocation.crlCacheTtlSeconds));
+        }
+
+        log.debug("Configurações de revogação validadas com sucesso");
+    }
+
+    /**
      * Retorna o intervalo de refresh em milissegundos
      */
     public long getRefreshIntervalMillis() {
@@ -325,5 +374,41 @@ public class TrustStoreConfig {
      */
     public long getCacheTtlMaxMillis() {
         return cacheTtlMaxHours * 60 * 60 * 1000L;
+    }
+
+    /**
+     * Configurações de verificação de revogação (OCSP e CRL).
+     */
+    @Data
+    public static class RevocationConfig {
+        /**
+         * Timeout da requisição OCSP em segundos (padrão 10, intervalo [1, 60]).
+         */
+        private int ocspTimeoutSeconds = 10;
+
+        /**
+         * Timeout da requisição CRL em segundos (padrão 10, intervalo [1, 60]).
+         */
+        private int crlTimeoutSeconds = 10;
+
+        /**
+         * Número máximo de tentativas (padrão 2, intervalo [0, 10]).
+         */
+        private int maxRetries = 2;
+
+        /**
+         * Intervalo entre tentativas em segundos (padrão 3, intervalo [1, 60]).
+         */
+        private int retryIntervalSeconds = 3;
+
+        /**
+         * TTL do cache OCSP em segundos (padrão 3600 = 1h, intervalo [60, 86400]).
+         */
+        private long ocspCacheTtlSeconds = 3600;
+
+        /**
+         * TTL do cache CRL em segundos (padrão 3600 = 1h, intervalo [60, 86400]).
+         */
+        private long crlCacheTtlSeconds = 3600;
     }
 }
