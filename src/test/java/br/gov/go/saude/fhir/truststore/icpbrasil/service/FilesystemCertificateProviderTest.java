@@ -23,7 +23,7 @@ class FilesystemCertificateProviderTest {
     void getCertificates_comClasspath_deveRetornarCertificados() {
         // Given - usa o classpath com o ISRG Root X1
         TrustStoreConfig config = createConfig("classpath:registries/certificates");
-        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(objectMapper, config);
+        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(config);
         provider.validate();
 
         // When
@@ -41,7 +41,7 @@ class FilesystemCertificateProviderTest {
     void getCertificates_comFilesystem_deveRetornarCertificados() {
         // Given - usa o diretório filesystem de teste
         TrustStoreConfig config = createConfig("src/test/resources/registries/certificates");
-        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(objectMapper, config);
+        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(config);
         provider.validate();
 
         // When
@@ -57,7 +57,7 @@ class FilesystemCertificateProviderTest {
     void getCertificates_comDiretorioVazio_deveRetornarListaVazia(@TempDir Path tempDir) {
         // Given
         TrustStoreConfig config = createConfig(tempDir.toString());
-        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(objectMapper, config);
+        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(config);
         provider.validate();
 
         // When
@@ -72,7 +72,7 @@ class FilesystemCertificateProviderTest {
     void validate_comDiretorioInexistente_deveLancarExcecao() {
         // Given
         TrustStoreConfig config = createConfig("/caminho/que/nao/existe");
-        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(objectMapper, config);
+        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(config);
 
         // When & Then
         assertThrows(IllegalStateException.class, provider::validate);
@@ -83,7 +83,7 @@ class FilesystemCertificateProviderTest {
         // Given
         Files.writeString(tempDir.resolve("invalid.json"), "{ json invalido }");
         TrustStoreConfig config = createConfig(tempDir.toString());
-        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(objectMapper, config);
+        FilesystemCertificateProvider provider = new FilesystemCertificateProvider(config);
         provider.validate();
 
         // When & Then

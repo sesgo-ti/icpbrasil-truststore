@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateDTO;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -43,8 +44,8 @@ public class FilesystemCertificateProvider implements CertificateProvider {
     private final String configuredDir;
     private final ResourcePatternResolver resourceResolver;
 
-    public FilesystemCertificateProvider(ObjectMapper objectMapper, TrustStoreConfig trustStoreConfig) {
-        this.objectMapper = objectMapper;
+    public FilesystemCertificateProvider(TrustStoreConfig trustStoreConfig) {
+        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         this.configuredDir = trustStoreConfig.getTrustedCerts().getDir();
         this.resourceResolver = new PathMatchingResourcePatternResolver();
     }
