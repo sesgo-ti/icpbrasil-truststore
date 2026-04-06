@@ -3,22 +3,9 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bouncycastle.asn1.x509.AccessDescription;
-import org.bouncycastle.asn1.x509.DistributionPoint;
-import org.bouncycastle.asn1.x509.DistributionPointName;
-import org.bouncycastle.asn1.x509.GeneralName;
-import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.bouncycastle.cert.ocsp.BasicOCSPResp;
-import org.bouncycastle.cert.ocsp.CertificateID;
-import org.bouncycastle.cert.ocsp.CertificateStatus;
-import org.bouncycastle.cert.ocsp.OCSPReqBuilder;
-import org.bouncycastle.cert.ocsp.OCSPResp;
-import org.bouncycastle.cert.ocsp.RevokedStatus;
-import org.bouncycastle.cert.ocsp.SingleResp;
-import org.bouncycastle.cert.ocsp.UnknownStatus;
+import org.bouncycastle.cert.ocsp.*;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
@@ -35,13 +22,24 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Certificate revocation checking service using OCSP and CRL.
+ *
+ * <p>Verification strategy:</p>
+ * <ol>
+ *   <li>Tries OCSP if the certificate has an AIA extension with OCSP endpoints</li>
+ *   <li>Falls back to CRL if OCSP is inconclusive and CRL Distribution Points exist</li>
+ * </ol>
+ *
+ * <p>OCSP responses and CRLs are cached in memory via {@link RevocationCache}.
+ * Operational parameters (timeouts, retries, TTLs) are read from
+ * {@link TrustStoreConfig.RevocationConfig}.</p>
+ */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RevocationService {
 
     static {
@@ -51,28 +49,39 @@ public class RevocationService {
     }
 
     private final RevocationCache cache;
-    private final TrustStoreConfig trustStoreConfig;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private final TrustStoreConfig.RevocationConfig config;
+    private final HttpClient httpClient;
 
+    public RevocationService(RevocationCache cache, TrustStoreConfig trustStoreConfig) {
+        this.cache = cache;
+        this.config = trustStoreConfig.getRevocation();
+        httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+    }
+
+    /**
+     * Checks whether a certificate has been revoked by trying OCSP first, then CRL.
+     *
+     * @param cert   the certificate to verify
+     * @param issuer the issuer certificate (required to build the OCSP request)
+     * @return the revocation status — see {@link RevocationStatus} for possible outcomes
+     */
     public RevocationStatus check(X509Certificate cert, X509Certificate issuer) {
-        TrustStoreConfig.RevocationConfig config = trustStoreConfig.getRevocation();
+        List<String> ocspUrls = CertificateParser.getOcspUrls(cert);
+        List<String> crlUrls = CertificateParser.getCrlUrls(cert);
 
-        String ocspUrl = extractOcspUrl(cert);
-        List<String> crlUrls = extractCrlUrls(cert);
-
-        if (ocspUrl == null && crlUrls.isEmpty()) {
+        if (ocspUrls.isEmpty() && crlUrls.isEmpty()) {
             return new RevocationStatus.NoDistributionPoints();
         }
 
-        if (ocspUrl != null) {
-            RevocationStatus result = tryOcsp(cert, issuer, ocspUrl, config);
+        for (String url : ocspUrls) {
+            RevocationStatus result = tryOcsp(cert, issuer, url);
             if (isConclusive(result)) return result;
         }
 
         for (String url : crlUrls) {
-            RevocationStatus result = tryCrl(cert, url, config);
+            RevocationStatus result = tryCrl(cert, url);
             if (isConclusive(result)) return result;
         }
 
@@ -81,52 +90,29 @@ public class RevocationService {
                 : new RevocationStatus.CrlUnavailable();
     }
 
+    /**
+     * Determines whether a result is conclusive (Good, Revoked, or Malformed)
+     * or should fall through to the next verification mechanism.
+     *
+     * @param status the revocation status to evaluate
+     * @return {@code true} if the status is final and no further checks are needed
+     */
     private boolean isConclusive(RevocationStatus status) {
         return status instanceof RevocationStatus.Good
                 || status instanceof RevocationStatus.Revoked
                 || status instanceof RevocationStatus.Malformed;
     }
 
-    String extractOcspUrl(X509Certificate cert) {
-        try {
-            AccessDescription[] descriptions = CertificateParser.getCertificateAuthorityInformationAccess(cert);
-            for (AccessDescription desc : descriptions) {
-                if (desc.getAccessMethod().equals(AccessDescription.id_ad_ocsp)) {
-                    GeneralName name = desc.getAccessLocation();
-                    if (name.getTagNo() == GeneralName.uniformResourceIdentifier) {
-                        return name.getName().toString();
-                    }
-                }
-            }
-        } catch (IllegalArgumentException e) {
-            log.debug("Extensão AIA não encontrada no certificado: {}", e.getMessage());
-        }
-        return null;
-    }
-
-    List<String> extractCrlUrls(X509Certificate cert) {
-        List<String> urls = new ArrayList<>();
-        try {
-            DistributionPoint[] dps = CertificateParser.getCrlDistributionPoints(cert);
-            for (DistributionPoint dp : dps) {
-                DistributionPointName dpn = dp.getDistributionPoint();
-                if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
-                    GeneralName[] names = GeneralNames.getInstance(dpn.getName()).getNames();
-                    for (GeneralName name : names) {
-                        if (name.getTagNo() == GeneralName.uniformResourceIdentifier) {
-                            urls.add(name.getName().toString());
-                        }
-                    }
-                }
-            }
-        } catch (IllegalArgumentException e) {
-            log.debug("Extensão CRL Distribution Points não encontrada no certificado: {}", e.getMessage());
-        }
-        return urls;
-    }
-
+    /**
+     * Attempts revocation checking via OCSP. Checks the cache before making an HTTP request.
+     *
+     * @param cert   the certificate to verify
+     * @param issuer the issuer certificate
+     * @param url    the OCSP responder URL
+     * @return the revocation status from the OCSP check
+     */
     private RevocationStatus tryOcsp(X509Certificate cert, X509Certificate issuer,
-                                     String url, TrustStoreConfig.RevocationConfig config) {
+                                     String url) {
         String cacheKey = cert.getSerialNumber().toString(16) + "|" + cert.getIssuerX500Principal().getName();
 
         Optional<byte[]> cached = cache.getOcsp(cacheKey, config.getOcspCacheTtlSeconds());
@@ -164,6 +150,14 @@ public class RevocationService {
         }
     }
 
+    /**
+     * Builds a DER-encoded OCSP request for the given certificate.
+     *
+     * @param cert   the certificate to query
+     * @param issuer the issuer certificate (used to compute the certificate ID)
+     * @return the OCSP request as a DER-encoded byte array
+     * @throws Exception if the request cannot be built
+     */
     private byte[] buildOcspRequest(X509Certificate cert, X509Certificate issuer) throws Exception {
         DigestCalculatorProvider digCalcProv = new JcaDigestCalculatorProviderBuilder().build();
         CertificateID certId = new CertificateID(
@@ -176,6 +170,13 @@ public class RevocationService {
         return builder.build().getEncoded();
     }
 
+    /**
+     * Parses an OCSP response and maps it to the corresponding revocation status.
+     *
+     * @param responseBytes the raw OCSP response (DER-encoded)
+     * @param cert          the certificate being checked (used for logging)
+     * @return the revocation status derived from the OCSP response
+     */
     private RevocationStatus parseOcspResponse(byte[] responseBytes, X509Certificate cert) {
         try {
             OCSPResp ocspResp = new OCSPResp(responseBytes);
@@ -203,7 +204,14 @@ public class RevocationService {
         }
     }
 
-    private RevocationStatus tryCrl(X509Certificate cert, String url, TrustStoreConfig.RevocationConfig config) {
+    /**
+     * Attempts revocation checking via CRL. Checks the cache before making an HTTP request.
+     *
+     * @param cert   the certificate to verify
+     * @param url    the CRL distribution point URL
+     * @return the revocation status from the CRL check
+     */
+    private RevocationStatus tryCrl(X509Certificate cert, String url) {
         Optional<byte[]> cached = cache.getCrl(url, config.getCrlCacheTtlSeconds());
         if (cached.isPresent()) {
             log.debug("CRL encontrada no cache para {}", url);
@@ -236,6 +244,15 @@ public class RevocationService {
         }
     }
 
+    /**
+     * Parses a CRL and checks whether the certificate is listed as revoked.
+     *
+     * @param crlBytes the raw CRL data (DER-encoded)
+     * @param cert     the certificate to look up in the CRL
+     * @return {@link RevocationStatus.Good} if not revoked,
+     *         {@link RevocationStatus.Revoked} if revoked,
+     *         {@link RevocationStatus.Malformed} if the CRL cannot be parsed
+     */
     private RevocationStatus parseCrl(byte[] crlBytes, X509Certificate cert) {
         try {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
@@ -250,6 +267,16 @@ public class RevocationService {
         }
     }
 
+    /**
+     * Executes an operation with automatic retries on failure.
+     *
+     * @param maxRetries      maximum number of retries (0 means no retry)
+     * @param intervalSeconds interval between retries in seconds
+     * @param supplier        the operation to execute
+     * @param <T>             the return type of the operation
+     * @return the result of the first successful execution
+     * @throws Exception the exception from the last failed attempt if all retries are exhausted
+     */
     private <T> T executeWithRetry(int maxRetries, int intervalSeconds,
                                    RetryableSupplier<T> supplier) throws Exception {
         Exception lastException = null;
@@ -271,6 +298,11 @@ public class RevocationService {
         throw lastException;
     }
 
+    /**
+     * Functional interface for operations that may throw checked exceptions.
+     *
+     * @param <T> the return type
+     */
     @FunctionalInterface
     private interface RetryableSupplier<T> {
         T get() throws Exception;

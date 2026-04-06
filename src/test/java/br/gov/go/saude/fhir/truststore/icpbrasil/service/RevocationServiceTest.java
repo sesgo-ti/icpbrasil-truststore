@@ -11,7 +11,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import javax.security.auth.x500.X500Principal;
+
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.security.cert.X509Certificate;
+import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,35 +49,9 @@ class RevocationServiceTest {
     }
 
     @Test
-    void testExtractOcspUrl_CertificadoSemOcsp_DeveRetornarNull() {
-        // O certificado DANIEL não possui OCSP na extensão AIA
-        String ocspUrl = revocationService.extractOcspUrl(leafCert);
-
-        assertNull(ocspUrl);
-    }
-
-    @Test
-    void testExtractCrlUrls_CertificadoComCrl_DeveRetornarUrls() {
-        List<String> crlUrls = revocationService.extractCrlUrls(leafCert);
-
-        assertNotNull(crlUrls);
-        assertEquals(2, crlUrls.size());
-        assertTrue(crlUrls.get(0).contains("acsoluti.com.br"));
-        assertTrue(crlUrls.get(1).contains("acsoluti.com.br"));
-    }
-
-    @Test
-    void testExtractCrlUrls_CertificadoIntermediario_DeveRetornarUrls() {
-        List<String> crlUrls = revocationService.extractCrlUrls(issuerCert);
-
-        assertNotNull(crlUrls);
-        assertFalse(crlUrls.isEmpty());
-    }
-
-    @Test
     void testCheck_ComCrlNoCache_DeveRetornarGood() throws Exception {
         // Given - baixa a CRL real e coloca no cache antes de chamar check
-        List<String> crlUrls = revocationService.extractCrlUrls(leafCert);
+        List<String> crlUrls = CertificateParser.getCrlUrls(leafCert);
         assertFalse(crlUrls.isEmpty());
 
         String crlUrl = crlUrls.get(0);
@@ -96,9 +76,9 @@ class RevocationServiceTest {
 
         org.bouncycastle.x509.X509V3CertificateGenerator certGen = new org.bouncycastle.x509.X509V3CertificateGenerator();
         certGen.setSerialNumber(java.math.BigInteger.valueOf(1));
-        certGen.setIssuerDN(new javax.security.auth.x500.X500Principal("CN=Test Root"));
-        certGen.setNotBefore(new java.util.Date(System.currentTimeMillis() - 86400000L));
-        certGen.setNotAfter(new java.util.Date(System.currentTimeMillis() + 86400000L));
+        certGen.setIssuerDN(new X500Principal("CN=Test Root"));
+        certGen.setNotBefore(new Date(System.currentTimeMillis() - 86400000L));
+        certGen.setNotAfter(new Date(System.currentTimeMillis() + 86400000L));
         certGen.setSubjectDN(new javax.security.auth.x500.X500Principal("CN=Test Root"));
         certGen.setPublicKey(kp.getPublic());
         certGen.setSignatureAlgorithm("SHA256WithRSA");
@@ -127,15 +107,15 @@ class RevocationServiceTest {
     }
 
     private byte[] downloadCrl(String url) throws Exception {
-        java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
-                .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
-        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+        HttpRequest request = HttpRequest.newBuilder()
                 .uri(java.net.URI.create(url))
                 .timeout(java.time.Duration.ofSeconds(30))
                 .GET()
                 .build();
-        java.net.http.HttpResponse<byte[]> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
         if (response.statusCode() != 200) {
             throw new RuntimeException("Falha ao baixar CRL: HTTP " + response.statusCode());
         }
