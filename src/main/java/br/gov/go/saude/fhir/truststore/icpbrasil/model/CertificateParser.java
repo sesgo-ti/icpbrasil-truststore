@@ -359,10 +359,9 @@ public class CertificateParser {
                         certificate,
                         "2.5.29.32",
                         octets -> {
-                            org.bouncycastle.asn1.x509.CertificatePolicies policies =
-                                    org.bouncycastle.asn1.x509.CertificatePolicies.getInstance(octets);
+                            CertificatePolicies policies = CertificatePolicies.getInstance(octets);
                             List<String> oids = new ArrayList<>();
-                            for (org.bouncycastle.asn1.x509.PolicyInformation info : policies.getPolicyInformation()) {
+                            for (PolicyInformation info : policies.getPolicyInformation()) {
                                 oids.add(info.getPolicyIdentifier().getId());
                             }
                             return oids;
