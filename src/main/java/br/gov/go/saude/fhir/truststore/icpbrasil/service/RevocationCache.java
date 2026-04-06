@@ -12,7 +12,7 @@ public class RevocationCache {
     private final ConcurrentHashMap<String, OcspEntry> ocsp = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CrlEntry> crl = new ConcurrentHashMap<>();
 
-    public Optional<byte[]> getOcsp(String key, long ttlSeconds) {
+    public Optional<byte[]> getOcsp(String key) {
         OcspEntry entry = ocsp.get(key);
         if (entry == null) return Optional.empty();
         if (!entry.isValid()) {
@@ -26,7 +26,7 @@ public class RevocationCache {
         ocsp.put(key, new OcspEntry(der, Instant.now().plusSeconds(ttlSeconds)));
     }
 
-    public Optional<byte[]> getCrl(String url, long ttlSeconds) {
+    public Optional<byte[]> getCrl(String url) {
         CrlEntry entry = crl.get(url);
         if (entry == null) return Optional.empty();
         if (!entry.isValid()) {
