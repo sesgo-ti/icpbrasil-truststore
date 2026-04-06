@@ -11,12 +11,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import javax.security.auth.x500.X500Principal;
+import org.bouncycastle.x509.X509V3CertificateGenerator;
 
+import javax.security.auth.x500.X500Principal;
+import java.math.BigInteger;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 
@@ -70,16 +76,16 @@ class RevocationServiceTest {
     @Test
     void testCheck_CertificadoSemDistributionPoints_DeveRetornarNoDistributionPoints() throws Exception {
         // Given - certificado auto-assinado sem AIA e sem CRL DP
-        java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
         kpg.initialize(2048);
-        java.security.KeyPair kp = kpg.generateKeyPair();
+        KeyPair kp = kpg.generateKeyPair();
 
-        org.bouncycastle.x509.X509V3CertificateGenerator certGen = new org.bouncycastle.x509.X509V3CertificateGenerator();
-        certGen.setSerialNumber(java.math.BigInteger.valueOf(1));
+        X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
+        certGen.setSerialNumber(BigInteger.valueOf(1));
         certGen.setIssuerDN(new X500Principal("CN=Test Root"));
         certGen.setNotBefore(new Date(System.currentTimeMillis() - 86400000L));
         certGen.setNotAfter(new Date(System.currentTimeMillis() + 86400000L));
-        certGen.setSubjectDN(new javax.security.auth.x500.X500Principal("CN=Test Root"));
+        certGen.setSubjectDN(new X500Principal("CN=Test Root"));
         certGen.setPublicKey(kp.getPublic());
         certGen.setSignatureAlgorithm("SHA256WithRSA");
 
@@ -111,8 +117,8 @@ class RevocationServiceTest {
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(java.net.URI.create(url))
-                .timeout(java.time.Duration.ofSeconds(30))
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
                 .GET()
                 .build();
         HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
