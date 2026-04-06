@@ -140,4 +140,33 @@ class CertificateParserTest {
         assertTrue(keyUsage[0]); // digitalSignature
         assertTrue(keyUsage[1]); // nonRepudiation
     }
+
+    @Test
+    void testGetCrlUrls() {
+        List<String> crlUrls = CertificateParser.getCrlUrls(certificate);
+
+        assertNotNull(crlUrls);
+        assertEquals(2, crlUrls.size());
+        assertTrue(crlUrls.get(0).contains("http://ccd.acsoluti.com.br/lcr/ac-soluti-multipla-v5-g2.crl"));
+        assertTrue(crlUrls.get(1).contains("http://ccd2.acsoluti.com.br/lcr/ac-soluti-multipla-v5-g2.crl"));
+    }
+
+    @Test
+    void testGetCrlUrlsCertificadoIntermediario() {
+        List<String> crlUrls = CertificateParser.getCrlUrls(authorityCertificate);
+
+        assertNotNull(crlUrls);
+        assertEquals(2, crlUrls.size());
+        assertTrue(crlUrls.get(0).contains("http://ccd.acsoluti.com.br/lcr/ac-soluti-v5-g2.crl"));
+        assertTrue(crlUrls.get(1).contains("http://ccd2.acsoluti.com.br/lcr/ac-soluti-v5-g2.crl"));
+    }
+
+    @Test
+    void testGetOcspUrlsCertificadoSemOcsp() {
+        // Certificados ICP-Brasil Soluti não possuem OCSP na AIA
+        List<String> ocspUrls = CertificateParser.getOcspUrls(certificate);
+
+        assertNotNull(ocspUrls);
+        assertTrue(ocspUrls.isEmpty());
+    }
 }

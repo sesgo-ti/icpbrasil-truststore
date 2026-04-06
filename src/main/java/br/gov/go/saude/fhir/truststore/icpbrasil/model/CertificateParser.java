@@ -261,6 +261,57 @@ public class CertificateParser {
     }
 
     /**
+     * Extrai as URLs dos responders OCSP da extensão Authority Information Access (AIA).
+     *
+     * @param certificate certificado X.509
+     * @return lista de URLs OCSP (pode ser vazia se a extensão não existir ou não contiver OCSP)
+     */
+    public static List<String> getOcspUrls(X509Certificate certificate) {
+        List<String> urls = new ArrayList<>();
+        try {
+            AccessDescription[] descriptions = getCertificateAuthorityInformationAccess(certificate);
+            for (AccessDescription desc : descriptions) {
+                if (desc.getAccessMethod().equals(AccessDescription.id_ad_ocsp)) {
+                    GeneralName name = desc.getAccessLocation();
+                    if (name.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                        urls.add(name.getName().toString());
+                    }
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            log.debug("Extensão AIA não encontrada no certificado: {}", e.getMessage());
+        }
+        return urls;
+    }
+
+    /**
+     * Extrai as URLs de CRL da extensão CRL Distribution Points.
+     *
+     * @param certificate certificado X.509
+     * @return lista de URLs de CRL (pode ser vazia se a extensão não existir)
+     */
+    public static List<String> getCrlUrls(X509Certificate certificate) {
+        List<String> urls = new ArrayList<>();
+        try {
+            DistributionPoint[] dps = getCrlDistributionPoints(certificate);
+            for (DistributionPoint dp : dps) {
+                DistributionPointName dpn = dp.getDistributionPoint();
+                if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
+                    GeneralName[] names = GeneralNames.getInstance(dpn.getName()).getNames();
+                    for (GeneralName name : names) {
+                        if (name.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                            urls.add(name.getName().toString());
+                        }
+                    }
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            log.debug("Extensão CRL Distribution Points não encontrada no certificado: {}", e.getMessage());
+        }
+        return urls;
+    }
+
+    /**
      * Retorna o Subject Key Identifier (SKI) do certificado em formato hexadecimal.
      */
     public static String getSubjectKeyIdentifier(X509Certificate certificate) {
