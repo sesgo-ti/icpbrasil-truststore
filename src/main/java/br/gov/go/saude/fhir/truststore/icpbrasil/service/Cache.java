@@ -2,7 +2,6 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
@@ -10,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 @Slf4j
-@Service
 public class Cache {
     private static volatile boolean isCacheValid = false;
     private static volatile Map<String, X509Certificate> skiIndex = new HashMap<>();
