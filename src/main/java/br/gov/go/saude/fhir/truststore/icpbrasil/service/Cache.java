@@ -13,9 +13,23 @@ public class Cache {
     private static volatile boolean isCacheValid = false;
     private static volatile Map<String, X509Certificate> skiIndex = new HashMap<>();
 
-    /**\
-     * Se a cache estiver válida, atualiza o cache de certificados
-     * Se a cache estiver inválida, não faz nada
+    /**
+     * Carrega os certificados no cache incondicionalmente, marcando-o como válido.
+     * Este é o entry point recomendado para consumidores da lib que desejam
+     * popular o cache manualmente.
+     *
+     * @param certificates Lista de certificados para carregar no cache
+     */
+    public static void load(List<X509Certificate> certificates) {
+        log.info("Carregando cache de certificados...");
+        isCacheValid = true;
+        createMapSkiToCertificate(certificates);
+        log.info("Cache de certificados carregado com {} entradas.", skiIndex.size());
+    }
+
+    /**
+     * Se a cache estiver válida, atualiza o cache de certificados.
+     * Se a cache estiver inválida, não faz nada.
      *
      * @param certificates Lista de certificados para atualizar o cache
      */
