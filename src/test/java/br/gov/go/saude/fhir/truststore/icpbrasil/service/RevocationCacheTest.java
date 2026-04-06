@@ -18,7 +18,7 @@ class RevocationCacheTest {
 
     @Test
     void testGetOcsp_ComCacheMiss_DeveRetornarVazio() {
-        Optional<byte[]> result = cache.getOcsp("chave-inexistente", 3600);
+        Optional<byte[]> result = cache.getOcsp("chave-inexistente");
 
         assertTrue(result.isEmpty());
     }
@@ -30,7 +30,7 @@ class RevocationCacheTest {
         cache.putOcsp("chave-ocsp", der, 3600);
 
         // When
-        Optional<byte[]> result = cache.getOcsp("chave-ocsp", 3600);
+        Optional<byte[]> result = cache.getOcsp("chave-ocsp");
 
         // Then
         assertTrue(result.isPresent());
@@ -44,7 +44,7 @@ class RevocationCacheTest {
         cache.putOcsp("chave-expirada", der, 0);
 
         // When
-        Optional<byte[]> result = cache.getOcsp("chave-expirada", 0);
+        Optional<byte[]> result = cache.getOcsp("chave-expirada");
 
         // Then
         assertTrue(result.isEmpty());
@@ -52,7 +52,7 @@ class RevocationCacheTest {
 
     @Test
     void testGetCrl_ComCacheMiss_DeveRetornarVazio() {
-        Optional<byte[]> result = cache.getCrl("http://url-inexistente", 3600);
+        Optional<byte[]> result = cache.getCrl("http://url-inexistente");
 
         assertTrue(result.isEmpty());
     }
@@ -64,7 +64,7 @@ class RevocationCacheTest {
         cache.putCrl("http://crl.example.com", der, 3600);
 
         // When
-        Optional<byte[]> result = cache.getCrl("http://crl.example.com", 3600);
+        Optional<byte[]> result = cache.getCrl("http://crl.example.com");
 
         // Then
         assertTrue(result.isPresent());
@@ -78,7 +78,7 @@ class RevocationCacheTest {
         cache.putCrl("http://crl-expirada.example.com", der, 0);
 
         // When
-        Optional<byte[]> result = cache.getCrl("http://crl-expirada.example.com", 0);
+        Optional<byte[]> result = cache.getCrl("http://crl-expirada.example.com");
 
         // Then
         assertTrue(result.isEmpty());
@@ -91,7 +91,7 @@ class RevocationCacheTest {
         cache.putOcsp("chave", new byte[]{2}, 3600);
 
         // When
-        Optional<byte[]> result = cache.getOcsp("chave", 3600);
+        Optional<byte[]> result = cache.getOcsp("chave");
 
         // Then
         assertTrue(result.isPresent());
@@ -106,7 +106,7 @@ class RevocationCacheTest {
         cache.putCrl(url, new byte[]{2}, 3600);
 
         // When
-        Optional<byte[]> result = cache.getCrl(url, 3600);
+        Optional<byte[]> result = cache.getCrl(url);
 
         // Then
         assertTrue(result.isPresent());

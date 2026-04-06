@@ -115,7 +115,7 @@ public class RevocationService {
                                      String url) {
         String cacheKey = cert.getSerialNumber().toString(16) + "|" + cert.getIssuerX500Principal().getName();
 
-        Optional<byte[]> cached = cache.getOcsp(cacheKey, config.getOcspCacheTtlSeconds());
+        Optional<byte[]> cached = cache.getOcsp(cacheKey);
         if (cached.isPresent()) {
             log.debug("Resposta OCSP encontrada no cache para {}", cacheKey);
             return parseOcspResponse(cached.get(), cert);
@@ -212,7 +212,7 @@ public class RevocationService {
      * @return the revocation status from the CRL check
      */
     private RevocationStatus tryCrl(X509Certificate cert, String url) {
-        Optional<byte[]> cached = cache.getCrl(url, config.getCrlCacheTtlSeconds());
+        Optional<byte[]> cached = cache.getCrl(url);
         if (cached.isPresent()) {
             log.debug("CRL encontrada no cache para {}", url);
             return parseCrl(cached.get(), cert);
