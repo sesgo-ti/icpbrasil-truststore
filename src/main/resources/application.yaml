@@ -71,6 +71,20 @@ truststore-icpbrasil:
     # Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/minha-ca.crt
     ca-cert-path: "${S3_CA_CERT_PATH:}"
 
+  # Configurações de Verificação de Revogação (OCSP e CRL)
+  # [Resultado]: Controla timeouts, retries e cache para checagem de revogação
+  # Nota: O HttpClient de revogação usa o trust store padrão da JVM intencionalmente,
+  # pois os endpoints OCSP/CRL são acessados via CAs públicas (não ICP-Brasil).
+  revocation:
+    ocsp-timeout-seconds: 10        # Timeout da requisição OCSP (1-60s)
+    crl-timeout-seconds: 10         # Timeout da requisição CRL (1-60s)
+    max-retries: 2                  # Tentativas em caso de falha (0-10)
+    retry-interval-seconds: 3       # Intervalo entre tentativas (1-60s)
+    ocsp-cache-ttl-seconds: 3600    # TTL do cache OCSP (60-86400s)
+    crl-cache-ttl-seconds: 3600     # TTL do cache CRL (60-86400s)
+    ocsp-cache-max-size: 10000      # Máximo de entradas no cache OCSP (100-1000000)
+    crl-cache-max-size: 1000        # Máximo de entradas no cache CRL (100-100000)
+
   # Diretório de Certificados Confiáveis Fixos
   # [Resultado]: Local onde o sistema busca certificados adicionais (JSON) no classpath ou disco
   trusted-certs:
