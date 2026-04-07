@@ -78,8 +78,11 @@ public class OcspClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> sendRequest(cert, issuer, url));
 
-            cache.putOcsp(cacheKey, responseBytes);
-            return parseResponse(responseBytes, cert, issuer);
+            RevocationStatus result = parseResponse(responseBytes, cert, issuer);
+            if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
+                cache.putOcsp(cacheKey, responseBytes);
+            }
+            return result;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação OCSP interrompida para {}", url);
@@ -129,8 +132,9 @@ public class OcspClient {
         try {
             OCSPResp ocspResp = new OCSPResp(responseBytes);
             if (ocspResp.getStatus() != OCSPResp.SUCCESSFUL) {
-                log.warn("Resposta OCSP com status não-sucesso: {}", ocspResp.getStatus());
-                return new RevocationStatus.Malformed("OCSP");
+                log.warn("Resposta OCSP com status não-sucesso: {} ({})",
+                        ocspResp.getStatus(), describeOcspResponseStatus(ocspResp.getStatus()));
+                return new RevocationStatus.OcspUnavailable();
             }
             BasicOCSPResp basicResp = (BasicOCSPResp) ocspResp.getResponseObject();
             if (!verifySignature(basicResp, issuer)) {
@@ -145,9 +149,10 @@ public class OcspClient {
                 } else if (status instanceof RevokedStatus) {
                     return new RevocationStatus.Revoked("OCSP");
                 } else if (status instanceof UnknownStatus) {
-                    log.warn("OCSP retornou status unknown para certificado serial {}",
+                    log.warn("OCSP retornou status unknown para certificado serial {} — " +
+                                    "o responder não reconhece este certificado",
                             cert.getSerialNumber().toString(16));
-                    return new RevocationStatus.Malformed("OCSP");
+                    return new RevocationStatus.OcspUnavailable();
                 }
             }
             return new RevocationStatus.Malformed("OCSP");
@@ -155,6 +160,17 @@ public class OcspClient {
             log.warn("Falha ao processar resposta OCSP: {}", e.getMessage());
             return new RevocationStatus.Malformed("OCSP");
         }
+    }
+
+    private String describeOcspResponseStatus(int status) {
+        return switch (status) {
+            case OCSPResp.MALFORMED_REQUEST -> "malformedRequest";
+            case OCSPResp.INTERNAL_ERROR -> "internalError";
+            case OCSPResp.TRY_LATER -> "tryLater";
+            case OCSPResp.SIG_REQUIRED -> "sigRequired";
+            case OCSPResp.UNAUTHORIZED -> "unauthorized";
+            default -> "desconhecido(" + status + ")";
+        };
     }
 
     /**
