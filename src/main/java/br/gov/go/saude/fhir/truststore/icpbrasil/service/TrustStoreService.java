@@ -2,6 +2,7 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.repository.TrustStoreRepository;
+import br.gov.go.saude.fhir.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;

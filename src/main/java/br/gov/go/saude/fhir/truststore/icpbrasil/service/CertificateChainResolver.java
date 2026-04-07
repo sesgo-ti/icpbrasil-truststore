@@ -16,7 +16,7 @@ public class CertificateChainResolver {
     private static final int MAX_CHAIN_DEPTH = 10;
 
     /**
-     * Constrói a cadeia de certificados a partir de um certificado folha (leaf),
+     * Constrói a cadeia de certificados **ICP-Brasil** a partir de um certificado folha (leaf),
      * caminhando pela relação AKI→SKI até encontrar um certificado raiz
      * (auto-assinado) ou um emissor não presente no cache.
      *

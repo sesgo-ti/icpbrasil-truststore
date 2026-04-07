@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
@@ -62,7 +62,7 @@ class RevocationServiceTest {
 
         String crlUrl = crlUrls.get(0);
         byte[] crlBytes = downloadCrl(crlUrl);
-        revocationCache.putCrl(crlUrl, crlBytes, 3600);
+        revocationCache.putCrl(crlUrl, crlBytes);
 
         // When
         RevocationStatus status = revocationService.check(leafCert, issuerCert);

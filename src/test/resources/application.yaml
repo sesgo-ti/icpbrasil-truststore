@@ -38,6 +38,8 @@ truststore-icpbrasil:
     retry-interval-seconds: 3
     ocsp-cache-ttl-seconds: 3600
     crl-cache-ttl-seconds: 3600
+    ocsp-cache-max-size: 10000
+    crl-cache-max-size: 1000
 
   trusted-certs:
     dir: "classpath:registries/certificates"
