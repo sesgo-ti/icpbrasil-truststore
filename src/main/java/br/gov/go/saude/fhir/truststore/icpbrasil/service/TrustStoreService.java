@@ -11,6 +11,7 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
+
 @Slf4j
 @Service
 public class TrustStoreService {
