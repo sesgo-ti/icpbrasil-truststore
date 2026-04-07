@@ -3,11 +3,13 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.config;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.Security;
 
 /**
  * Propriedades de configuração para o TrustStore ICP-Brasil.
@@ -18,6 +20,14 @@ import java.net.URISyntaxException;
 @Slf4j
 @ConfigurationProperties(prefix = "truststore-icpbrasil")
 public class TrustStoreConfig {
+
+    // BouncyCastle é necessário para operações OCSP e CRL (assinaturas, parsing de extensões).
+    // O registro deve ocorrer antes de qualquer uso, por isso fica no bloco estático da config.
+    static {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+    }
 
     /**
      * URL do arquivo de certificados (Trust Store ICP-Brasil).
