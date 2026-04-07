@@ -62,7 +62,7 @@ class RevocationServiceTest {
 
         String crlUrl = crlUrls.get(0);
         byte[] crlBytes = downloadCrl(crlUrl);
-        revocationCache.putCrl(crlUrl, crlBytes, 3600);
+        revocationCache.putCrl(crlUrl, crlBytes);
 
         // When
         RevocationStatus status = revocationService.check(leafCert, issuerCert);

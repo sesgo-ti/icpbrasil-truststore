@@ -1,54 +1,55 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 
+import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * Cache de respostas OCSP e CRLs com TTL e limite de tamanho configuráveis.
+ *
+ * <p>Utiliza Caffeine para eviction automática por TTL ({@code expireAfterWrite})
+ * e por tamanho ({@code maximumSize}), eliminando a necessidade de limpeza manual.</p>
+ *
+ * <p>Parâmetros configuráveis via {@code truststore-icpbrasil.revocation.*}
+ * em {@code application.yaml}.</p>
+ */
 @Service
 public class RevocationCache {
 
-    private final ConcurrentHashMap<String, OcspEntry> ocsp = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, CrlEntry> crl = new ConcurrentHashMap<>();
+    private final Cache<String, byte[]> ocspCache;
+    private final Cache<String, byte[]> crlCache;
 
-    public Optional<byte[]> getOcsp(String key) {
-        OcspEntry entry = ocsp.get(key);
-        if (entry == null) return Optional.empty();
-        if (!entry.isValid()) {
-            ocsp.remove(key);
-            return Optional.empty();
-        }
-        return Optional.of(entry.der);
+    public RevocationCache(TrustStoreConfig trustStoreConfig) {
+        TrustStoreConfig.RevocationConfig config = trustStoreConfig.getRevocation();
+
+        this.ocspCache = Caffeine.newBuilder()
+                .expireAfterWrite(config.getOcspCacheTtlSeconds(), TimeUnit.SECONDS)
+                .maximumSize(config.getOcspCacheMaxSize())
+                .build();
+
+        this.crlCache = Caffeine.newBuilder()
+                .expireAfterWrite(config.getCrlCacheTtlSeconds(), TimeUnit.SECONDS)
+                .maximumSize(config.getCrlCacheMaxSize())
+                .build();
     }
 
-    public void putOcsp(String key, byte[] der, long ttlSeconds) {
-        ocsp.put(key, new OcspEntry(der, Instant.now().plusSeconds(ttlSeconds)));
+    public Optional<byte[]> getOcsp(String key) {
+        return Optional.ofNullable(ocspCache.getIfPresent(key));
+    }
+
+    public void putOcsp(String key, byte[] der) {
+        ocspCache.put(key, der);
     }
 
     public Optional<byte[]> getCrl(String url) {
-        CrlEntry entry = crl.get(url);
-        if (entry == null) return Optional.empty();
-        if (!entry.isValid()) {
-            crl.remove(url);
-            return Optional.empty();
-        }
-        return Optional.of(entry.der);
+        return Optional.ofNullable(crlCache.getIfPresent(url));
     }
 
-    public void putCrl(String url, byte[] der, long ttlSeconds) {
-        crl.put(url, new CrlEntry(der, Instant.now().plusSeconds(ttlSeconds)));
-    }
-
-    private record OcspEntry(byte[] der, Instant expiry) {
-        boolean isValid() {
-            return Instant.now().isBefore(expiry);
-        }
-    }
-
-    private record CrlEntry(byte[] der, Instant expiry) {
-        boolean isValid() {
-            return Instant.now().isBefore(expiry);
-        }
+    public void putCrl(String url, byte[] der) {
+        crlCache.put(url, der);
     }
 }
