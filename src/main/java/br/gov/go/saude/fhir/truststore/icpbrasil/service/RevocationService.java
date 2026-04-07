@@ -4,10 +4,16 @@ import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.ocsp.*;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.DigestCalculatorProvider;
+import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
 import org.springframework.stereotype.Service;
 
@@ -81,7 +87,7 @@ public class RevocationService {
         }
 
         for (String url : crlUrls) {
-            RevocationStatus result = tryCrl(cert, url);
+            RevocationStatus result = tryCrl(cert, issuer, url);
             if (isConclusive(result)) return result;
         }
 
@@ -118,7 +124,7 @@ public class RevocationService {
         Optional<byte[]> cached = cache.getOcsp(cacheKey);
         if (cached.isPresent()) {
             log.debug("Resposta OCSP encontrada no cache para {}", cacheKey);
-            return parseOcspResponse(cached.get(), cert);
+            return parseOcspResponse(cached.get(), cert, issuer);
         }
 
         try {
@@ -138,11 +144,11 @@ public class RevocationService {
                 return response.body();
             });
 
-            cache.putOcsp(cacheKey, responseBytes, config.getOcspCacheTtlSeconds());
-            return parseOcspResponse(responseBytes, cert);
+            cache.putOcsp(cacheKey, responseBytes);
+            return parseOcspResponse(responseBytes, cert, issuer);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("OCSP verificação interrompida para {}", url);
+            log.warn("Verificação OCSP interrompida para {}", url);
             return new RevocationStatus.NoConnectivity();
         } catch (Exception e) {
             log.warn("OCSP indisponível para {}: {}", url, e.getMessage());
@@ -171,13 +177,16 @@ public class RevocationService {
     }
 
     /**
-     * Parses an OCSP response and maps it to the corresponding revocation status.
+     * Parses an OCSP response, verifies its signature and maps it to the corresponding
+     * revocation status.
      *
      * @param responseBytes the raw OCSP response (DER-encoded)
-     * @param cert          the certificate being checked (used for logging)
+     * @param cert          the certificate being checked
+     * @param issuer        the issuer certificate (used to verify the response signature)
      * @return the revocation status derived from the OCSP response
      */
-    private RevocationStatus parseOcspResponse(byte[] responseBytes, X509Certificate cert) {
+    private RevocationStatus parseOcspResponse(byte[] responseBytes, X509Certificate cert,
+                                                X509Certificate issuer) {
         try {
             OCSPResp ocspResp = new OCSPResp(responseBytes);
             if (ocspResp.getStatus() != OCSPResp.SUCCESSFUL) {
@@ -185,6 +194,11 @@ public class RevocationService {
                 return new RevocationStatus.Malformed("OCSP");
             }
             BasicOCSPResp basicResp = (BasicOCSPResp) ocspResp.getResponseObject();
+            if (!verifyOcspSignature(basicResp, issuer)) {
+                log.warn("Assinatura da resposta OCSP inválida para certificado serial {}",
+                        cert.getSerialNumber().toString(16));
+                return new RevocationStatus.Malformed("OCSP");
+            }
             for (SingleResp singleResp : basicResp.getResponses()) {
                 CertificateStatus status = singleResp.getCertStatus();
                 if (status == CertificateStatus.GOOD) {
@@ -199,8 +213,102 @@ public class RevocationService {
             }
             return new RevocationStatus.Malformed("OCSP");
         } catch (Exception e) {
-            log.warn("Erro ao parsear resposta OCSP: {}", e.getMessage());
+            log.warn("Falha ao processar resposta OCSP: {}", e.getMessage());
             return new RevocationStatus.Malformed("OCSP");
+        }
+    }
+
+    /**
+     * Verifies the OCSP response signature per RFC 6960 Section 3.2.
+     * Accepts responses signed by the issuer CA directly or by a delegated responder
+     * with {@code id-kp-OCSPSigning} EKU issued by the same CA.
+     *
+     * @param basicResp the parsed OCSP response
+     * @param issuer    the CA that issued the certificate being checked
+     * @return {@code true} if the signature is valid and the signer is authorized
+     */
+    private boolean verifyOcspSignature(BasicOCSPResp basicResp, X509Certificate issuer) {
+        try {
+            ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
+                    .setProvider("BC")
+                    .build(issuer.getPublicKey());
+            if (basicResp.isSignatureValid(verifier)) {
+                return true;
+            }
+        } catch (Exception e) {
+            log.debug("Assinatura OCSP não confere com o emissor, tentando certificado delegado");
+        }
+
+        try {
+            X509CertificateHolder[] certs = basicResp.getCerts();
+            if (certs == null || certs.length == 0) {
+                log.warn("Resposta OCSP não contém certificados do assinante");
+                return false;
+            }
+
+            JcaX509CertificateHolder issuerHolder = new JcaX509CertificateHolder(issuer);
+
+            for (var responderCert : certs) {
+                if (isAuthorizedResponder(responderCert, issuerHolder, issuer)
+                        && isOcspSignatureValid(basicResp, responderCert)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Falha ao verificar assinatura OCSP via certificado delegado: {}", e.getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks whether a certificate is an authorized OCSP responder per RFC 6960 Section 3.2:
+     * must be issued by the same CA and carry the {@code id-kp-OCSPSigning} EKU,
+     * with a valid signature from the CA.
+     */
+    private boolean isAuthorizedResponder(X509CertificateHolder responderCert,
+                                          JcaX509CertificateHolder issuerHolder,
+                                          X509Certificate issuer) {
+        try {
+            if (!responderCert.getIssuer().equals(issuerHolder.getSubject())) {
+                return false;
+            }
+
+            Extension ekuExt = responderCert.getExtension(Extension.extendedKeyUsage);
+            if (ekuExt == null) {
+                return false;
+            }
+
+            ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ekuExt.getParsedValue());
+            if (!eku.hasKeyPurposeId(KeyPurposeId.id_kp_OCSPSigning)) {
+                return false;
+            }
+
+            ContentVerifierProvider issuerVerifier = new JcaContentVerifierProviderBuilder()
+                    .setProvider("BC")
+                    .build(issuer.getPublicKey());
+            return responderCert.isSignatureValid(issuerVerifier);
+        } catch (Exception e) {
+            log.debug("Certificado delegado OCSP inválido: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Verifies the OCSP response signature against the given signer certificate.
+     *
+     * @param basicResp the parsed OCSP response
+     * @param signer    the candidate signer certificate
+     * @return {@code true} if the signature is valid
+     */
+    private boolean isOcspSignatureValid(BasicOCSPResp basicResp, X509CertificateHolder signer) {
+        try {
+            ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
+                    .setProvider("BC")
+                    .build(signer);
+            return basicResp.isSignatureValid(verifier);
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -208,14 +316,15 @@ public class RevocationService {
      * Attempts revocation checking via CRL. Checks the cache before making an HTTP request.
      *
      * @param cert   the certificate to verify
+     * @param issuer the issuer certificate (used to verify the CRL signature)
      * @param url    the CRL distribution point URL
      * @return the revocation status from the CRL check
      */
-    private RevocationStatus tryCrl(X509Certificate cert, String url) {
+    private RevocationStatus tryCrl(X509Certificate cert, X509Certificate issuer, String url) {
         Optional<byte[]> cached = cache.getCrl(url);
         if (cached.isPresent()) {
             log.debug("CRL encontrada no cache para {}", url);
-            return parseCrl(cached.get(), cert);
+            return parseCrl(cached.get(), cert, issuer);
         }
 
         try {
@@ -232,11 +341,11 @@ public class RevocationService {
                 return response.body();
             });
 
-            cache.putCrl(url, crlBytes, config.getCrlCacheTtlSeconds());
-            return parseCrl(crlBytes, cert);
+            cache.putCrl(url, crlBytes);
+            return parseCrl(crlBytes, cert, issuer);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("CRL verificação interrompida para {}", url);
+            log.warn("Verificação CRL interrompida para {}", url);
             return new RevocationStatus.NoConnectivity();
         } catch (Exception e) {
             log.warn("CRL indisponível para {}: {}", url, e.getMessage());
@@ -245,24 +354,27 @@ public class RevocationService {
     }
 
     /**
-     * Parses a CRL and checks whether the certificate is listed as revoked.
+     * Parses a CRL, verifies its signature and checks whether the certificate
+     * is listed as revoked.
      *
      * @param crlBytes the raw CRL data (DER-encoded)
      * @param cert     the certificate to look up in the CRL
+     * @param issuer   the issuer certificate (used to verify the CRL signature)
      * @return {@link RevocationStatus.Good} if not revoked,
      *         {@link RevocationStatus.Revoked} if revoked,
-     *         {@link RevocationStatus.Malformed} if the CRL cannot be parsed
+     *         {@link RevocationStatus.Malformed} if the CRL cannot be parsed or the signature is invalid
      */
-    private RevocationStatus parseCrl(byte[] crlBytes, X509Certificate cert) {
+    private RevocationStatus parseCrl(byte[] crlBytes, X509Certificate cert, X509Certificate issuer) {
         try {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             X509CRL crl = (X509CRL) cf.generateCRL(new ByteArrayInputStream(crlBytes));
+            crl.verify(issuer.getPublicKey());
             if (crl.isRevoked(cert)) {
                 return new RevocationStatus.Revoked("CRL");
             }
             return new RevocationStatus.Good("CRL", crlBytes);
         } catch (Exception e) {
-            log.warn("Erro ao parsear CRL: {}", e.getMessage());
+            log.warn("Falha ao validar CRL: {}", e.getMessage());
             return new RevocationStatus.Malformed("CRL");
         }
     }
