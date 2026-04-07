@@ -6,7 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Optional;
 @Slf4j
 @Service
@@ -168,6 +170,22 @@ public class TrustStoreService {
             } else {
                 log.warn("Cache inválido, não será atualizado");
             }
+        }
+    }
+
+    public boolean isTrustedRoot(X509Certificate cert) {
+        try {
+            byte[] encoded = cert.getEncoded();
+            return Cache.getRootCertificates().values().stream()
+                    .anyMatch(trusted -> {
+                        try {
+                            return Arrays.equals(trusted.getEncoded(), encoded);
+                        } catch (Exception e) {
+                            return false;
+                        }
+                    });
+        } catch (Exception e) {
+            return false;
         }
     }
 

@@ -23,7 +23,7 @@ public class CertificateChainResolver {
      * @param leaf certificado folha (end-entity) a partir do qual a cadeia será montada
      * @return Lista ordenada [leaf, intermediário1, ..., raiz]
      */
-    public List<X509Certificate> resolver(X509Certificate leaf) {
+    public static List<X509Certificate> mountChain(X509Certificate leaf) {
         List<X509Certificate> chain = new ArrayList<>();
         Set<String> visited = new HashSet<>();
 
