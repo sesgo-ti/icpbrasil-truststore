@@ -63,12 +63,16 @@ public class RevocationService {
     }
 
     /**
-     * Determina se um resultado é conclusivo (Good, Revoked ou Malformed)
+     * Determina se um resultado é conclusivo (Good ou Revoked)
      * ou se deve prosseguir para o próximo mecanismo de verificação.
+     *
+     * <p>Apenas respostas definitivas são conclusivas. Qualquer outro status
+     * (Malformed, OcspUnavailable, CrlUnavailable, NoConnectivity) indica
+     * que não foi possível obter resposta válida daquele mecanismo e deve-se
+     * tentar o próximo.</p>
      */
     private boolean isConclusive(RevocationStatus status) {
         return status instanceof RevocationStatus.Good
-                || status instanceof RevocationStatus.Revoked
-                || status instanceof RevocationStatus.Malformed;
+                || status instanceof RevocationStatus.Revoked;
     }
 }
