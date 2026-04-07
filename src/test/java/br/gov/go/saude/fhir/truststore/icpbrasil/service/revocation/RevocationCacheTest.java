@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import org.junit.jupiter.api.BeforeEach;
