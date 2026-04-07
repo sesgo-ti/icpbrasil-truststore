@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.service.provider;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

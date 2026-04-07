@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.service.provider;
 
 import java.security.cert.X509Certificate;
 import java.util.List;

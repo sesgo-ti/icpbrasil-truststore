@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.model;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.fhir.truststore.icpbrasil.util.Util;

@@ -1,7 +1,7 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.http;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
-import br.gov.go.saude.fhir.truststore.icpbrasil.service.CertificateProvider;
+import br.gov.go.saude.fhir.truststore.icpbrasil.service.provider.CertificateProvider;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
