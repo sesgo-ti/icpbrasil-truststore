@@ -31,6 +31,11 @@ truststore-icpbrasil:
     secret-key: "${S3_SECRET_KEY:password}"
     bucket: "${S3_BUCKET:staging}"
 
+  chain:
+    download-timeout-seconds: 10
+    max-retries: 1
+    retry-interval-seconds: 1
+
   revocation:
     ocsp-timeout-seconds: 10
     crl-timeout-seconds: 10
