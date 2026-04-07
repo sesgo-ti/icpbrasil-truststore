@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.model;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import org.bouncycastle.asn1.ASN1Primitive;

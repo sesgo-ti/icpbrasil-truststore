@@ -1,4 +1,4 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.service;
+package br.gov.go.saude.fhir.truststore.icpbrasil.service.provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;

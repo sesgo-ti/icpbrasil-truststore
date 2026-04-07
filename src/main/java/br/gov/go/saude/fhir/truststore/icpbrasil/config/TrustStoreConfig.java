@@ -3,11 +3,13 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.config;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.Security;
 
 /**
  * Propriedades de configuração para o TrustStore ICP-Brasil.
@@ -18,6 +20,14 @@ import java.net.URISyntaxException;
 @Slf4j
 @ConfigurationProperties(prefix = "truststore-icpbrasil")
 public class TrustStoreConfig {
+
+    // BouncyCastle é necessário para operações OCSP e CRL (assinaturas, parsing de extensões).
+    // O registro deve ocorrer antes de qualquer uso, por isso fica no bloco estático da config.
+    static {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+    }
 
     /**
      * URL do arquivo de certificados (Trust Store ICP-Brasil).
@@ -352,6 +362,16 @@ public class TrustStoreConfig {
                     revocation.crlCacheTtlSeconds));
         }
 
+        if (revocation.ocspCacheMaxSize < 100 || revocation.ocspCacheMaxSize > 1_000_000) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache Max Size: Deve ser entre 100 e 1000000. Propriedade: 'truststore-icpbrasil.revocation.ocsp-cache-max-size' (Valor: '%d')",
+                    revocation.ocspCacheMaxSize));
+        }
+
+        if (revocation.crlCacheMaxSize < 100 || revocation.crlCacheMaxSize > 100_000) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache Max Size: Deve ser entre 100 e 100000. Propriedade: 'truststore-icpbrasil.revocation.crl-cache-max-size' (Valor: '%d')",
+                    revocation.crlCacheMaxSize));
+        }
+
         log.debug("Configurações de revogação validadas com sucesso");
     }
 
@@ -410,5 +430,15 @@ public class TrustStoreConfig {
          * TTL do cache CRL em segundos (padrão 3600 = 1h, intervalo [60, 86400]).
          */
         private long crlCacheTtlSeconds = 3600;
+
+        /**
+         * Tamanho máximo do cache OCSP em número de entradas (padrão 10000, intervalo [100, 1000000]).
+         */
+        private long ocspCacheMaxSize = 10_000;
+
+        /**
+         * Tamanho máximo do cache CRL em número de entradas (padrão 1000, intervalo [100, 100000]).
+         */
+        private long crlCacheMaxSize = 1_000;
     }
 }
