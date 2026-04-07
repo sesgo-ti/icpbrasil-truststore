@@ -68,6 +68,35 @@ public class CertificateParser {
     }
 
     /**
+     * Faz o parse de todos os certificados X.509 contidos em um array de bytes.
+     * Suporta DER, PEM (simples ou concatenados) e PKCS#7 (.p7b).
+     *
+     * @param data Array de bytes contendo um ou mais certificados
+     * @return Lista de certificados X509 parseados
+     * @throws CertificateParsingException Se houver erro no parsing
+     */
+    public static List<X509Certificate> parseAll(byte[] data) throws CertificateParsingException {
+        if (data == null || data.length == 0) {
+            throw new IllegalArgumentException("Dados não podem ser nulos ou vazios");
+        }
+
+        try (InputStream inputStream = new ByteArrayInputStream(data)) {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            List<X509Certificate> result = new ArrayList<>();
+            for (Certificate cert : cf.generateCertificates(inputStream)) {
+                if (cert instanceof X509Certificate x509) {
+                    result.add(x509);
+                }
+            }
+            return result;
+        } catch (CertificateException e) {
+            throw new CertificateParsingException("Erro ao parsear certificados", e);
+        } catch (IOException e) {
+            throw new CertificateParsingException("Erro ao processar dados dos certificados", e);
+        }
+    }
+
+    /**
      * Faz o parse de um certificado X.509 a partir de uma String codificada em Base64 (DER).
      *
      * @param base64 String Base64 contendo o certificado no formato DER
@@ -258,6 +287,31 @@ public class CertificateParser {
                     log.error("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
                     return new IllegalArgumentException("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
                 });
+    }
+
+    /**
+     * Extrai as URLs de CA Issuers da extensão Authority Information Access (AIA).
+     * Essas URLs apontam para o certificado do emissor, tipicamente em formato DER ou PKCS#7 (.p7b).
+     *
+     * @param certificate certificado X.509
+     * @return lista de URLs CA Issuers (pode ser vazia se a extensão não existir)
+     */
+    public static List<String> getCaIssuersUrls(X509Certificate certificate) {
+        List<String> urls = new ArrayList<>();
+        try {
+            AccessDescription[] descriptions = getCertificateAuthorityInformationAccess(certificate);
+            for (AccessDescription desc : descriptions) {
+                if (desc.getAccessMethod().equals(AccessDescription.id_ad_caIssuers)) {
+                    GeneralName name = desc.getAccessLocation();
+                    if (name.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                        urls.add(name.getName().toString());
+                    }
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            log.debug("Extensão AIA não encontrada no certificado: {}", e.getMessage());
+        }
+        return urls;
     }
 
     /**
