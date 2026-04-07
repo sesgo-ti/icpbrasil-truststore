@@ -33,9 +33,6 @@ class CertificateChainResolverTest {
     @Autowired
     TrustStoreRepository trustStoreRepository;
 
-    @Autowired
-    CertificateChainResolver certificateChainResolver;
-
     X509Certificate leafCertificate;
     X509Certificate intermediaryCertificate;
 
@@ -61,8 +58,8 @@ class CertificateChainResolverTest {
     }
 
     @Test
-    void testResolverCadeiaComLeaf() {
-        List<X509Certificate> chain = certificateChainResolver.resolver(leafCertificate);
+    void testMountChainCadeiaComLeaf() {
+        List<X509Certificate> chain = CertificateChainResolver.mountChain(leafCertificate);
 
         assertFalse(chain.isEmpty());
         assertEquals(leafCertificate, chain.getFirst());
@@ -76,8 +73,8 @@ class CertificateChainResolverTest {
     }
 
     @Test
-    void testResolverCadeiaAkiSkiRelacionamento() {
-        List<X509Certificate> chain = certificateChainResolver.resolver(leafCertificate);
+    void testMountChainCadeiaAkiSkiRelacionamento() {
+        List<X509Certificate> chain = CertificateChainResolver.mountChain(leafCertificate);
 
         for (int i = 0; i < chain.size() - 1; i++) {
             String aki = CertificateParser.getAuthorityKeyIdentifier(chain.get(i));
@@ -88,19 +85,19 @@ class CertificateChainResolverTest {
     }
 
     @Test
-    void testResolverCadeiaParaCertificadoRaiz() {
+    void testMountChainCadeiaParaCertificadoRaiz() {
         Map<String, X509Certificate> roots = Cache.getRootCertificates();
         X509Certificate rootCert = roots.values().iterator().next();
 
-        List<X509Certificate> chain = certificateChainResolver.resolver(rootCert);
+        List<X509Certificate> chain = CertificateChainResolver.mountChain(rootCert);
 
         assertEquals(1, chain.size());
         assertEquals(rootCert, chain.getFirst());
     }
 
     @Test
-    void testResolverCadeiaSemDuplicatas() {
-        List<X509Certificate> chain = certificateChainResolver.resolver(leafCertificate);
+    void testMountChainCadeiaSemDuplicatas() {
+        List<X509Certificate> chain = CertificateChainResolver.mountChain(leafCertificate);
 
         long distinctCount = chain.stream()
                 .map(CertificateParser::getSubjectKeyIdentifier)

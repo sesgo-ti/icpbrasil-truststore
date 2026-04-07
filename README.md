@@ -11,6 +11,7 @@ Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de
 - Sincronização automática em background
 - Dois backends de armazenamento: filesystem local ou S3-compatível (MinIO, AWS S3, etc.)
 - Endpoint REST opcional para consulta de certificados por SKI
+- Verificação de revogação de certificados via OCSP e CRL com cache e fallback automático
 - `SSLContext` e `X509TrustManager` com trust exclusivo nas CAs embutidas
 - Health indicator (`/actuator/health`) com estados VALID / CRITICAL / EXPIRED
 
@@ -143,6 +144,39 @@ truststore-icpbrasil:
     max-retries: 3                 # 1–10
     retry-interval-seconds: 30    # 10–300
 ```
+
+### Revogação (OCSP e CRL)
+
+```yaml
+truststore-icpbrasil:
+  revocation:
+    ocsp-timeout-seconds: 10
+    crl-timeout-seconds: 10
+    max-retries: 2
+    retry-interval-seconds: 3
+    ocsp-cache-ttl-seconds: 3600
+    crl-cache-ttl-seconds: 3600
+```
+
+O `RevocationService` verifica se um certificado foi revogado consultando OCSP e CRL. A estratégia é:
+
+1. Tenta OCSP (se o certificado possuir a extensão AIA com endpoint OCSP)
+2. Se OCSP for inconclusivo, tenta CRL (se o certificado possuir CRL Distribution Points)
+3. Respostas OCSP e CRLs são cacheadas em memória com TTL configurável
+
+O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados:
+
+| Status | Significado |
+|---|---|
+| `Good` | Certificado não revogado (inclui bytes da resposta para LTV) |
+| `Revoked` | Certificado revogado |
+| `NoDistributionPoints` | Certificado não possui extensões OCSP nem CRL |
+| `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
+| `CrlUnavailable` | CRL inacessível após todas as tentativas |
+| `NoConnectivity` | Verificação interrompida (thread interrupted) |
+| `Malformed` | Resposta OCSP ou CRL corrompida ou com status inesperado |
+
+Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
 
 ---
 
