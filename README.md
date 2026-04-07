@@ -11,6 +11,7 @@ Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de
 - Sincronização automática em background
 - Dois backends de armazenamento: filesystem local ou S3-compatível (MinIO, AWS S3, etc.)
 - Endpoint REST opcional para consulta de certificados por SKI
+- Montagem de cadeia de certificados via AIA CA Issuers (suporte a DER, PEM e PKCS#7)
 - Verificação de revogação de certificados via OCSP e CRL com cache e fallback automático
 - `SSLContext` e `X509TrustManager` com trust exclusivo nas CAs embutidas
 - Health indicator (`/actuator/health`) com estados VALID / CRITICAL / EXPIRED
@@ -177,6 +178,28 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 | `Malformed` | Resposta OCSP ou CRL corrompida ou com status inesperado |
 
 Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
+
+### Montagem de cadeia (AIA CA Issuers)
+
+```yaml
+truststore-icpbrasil:
+  chain:
+    download-timeout-seconds: 10  # 1–60
+    max-retries: 1                # 0–5
+    retry-interval-seconds: 2     # 1–30
+```
+
+O `CertificateChainResolver` recebe um certificado folha (leaf) e constrói a cadeia completa `[leaf, intermediário1, ..., raiz]` baixando os emissores via extensão AIA (Authority Information Access) — CA Issuers. O download pode retornar um certificado único (DER/PEM) ou um pacote PKCS#7 (.p7b) contendo a cadeia inteira.
+
+Características:
+
+- **Independente do cache ICP-Brasil** — funciona com qualquer certificado X.509
+- Profundidade máxima de 10 níveis, com detecção de referência circular
+- Verificação criptográfica da assinatura em cada nível da cadeia
+- Pool de certificados baixados (um p7b com cadeia completa evita downloads redundantes)
+- Lança `IncompleteChainException` se não alcançar um certificado raiz (auto-assinado)
+
+Se a seção `chain` não for definida no YAML, valores padrão são aplicados automaticamente.
 
 ---
 
