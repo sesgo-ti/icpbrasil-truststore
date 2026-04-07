@@ -89,6 +89,11 @@ public class TrustStoreConfig {
     private RevocationConfig revocation;
 
     /**
+     * Configurações de montagem de cadeia de certificados via AIA CA Issuers.
+     */
+    private ChainConfig chain;
+
+    /**
      * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
      */
     @Data
@@ -186,6 +191,7 @@ public class TrustStoreConfig {
         validateCacheConfig();
         validateStorageConfig();
         validateRevocationConfig();
+        validateChainConfig();
 
         log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
     }
@@ -376,6 +382,34 @@ public class TrustStoreConfig {
     }
 
     /**
+     * Valida as configurações de montagem de cadeia
+     */
+    private void validateChainConfig() {
+        if (chain == null) {
+            chain = new ChainConfig();
+            log.info("Configurações de cadeia não definidas, usando valores padrão");
+            return;
+        }
+
+        if (chain.downloadTimeoutSeconds < 1 || chain.downloadTimeoutSeconds > 60) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Download Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.chain.download-timeout-seconds' (Valor: '%d')",
+                    chain.downloadTimeoutSeconds));
+        }
+
+        if (chain.maxRetries < 0 || chain.maxRetries > 5) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Max Retries: Deve ser entre 0 e 5. Propriedade: 'truststore-icpbrasil.chain.max-retries' (Valor: '%d')",
+                    chain.maxRetries));
+        }
+
+        if (chain.retryIntervalSeconds < 1 || chain.retryIntervalSeconds > 30) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Retry Interval: Deve ser entre 1 e 30 segundos. Propriedade: 'truststore-icpbrasil.chain.retry-interval-seconds' (Valor: '%d')",
+                    chain.retryIntervalSeconds));
+        }
+
+        log.debug("Configurações de cadeia validadas com sucesso");
+    }
+
+    /**
      * Retorna o intervalo de refresh em milissegundos
      */
     public long getRefreshIntervalMillis() {
@@ -440,5 +474,26 @@ public class TrustStoreConfig {
          * Tamanho máximo do cache CRL em número de entradas (padrão 1000, intervalo [100, 100000]).
          */
         private long crlCacheMaxSize = 1_000;
+    }
+
+    /**
+     * Configurações de montagem de cadeia de certificados via AIA CA Issuers.
+     */
+    @Data
+    public static class ChainConfig {
+        /**
+         * Timeout do download de certificados via AIA em segundos (padrão 10, intervalo [1, 60]).
+         */
+        private int downloadTimeoutSeconds = 10;
+
+        /**
+         * Número máximo de retries por URL (padrão 1, intervalo [0, 5]).
+         */
+        private int maxRetries = 1;
+
+        /**
+         * Intervalo entre tentativas em segundos (padrão 2, intervalo [1, 30]).
+         */
+        private int retryIntervalSeconds = 2;
     }
 }

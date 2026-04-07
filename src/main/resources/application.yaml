@@ -71,6 +71,13 @@ truststore-icpbrasil:
     # Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/minha-ca.crt
     ca-cert-path: "${S3_CA_CERT_PATH:}"
 
+  # Configurações de Montagem de Cadeia de Certificados via AIA CA Issuers
+  # [Resultado]: Controla o download de certificados emissores para construção da cadeia
+  chain:
+    download-timeout-seconds: 10    # Timeout do download AIA (1-60s)
+    max-retries: 1                  # Tentativas adicionais por URL (0-5)
+    retry-interval-seconds: 2       # Intervalo entre tentativas (1-30s)
+
   # Configurações de Verificação de Revogação (OCSP e CRL)
   # [Resultado]: Controla timeouts, retries e cache para checagem de revogação
   # Nota: O HttpClient de revogação usa o trust store padrão da JVM intencionalmente,
