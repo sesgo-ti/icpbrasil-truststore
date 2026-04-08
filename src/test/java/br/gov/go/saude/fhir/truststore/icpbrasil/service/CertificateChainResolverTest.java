@@ -1,6 +1,7 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import lombok.SneakyThrows;
@@ -86,8 +87,10 @@ class CertificateChainResolverTest {
         networkConfig.setRetryIntervalSeconds(0);
         trustStoreConfig.setNetwork(networkConfig);
 
+        DownloadPolicy downloadPolicy = mock(DownloadPolicy.class); // permissivo: não bloqueia nada
+
         RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
-        resolver = new CertificateChainResolver(retryPolicy, chainConfig, mockHttpClient);
+        resolver = new CertificateChainResolver(retryPolicy, chainConfig, mockHttpClient, downloadPolicy);
     }
 
     @Test
