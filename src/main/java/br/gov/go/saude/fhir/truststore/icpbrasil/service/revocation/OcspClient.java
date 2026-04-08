@@ -1,6 +1,8 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -42,12 +44,14 @@ public class OcspClient {
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
     private final HttpClient httpClient;
+    private final DownloadPolicy downloadPolicy;
 
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
-                      TrustStoreConfig trustStoreConfig) {
+                      TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = trustStoreConfig.getRevocation();
+        this.downloadPolicy = downloadPolicy;
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(config.getOcspTimeoutSeconds()))
@@ -70,6 +74,13 @@ public class OcspClient {
         if (cached.isPresent()) {
             log.debug("Resposta OCSP encontrada no cache para {}", cacheKey);
             return parseResponse(cached.get(), cert, issuer);
+        }
+
+        try {
+            downloadPolicy.validateUrl(url);
+        } catch (DownloadPolicyException e) {
+            log.warn("URL OCSP bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.OcspUnavailable();
         }
 
         try {
@@ -113,6 +124,7 @@ public class OcspClient {
         if (response.statusCode() != 200) {
             throw new IOException("OCSP HTTP status: " + response.statusCode());
         }
+        downloadPolicy.validateOcspResponseSize(response.body(), url);
         return response.body();
     }
 
