@@ -202,6 +202,42 @@ Características:
 
 Se a seção `chain` não for definida no YAML, valores padrão são aplicados automaticamente.
 
+### Política de download (SSRF e limites de tamanho)
+
+```yaml
+truststore-icpbrasil:
+  download-policy:
+    max-ocsp-response-bytes: 1048576   # 1 MB — padrão; intervalo válido: 1024–10485760
+    max-crl-response-bytes: 52428800   # 50 MB — padrão; intervalo válido: 1024–524288000
+    max-aia-response-bytes: 10485760   # 10 MB — padrão; intervalo válido: 1024–104857600
+    block-private-hostnames: true      # Resolve DNS para bloquear IPs privados
+    allowed-domains: []                # Lista de domínios permitidos (vazio = qualquer domínio público)
+```
+
+O `DownloadPolicy` protege contra SSRF (Server-Side Request Forgery) e exaustão de memória em downloads disparados por URLs extraídas de extensões de certificados X.509 (AIA CA Issuers, endpoints OCSP e pontos de distribuição de CRL).
+
+**Validações sempre aplicadas:**
+
+- Apenas esquemas `http` e `https` são permitidos
+- Endereços localhost e reservados são bloqueados (127.x.x.x, ::1, etc.)
+- IPs privados literais são bloqueados (10.x.x.x, 172.16–31.x.x, 192.168.x.x)
+- O tamanho da resposta é verificado antes de carregar o conteúdo em memória
+
+**`block-private-hostnames`:** quando `true` (padrão), o hostname é resolvido via DNS antes do download — a conexão é bloqueada se o IP resultante for privado. Desabilite em ambientes de desenvolvimento onde os servidores OCSP/CRL estão em rede interna.
+
+**`allowed-domains`:** lista de sufixos de domínio permitidos. Quando vazia (padrão), qualquer domínio público é aceito. Exemplo para restringir apenas a domínios governamentais:
+
+```yaml
+truststore-icpbrasil:
+  download-policy:
+    allowed-domains:
+      - icpbrasil.gov.br
+      - caixa.gov.br
+      - serpro.gov.br
+```
+
+Se a seção `download-policy` não for definida no YAML, valores padrão são aplicados automaticamente.
+
 ---
 
 ## Contexto SSL e segurança
