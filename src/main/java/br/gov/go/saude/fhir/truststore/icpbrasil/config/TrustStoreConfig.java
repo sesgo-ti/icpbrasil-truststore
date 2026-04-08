@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.Security;
+import java.util.List;
 
 /**
  * Propriedades de configuração para o TrustStore ICP-Brasil.
@@ -92,6 +93,11 @@ public class TrustStoreConfig {
      * Configurações de montagem de cadeia de certificados via AIA CA Issuers.
      */
     private ChainConfig chain;
+
+    /**
+     * Configurações de política de download (proteção SSRF e limites de tamanho).
+     */
+    private DownloadPolicyConfig downloadPolicy;
 
     /**
      * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
@@ -192,6 +198,7 @@ public class TrustStoreConfig {
         validateStorageConfig();
         validateRevocationConfig();
         validateChainConfig();
+        validateDownloadPolicyConfig();
 
         log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
     }
@@ -410,6 +417,40 @@ public class TrustStoreConfig {
     }
 
     /**
+     * Valida as configurações de política de download.
+     */
+    private void validateDownloadPolicyConfig() {
+        if (downloadPolicy == null) {
+            downloadPolicy = new DownloadPolicyConfig();
+            log.info("Configurações de política de download não definidas, usando valores padrão");
+            return;
+        }
+
+        if (downloadPolicy.maxOcspResponseBytes < 1024 || downloadPolicy.maxOcspResponseBytes > 10_485_760L) {
+            throw new IllegalStateException(String.format(
+                    "[Erro de Configuração] Download Policy OCSP Max Size: Deve ser entre 1024 e 10485760 bytes. " +
+                    "Propriedade: 'truststore-icpbrasil.download-policy.max-ocsp-response-bytes' (Valor: '%d')",
+                    downloadPolicy.maxOcspResponseBytes));
+        }
+
+        if (downloadPolicy.maxCrlResponseBytes < 1024 || downloadPolicy.maxCrlResponseBytes > 524_288_000L) {
+            throw new IllegalStateException(String.format(
+                    "[Erro de Configuração] Download Policy CRL Max Size: Deve ser entre 1024 e 524288000 bytes. " +
+                    "Propriedade: 'truststore-icpbrasil.download-policy.max-crl-response-bytes' (Valor: '%d')",
+                    downloadPolicy.maxCrlResponseBytes));
+        }
+
+        if (downloadPolicy.maxAiaResponseBytes < 1024 || downloadPolicy.maxAiaResponseBytes > 104_857_600L) {
+            throw new IllegalStateException(String.format(
+                    "[Erro de Configuração] Download Policy AIA Max Size: Deve ser entre 1024 e 104857600 bytes. " +
+                    "Propriedade: 'truststore-icpbrasil.download-policy.max-aia-response-bytes' (Valor: '%d')",
+                    downloadPolicy.maxAiaResponseBytes));
+        }
+
+        log.debug("Configurações de política de download validadas com sucesso");
+    }
+
+    /**
      * Retorna o intervalo de refresh em milissegundos
      */
     public long getRefreshIntervalMillis() {
@@ -495,5 +536,43 @@ public class TrustStoreConfig {
          * Intervalo entre tentativas em segundos (padrão 2, intervalo [1, 30]).
          */
         private int retryIntervalSeconds = 2;
+    }
+
+    /**
+     * Política de segurança para downloads iniciados por URLs extraídas de certificados.
+     * Protege contra SSRF e consumo abusivo de memória.
+     */
+    @Data
+    public static class DownloadPolicyConfig {
+
+        /**
+         * Tamanho máximo da resposta OCSP em bytes (padrão 1 MB, intervalo [1024, 10485760]).
+         * Respostas típicas de OCSP têm menos de 10 KB.
+         */
+        private long maxOcspResponseBytes = 1_048_576L;
+
+        /**
+         * Tamanho máximo da CRL em bytes (padrão 50 MB, intervalo [1024, 524288000]).
+         * CRLs do ICP-Brasil podem chegar a alguns MB; 50 MB é um limite de segurança.
+         */
+        private long maxCrlResponseBytes = 52_428_800L;
+
+        /**
+         * Tamanho máximo da resposta AIA CA Issuers em bytes (padrão 10 MB, intervalo [1024, 104857600]).
+         * Um arquivo p7b com cadeia completa raramente ultrapassa alguns MB.
+         */
+        private long maxAiaResponseBytes = 10_485_760L;
+
+        /**
+         * Se true, resolve o hostname DNS e bloqueia se o endereço resolvido for privado.
+         * Proteção adicional contra SSRF via DNS; note que não elimina DNS rebinding.
+         */
+        private boolean blockPrivateHostnames = true;
+
+        /**
+         * Lista de domínios permitidos (ex: "icpbrasil.gov.br", "serpro.gov.br").
+         * Subdomínios são automaticamente incluídos. Vazia = qualquer domínio público aceito.
+         */
+        private List<String> allowedDomains = List.of();
     }
 }

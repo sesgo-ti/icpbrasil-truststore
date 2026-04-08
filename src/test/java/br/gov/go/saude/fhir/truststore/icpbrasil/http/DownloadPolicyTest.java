@@ -1,5 +1,6 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.http;
 
+import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,7 +16,7 @@ class DownloadPolicyTest {
 
     @BeforeEach
     void setUp() {
-        DownloadPolicyConfig config = new DownloadPolicyConfig();
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
         config.setBlockPrivateHostnames(false); // desativa resolução DNS nos testes unitários
         config.setAllowedDomains(List.of());
         policy = new DownloadPolicy(config);
@@ -91,7 +92,7 @@ class DownloadPolicyTest {
 
     @Test
     void validateUrl_allowlistAtiva_dominioPermitido_naoLancaExcecao() {
-        DownloadPolicyConfig config = new DownloadPolicyConfig();
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
         config.setBlockPrivateHostnames(false);
         config.setAllowedDomains(List.of("icpbrasil.gov.br", "serpro.gov.br"));
         DownloadPolicy policyWithAllowlist = new DownloadPolicy(config);
@@ -103,7 +104,7 @@ class DownloadPolicyTest {
 
     @Test
     void validateUrl_allowlistAtiva_dominioNaoPermitido_lancaExcecao() {
-        DownloadPolicyConfig config = new DownloadPolicyConfig();
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
         config.setBlockPrivateHostnames(false);
         config.setAllowedDomains(List.of("icpbrasil.gov.br"));
         DownloadPolicy policyWithAllowlist = new DownloadPolicy(config);
