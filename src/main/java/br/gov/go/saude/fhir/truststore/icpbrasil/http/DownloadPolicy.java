@@ -1,6 +1,9 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.http;
 
+import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -14,15 +17,21 @@ import java.util.Set;
  * reservados. Aplica limites de tamanho de resposta por tipo de artefato.</p>
  */
 @Slf4j
+@Component
 public class DownloadPolicy {
 
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
     private static final Set<String> BLOCKED_HOSTNAMES =
             Set.of("localhost", "ip6-localhost", "ip6-loopback");
 
-    private final DownloadPolicyConfig config;
+    private final TrustStoreConfig.DownloadPolicyConfig config;
 
-    DownloadPolicy(DownloadPolicyConfig config) {
+    @Autowired
+    public DownloadPolicy(TrustStoreConfig trustStoreConfig) {
+        this.config = trustStoreConfig.getDownloadPolicy();
+    }
+
+    DownloadPolicy(TrustStoreConfig.DownloadPolicyConfig config) {
         this.config = config;
     }
 
