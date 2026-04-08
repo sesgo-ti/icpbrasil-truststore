@@ -64,8 +64,11 @@ public class CrlClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> download(url));
 
-            cache.putCrl(url, crlBytes);
-            return parse(crlBytes, cert, issuer);
+            RevocationStatus result = parse(crlBytes, cert, issuer);
+            if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
+                cache.putCrl(url, crlBytes);
+            }
+            return result;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação CRL interrompida para {}", url);
