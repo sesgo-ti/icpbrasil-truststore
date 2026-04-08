@@ -293,12 +293,6 @@ public class TrustStoreConfig {
                     cacheTtlMaxHours, cacheTtlCriticalHours));
         }
 
-//        // Validar TTL do cache (1-168 horas)
-//        if (cacheTtlHours < 24 || cacheTtlHours > 168) {
-//            throw new IllegalStateException("TTL do cache deve estar entre 1 e 168 horas. " +
-//                    "Valor atual: " + cacheTtlHours);
-//        }
-
         // Validar intervalo de refresh (deve ser positivo)
         if (refreshIntervalHours < 1 || refreshIntervalHours > cacheTtlCriticalHours) {
             throw new IllegalStateException(String.format("[Erro de Configuração] Intervalo de Refresh: Deve estar entre 1 e o TTL Crítico (%d). Propriedade: 'truststore-icpbrasil.refresh-interval-hours' (Valor: '%d')",
