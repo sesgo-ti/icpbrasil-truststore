@@ -225,7 +225,7 @@ O `DownloadPolicy` protege contra SSRF (Server-Side Request Forgery) e exaustão
 
 **`block-private-hostnames`:** quando `true` (padrão), o hostname é resolvido via DNS antes do download — a conexão é bloqueada se o IP resultante for privado. Desabilite em ambientes de desenvolvimento onde os servidores OCSP/CRL estão em rede interna.
 
-**`allowed-domains`:** lista de sufixos de domínio permitidos. Quando vazia (padrão), qualquer domínio público é aceito. Exemplo para restringir apenas a domínios governamentais:
+**`allowed-domains`:** lista de sufixos de domínio. Quando vazia (padrão), qualquer domínio público é aceito. A correspondência é por sufixo do hostname: `icpbrasil.gov.br` cobre `ocsp.icpbrasil.gov.br`, `crl.icpbrasil.gov.br`, etc. Exemplo para restringir apenas a domínios governamentais:
 
 ```yaml
 truststore-icpbrasil:
