@@ -50,6 +50,7 @@ public class OcspClient {
         this.config = trustStoreConfig.getRevocation();
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(config.getOcspTimeoutSeconds()))
                 .build();
     }
 
