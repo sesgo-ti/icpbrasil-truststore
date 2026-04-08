@@ -38,6 +38,7 @@ public class CrlClient {
         this.config = trustStoreConfig.getRevocation();
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
                 .build();
     }
 
