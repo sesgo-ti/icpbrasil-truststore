@@ -3,7 +3,7 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.service.provider;
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.fhir.truststore.icpbrasil.repository.TrustStoreRepository;
-import br.gov.go.saude.fhir.truststore.icpbrasil.util.Downloader;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.fhir.truststore.icpbrasil.util.Util;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;

@@ -1,8 +1,6 @@
-package br.gov.go.saude.fhir.truststore.icpbrasil.util;
+package br.gov.go.saude.fhir.truststore.icpbrasil.http;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
-import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
-import br.gov.go.saude.fhir.truststore.icpbrasil.http.TrustStoreManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
