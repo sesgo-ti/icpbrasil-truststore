@@ -13,6 +13,7 @@ Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de
 - Endpoint REST opcional para consulta de certificados por SKI
 - Montagem de cadeia de certificados via AIA CA Issuers (suporte a DER, PEM e PKCS#7)
 - Verificação de revogação de certificados via OCSP e CRL com cache e fallback automático
+- Proteção contra SSRF e limites de tamanho configuráveis para downloads iniciados por extensões de certificados (AIA, OCSP, CRL)
 - `SSLContext` e `X509TrustManager` com trust exclusivo nas CAs embutidas
 - Health indicator (`/actuator/health`) com estados VALID / CRITICAL / EXPIRED
 
