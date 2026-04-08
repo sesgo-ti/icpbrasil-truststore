@@ -92,10 +92,10 @@ class CertificateChainResolverTest {
 
     @Test
     @SneakyThrows
-    void testMountChainCadeiaCompleta() {
+    void testResolveChainCadeiaCompleta() {
         mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
 
-        List<X509Certificate> chain = resolver.mountChain(leafCert);
+        List<X509Certificate> chain = resolver.resolveChain(leafCert);
 
         assertEquals(3, chain.size());
         assertEquals(leafCert, chain.get(0));
@@ -105,10 +105,10 @@ class CertificateChainResolverTest {
 
     @Test
     @SneakyThrows
-    void testMountChainAkiSkiRelacionamento() {
+    void testResolveChainAkiSkiRelacionamento() {
         mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
 
-        List<X509Certificate> chain = resolver.mountChain(leafCert);
+        List<X509Certificate> chain = resolver.resolveChain(leafCert);
 
         for (int i = 0; i < chain.size() - 1; i++) {
             String aki = CertificateParser.getAuthorityKeyIdentifier(chain.get(i));
@@ -119,8 +119,8 @@ class CertificateChainResolverTest {
     }
 
     @Test
-    void testMountChainCertificadoRaiz() {
-        List<X509Certificate> chain = resolver.mountChain(rootCert);
+    void testResolveChainCertificadoRaiz() {
+        List<X509Certificate> chain = resolver.resolveChain(rootCert);
 
         assertEquals(1, chain.size());
         assertEquals(rootCert, chain.getFirst());
@@ -128,12 +128,12 @@ class CertificateChainResolverTest {
 
     @Test
     @SneakyThrows
-    void testMountChainSemAiaLancaExcecao() {
+    void testResolveChainSemAiaLancaExcecao() {
         X509Certificate certSemAia = generateCertWithoutAia(
                 leafKeyPair, intermediateKeyPair, intermediateCert);
 
         IncompleteChainException ex = assertThrows(IncompleteChainException.class,
-                () -> resolver.mountChain(certSemAia));
+                () -> resolver.resolveChain(certSemAia));
 
         assertEquals(1, ex.getPartialChain().size());
         assertEquals(certSemAia, ex.getPartialChain().getFirst());
@@ -142,12 +142,12 @@ class CertificateChainResolverTest {
 
     @Test
     @SneakyThrows
-    void testMountChainDownloadFalhaLancaExcecao() {
+    void testResolveChainDownloadFalhaLancaExcecao() {
         when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenThrow(new IOException("Conexão recusada"));
 
         IncompleteChainException ex = assertThrows(IncompleteChainException.class,
-                () -> resolver.mountChain(leafCert));
+                () -> resolver.resolveChain(leafCert));
 
         assertEquals(1, ex.getPartialChain().size());
         assertEquals(leafCert, ex.getPartialChain().getFirst());
@@ -155,23 +155,23 @@ class CertificateChainResolverTest {
 
     @Test
     @SneakyThrows
-    void testMountChainAssinaturaInvalidaLancaExcecao() {
+    void testResolveChainAssinaturaInvalidaLancaExcecao() {
         X509Certificate certComSkiForjado = generateCertWithSpoofedSki(intermediateCert);
 
         mockHttpResponse(INTERMEDIATE_AIA_URL, certComSkiForjado.getEncoded());
 
         IncompleteChainException ex = assertThrows(IncompleteChainException.class,
-                () -> resolver.mountChain(leafCert));
+                () -> resolver.resolveChain(leafCert));
 
         assertTrue(ex.getMessage().contains("Assinatura inválida"));
     }
 
     @Test
     @SneakyThrows
-    void testMountChainVerificaAssinaturaDaCadeia() {
+    void testResolveChainVerificaAssinaturaDaCadeia() {
         mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
 
-        List<X509Certificate> chain = resolver.mountChain(leafCert);
+        List<X509Certificate> chain = resolver.resolveChain(leafCert);
 
         for (int i = 0; i < chain.size() - 1; i++) {
             X509Certificate cert = chain.get(i);
@@ -185,21 +185,21 @@ class CertificateChainResolverTest {
 
     @Test
     @SneakyThrows
-    void testMountChainPoolReutilizaCertificadosDoP7b() {
+    void testResolveChainPoolReutilizaCertificadosDoP7b() {
         mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
 
-        resolver.mountChain(leafCert);
+        resolver.resolveChain(leafCert);
 
         verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
     @SneakyThrows
-    void testMountChainDerUnicoCertificado() {
+    void testResolveChainDerUnicoCertificado() {
         mockHttpResponse(INTERMEDIATE_AIA_URL, intermediateCert.getEncoded());
         mockHttpResponse(ROOT_AIA_URL, rootCert.getEncoded());
 
-        List<X509Certificate> chain = resolver.mountChain(leafCert);
+        List<X509Certificate> chain = resolver.resolveChain(leafCert);
 
         assertEquals(3, chain.size());
         verify(mockHttpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));

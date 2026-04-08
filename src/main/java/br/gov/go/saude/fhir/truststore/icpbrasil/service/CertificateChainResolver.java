@@ -63,7 +63,7 @@ public class CertificateChainResolver {
     }
 
     /**
-     * Constrói a cadeia de certificados a partir de um certificado folha (leaf),
+     * Resolve a cadeia de certificados a partir de um certificado folha (leaf),
      * baixando emissores via AIA CA Issuers até encontrar um auto-assinado (raiz)
      * ou não haver mais URLs AIA disponíveis.
      *
@@ -71,7 +71,7 @@ public class CertificateChainResolver {
      * @return Lista ordenada [leaf, intermediário1, ..., raiz] terminando em auto-assinado
      * @throws IncompleteChainException se não for possível alcançar um certificado raiz (auto-assinado)
      */
-    public List<X509Certificate> mountChain(X509Certificate leaf) {
+    public List<X509Certificate> resolveChain(X509Certificate leaf) throws IncompleteChainException {
         List<X509Certificate> chain = new ArrayList<>();
         Set<String> visited = new HashSet<>();
         Map<String, X509Certificate> pool = new HashMap<>();
@@ -81,7 +81,7 @@ public class CertificateChainResolver {
 
         for (int i = 0; i < MAX_CHAIN_DEPTH; i++) {
             if (CertificateParser.isSelfSigned(current)) {
-                return chain;
+                return List.copyOf(chain);
             }
 
             String aki;
