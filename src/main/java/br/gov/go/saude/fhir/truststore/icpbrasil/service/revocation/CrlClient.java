@@ -1,6 +1,8 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -30,12 +32,14 @@ public class CrlClient {
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
     private final HttpClient httpClient;
+    private final DownloadPolicy downloadPolicy;
 
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy,
-                     TrustStoreConfig trustStoreConfig) {
+                     TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = trustStoreConfig.getRevocation();
+        this.downloadPolicy = downloadPolicy;
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
@@ -56,6 +60,13 @@ public class CrlClient {
         if (cached.isPresent()) {
             log.debug("CRL encontrada no cache para {}", url);
             return parse(cached.get(), cert, issuer);
+        }
+
+        try {
+            downloadPolicy.validateUrl(url);
+        } catch (DownloadPolicyException e) {
+            log.warn("URL CRL bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.CrlUnavailable();
         }
 
         try {
@@ -90,6 +101,7 @@ public class CrlClient {
         if (response.statusCode() != 200) {
             throw new IOException("CRL HTTP status: " + response.statusCode());
         }
+        downloadPolicy.validateCrlResponseSize(response.body(), url);
         return response.body();
     }
 
