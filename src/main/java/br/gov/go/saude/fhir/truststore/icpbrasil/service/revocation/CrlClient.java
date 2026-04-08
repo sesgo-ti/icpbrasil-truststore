@@ -1,6 +1,8 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -30,15 +32,28 @@ public class CrlClient {
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
     private final HttpClient httpClient;
+    private final DownloadPolicy downloadPolicy;
 
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy,
-                     TrustStoreConfig trustStoreConfig) {
+                     TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = trustStoreConfig.getRevocation();
+        this.downloadPolicy = downloadPolicy;
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
                 .build();
+    }
+
+    // Package-private para testes
+    CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+              HttpClient httpClient, DownloadPolicy downloadPolicy) {
+        this.cache = cache;
+        this.retryPolicy = retryPolicy;
+        this.config = config;
+        this.httpClient = httpClient;
+        this.downloadPolicy = downloadPolicy;
     }
 
     /**
@@ -58,14 +73,29 @@ public class CrlClient {
         }
 
         try {
+            downloadPolicy.validateUrl(url);
+        } catch (DownloadPolicyException e) {
+            log.warn("URL CRL bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.CrlUnavailable();
+        }
+
+        try {
             byte[] crlBytes = retryPolicy.executeWithRetry(
                     "CRL " + url,
                     config.getMaxRetries(),
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> download(url));
 
-            cache.putCrl(url, crlBytes);
-            return parse(crlBytes, cert, issuer);
+            downloadPolicy.validateCrlResponseSize(crlBytes, url);
+
+            RevocationStatus result = parse(crlBytes, cert, issuer);
+            if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
+                cache.putCrl(url, crlBytes);
+            }
+            return result;
+        } catch (DownloadPolicyException e) {
+            log.warn("Resposta CRL bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.CrlUnavailable();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação CRL interrompida para {}", url);

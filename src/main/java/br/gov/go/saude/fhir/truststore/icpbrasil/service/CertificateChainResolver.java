@@ -1,6 +1,8 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import lombok.extern.slf4j.Slf4j;
@@ -43,11 +45,14 @@ public class CertificateChainResolver {
     private final HttpClient httpClient;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.ChainConfig chainConfig;
+    private final DownloadPolicy downloadPolicy;
 
     @Autowired
-    public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig trustStoreConfig) {
+    public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig trustStoreConfig,
+                                    DownloadPolicy downloadPolicy) {
         this.retryPolicy = retryPolicy;
         this.chainConfig = trustStoreConfig.getChain();
+        this.downloadPolicy = downloadPolicy;
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()))
@@ -56,10 +61,11 @@ public class CertificateChainResolver {
 
     // Package-private para testes
     CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
-                             HttpClient httpClient) {
+                             HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.retryPolicy = retryPolicy;
         this.chainConfig = chainConfig;
         this.httpClient = httpClient;
+        this.downloadPolicy = downloadPolicy;
     }
 
     /**
@@ -151,17 +157,28 @@ public class CertificateChainResolver {
     private List<X509Certificate> downloadCertificates(List<String> urls) {
         for (String url : urls) {
             try {
+                downloadPolicy.validateUrl(url);
+            } catch (DownloadPolicyException e) {
+                log.warn("URL de CA Issuers bloqueada pela política de download: {}", e.getMessage());
+                continue;
+            }
+
+            try {
                 byte[] data = retryPolicy.executeWithRetry(
                         "AIA CA Issuers " + url,
                         chainConfig.getMaxRetries(),
                         chainConfig.getRetryIntervalSeconds() * 1000L,
                         () -> downloadBytes(url));
 
+                downloadPolicy.validateAiaResponseSize(data, url);
+
                 List<X509Certificate> certs = CertificateParser.parseAll(data);
                 if (!certs.isEmpty()) {
                     log.debug("Baixados {} certificados de {}", certs.size(), url);
                     return certs;
                 }
+            } catch (DownloadPolicyException e) {
+                log.warn("Resposta AIA bloqueada pela política de download: {}", e.getMessage());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("Download de CA Issuers interrompido para {}", url);

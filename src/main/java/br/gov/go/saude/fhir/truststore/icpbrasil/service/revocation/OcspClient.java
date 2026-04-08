@@ -1,6 +1,8 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -42,15 +44,28 @@ public class OcspClient {
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
     private final HttpClient httpClient;
+    private final DownloadPolicy downloadPolicy;
 
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
-                      TrustStoreConfig trustStoreConfig) {
+                      TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = trustStoreConfig.getRevocation();
+        this.downloadPolicy = downloadPolicy;
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(config.getOcspTimeoutSeconds()))
                 .build();
+    }
+
+    // Package-private para testes
+    OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+               HttpClient httpClient, DownloadPolicy downloadPolicy) {
+        this.cache = cache;
+        this.retryPolicy = retryPolicy;
+        this.config = config;
+        this.httpClient = httpClient;
+        this.downloadPolicy = downloadPolicy;
     }
 
     /**
@@ -72,17 +87,29 @@ public class OcspClient {
         }
 
         try {
+            downloadPolicy.validateUrl(url);
+        } catch (DownloadPolicyException e) {
+            log.warn("URL OCSP bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.OcspUnavailable();
+        }
+
+        try {
             byte[] responseBytes = retryPolicy.executeWithRetry(
                     "OCSP " + url,
                     config.getMaxRetries(),
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> sendRequest(cert, issuer, url));
 
+            downloadPolicy.validateOcspResponseSize(responseBytes, url);
+
             RevocationStatus result = parseResponse(responseBytes, cert, issuer);
             if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
                 cache.putOcsp(cacheKey, responseBytes);
             }
             return result;
+        } catch (DownloadPolicyException e) {
+            log.warn("Resposta OCSP bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.OcspUnavailable();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação OCSP interrompida para {}", url);

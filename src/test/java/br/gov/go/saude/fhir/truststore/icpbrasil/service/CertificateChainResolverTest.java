@@ -1,6 +1,8 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.service;
 
 import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import lombok.SneakyThrows;
@@ -8,35 +10,29 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.cms.CMSProcessableByteArray;
 import org.bouncycastle.cms.CMSSignedData;
 import org.bouncycastle.cms.CMSSignedDataGenerator;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.util.CollectionStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HexFormat;
 import java.util.List;
 
+import static br.gov.go.saude.fhir.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CertificateChainResolverTest {
@@ -44,10 +40,8 @@ class CertificateChainResolverTest {
     private static final String ROOT_AIA_URL = "http://test.example.com/root.cer";
     private static final String INTERMEDIATE_AIA_URL = "http://test.example.com/intermediate.p7b";
 
-    private static final JcaX509ExtensionUtils EXT_UTILS = createExtUtils();
-    private static final JcaX509CertificateConverter CERT_CONVERTER = new JcaX509CertificateConverter();
-
     HttpClient mockHttpClient;
+    DownloadPolicy downloadPolicy;
     CertificateChainResolver resolver;
 
     KeyPair rootKeyPair;
@@ -86,8 +80,10 @@ class CertificateChainResolverTest {
         networkConfig.setRetryIntervalSeconds(0);
         trustStoreConfig.setNetwork(networkConfig);
 
+        downloadPolicy = mock(DownloadPolicy.class); // permissivo: não bloqueia nada
+
         RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
-        resolver = new CertificateChainResolver(retryPolicy, chainConfig, mockHttpClient);
+        resolver = new CertificateChainResolver(retryPolicy, chainConfig, mockHttpClient, downloadPolicy);
     }
 
     @Test
@@ -206,6 +202,52 @@ class CertificateChainResolverTest {
     }
 
 
+    @Test
+    @SneakyThrows
+    void testResolveChainUrlBloqueadaTentaProximaUrl() {
+        // Bloqueia a URL do intermediário
+        doThrow(new DownloadPolicyException("URL bloqueada: " + INTERMEDIATE_AIA_URL))
+                .when(downloadPolicy).validateUrl(INTERMEDIATE_AIA_URL);
+
+        IncompleteChainException ex = assertThrows(IncompleteChainException.class,
+                () -> resolver.resolveChain(leafCert));
+
+        assertEquals(1, ex.getPartialChain().size());
+        assertEquals(leafCert, ex.getPartialChain().getFirst());
+        verify(mockHttpClient, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SneakyThrows
+    void testResolveChainRespostaMuitoGrandeBloqueada() {
+        mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
+
+        doThrow(new DownloadPolicyException("Resposta AIA muito grande"))
+                .when(downloadPolicy).validateAiaResponseSize(any(byte[].class), eq(INTERMEDIATE_AIA_URL));
+
+        IncompleteChainException ex = assertThrows(IncompleteChainException.class,
+                () -> resolver.resolveChain(leafCert));
+
+        assertEquals(1, ex.getPartialChain().size());
+        assertEquals(leafCert, ex.getPartialChain().getFirst());
+    }
+
+    @Test
+    @SneakyThrows
+    void testResolveChainRespostaMuitoGrandeNaoRetenta() {
+        mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
+
+        doThrow(new DownloadPolicyException("Resposta AIA muito grande"))
+                .when(downloadPolicy).validateAiaResponseSize(any(byte[].class), eq(INTERMEDIATE_AIA_URL));
+
+        assertThrows(IncompleteChainException.class,
+                () -> resolver.resolveChain(leafCert));
+
+        // Deve ter feito apenas 1 request HTTP — a validação de tamanho é após o retry,
+        // portanto não há retentativa
+        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
     // --- Helpers: HTTP mock ---
 
     @SneakyThrows
@@ -222,17 +264,6 @@ class CertificateChainResolverTest {
     }
 
     // --- Helpers: geração de certificados ---
-
-    @SneakyThrows
-    private X509Certificate generateRootCert(KeyPair keyPair) {
-        X500Name subject = new X500Name("CN=Test Root CA, O=Test, C=BR");
-
-        X509v3CertificateBuilder builder = createBuilder(subject, subject, 1, keyPair);
-        builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
-        addSki(builder, keyPair);
-
-        return sign(builder, keyPair);
-    }
 
     @SneakyThrows
     private X509Certificate generateIntermediateCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
@@ -294,30 +325,6 @@ class CertificateChainResolverTest {
         return sign(builder, fakeKeyPair);
     }
 
-    // --- Helpers: building blocks ---
-
-    private X509v3CertificateBuilder createBuilder(X500Name issuer, X500Name subject,
-                                                   long serial, KeyPair subjectKeyPair) {
-        Instant now = Instant.now();
-        return new JcaX509v3CertificateBuilder(
-                issuer, BigInteger.valueOf(serial),
-                Date.from(now.minus(1, ChronoUnit.DAYS)),
-                Date.from(now.plus(365, ChronoUnit.DAYS)),
-                subject, subjectKeyPair.getPublic());
-    }
-
-    @SneakyThrows
-    private void addSki(X509v3CertificateBuilder builder, KeyPair keyPair) {
-        builder.addExtension(Extension.subjectKeyIdentifier, false,
-                EXT_UTILS.createSubjectKeyIdentifier(keyPair.getPublic()));
-    }
-
-    @SneakyThrows
-    private void addAki(X509v3CertificateBuilder builder, KeyPair issuerKeyPair) {
-        builder.addExtension(Extension.authorityKeyIdentifier, false,
-                EXT_UTILS.createAuthorityKeyIdentifier(issuerKeyPair.getPublic()));
-    }
-
     @SneakyThrows
     private void addAia(X509v3CertificateBuilder builder, String url) {
         AccessDescription ad = new AccessDescription(
@@ -325,12 +332,6 @@ class CertificateChainResolverTest {
                 new GeneralName(GeneralName.uniformResourceIdentifier, url));
         builder.addExtension(Extension.authorityInfoAccess, false,
                 new AuthorityInformationAccess(ad));
-    }
-
-    @SneakyThrows
-    private X509Certificate sign(X509v3CertificateBuilder builder, KeyPair signerKeyPair) {
-        var signer = new JcaContentSignerBuilder("SHA256WithRSA").build(signerKeyPair.getPrivate());
-        return CERT_CONVERTER.getCertificate(builder.build(signer));
     }
 
     @SneakyThrows
@@ -344,10 +345,5 @@ class CertificateChainResolverTest {
         CMSSignedData signedData = generator.generate(
                 new CMSProcessableByteArray(new byte[0]), false);
         return signedData.getEncoded();
-    }
-
-    @SneakyThrows
-    private static JcaX509ExtensionUtils createExtUtils() {
-        return new JcaX509ExtensionUtils();
     }
 }
