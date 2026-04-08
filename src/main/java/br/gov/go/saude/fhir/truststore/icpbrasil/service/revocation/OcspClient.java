@@ -58,6 +58,16 @@ public class OcspClient {
                 .build();
     }
 
+    // Package-private para testes
+    OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+               HttpClient httpClient, DownloadPolicy downloadPolicy) {
+        this.cache = cache;
+        this.retryPolicy = retryPolicy;
+        this.config = config;
+        this.httpClient = httpClient;
+        this.downloadPolicy = downloadPolicy;
+    }
+
     /**
      * Verifica revogação via OCSP para a URL informada.
      * Consulta o cache antes de fazer a requisição HTTP.
@@ -90,11 +100,16 @@ public class OcspClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> sendRequest(cert, issuer, url));
 
+            downloadPolicy.validateOcspResponseSize(responseBytes, url);
+
             RevocationStatus result = parseResponse(responseBytes, cert, issuer);
             if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
                 cache.putOcsp(cacheKey, responseBytes);
             }
             return result;
+        } catch (DownloadPolicyException e) {
+            log.warn("Resposta OCSP bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.OcspUnavailable();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação OCSP interrompida para {}", url);
@@ -124,7 +139,6 @@ public class OcspClient {
         if (response.statusCode() != 200) {
             throw new IOException("OCSP HTTP status: " + response.statusCode());
         }
-        downloadPolicy.validateOcspResponseSize(response.body(), url);
         return response.body();
     }
 

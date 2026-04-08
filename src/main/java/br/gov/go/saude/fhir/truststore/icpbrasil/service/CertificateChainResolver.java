@@ -170,11 +170,15 @@ public class CertificateChainResolver {
                         chainConfig.getRetryIntervalSeconds() * 1000L,
                         () -> downloadBytes(url));
 
+                downloadPolicy.validateAiaResponseSize(data, url);
+
                 List<X509Certificate> certs = CertificateParser.parseAll(data);
                 if (!certs.isEmpty()) {
                     log.debug("Baixados {} certificados de {}", certs.size(), url);
                     return certs;
                 }
+            } catch (DownloadPolicyException e) {
+                log.warn("Resposta AIA bloqueada pela política de download: {}", e.getMessage());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("Download de CA Issuers interrompido para {}", url);
@@ -197,7 +201,6 @@ public class CertificateChainResolver {
         if (response.statusCode() != 200) {
             throw new IOException("HTTP " + response.statusCode() + " para " + url);
         }
-        downloadPolicy.validateAiaResponseSize(response.body(), url);
         return response.body();
     }
 

@@ -46,6 +46,16 @@ public class CrlClient {
                 .build();
     }
 
+    // Package-private para testes
+    CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+              HttpClient httpClient, DownloadPolicy downloadPolicy) {
+        this.cache = cache;
+        this.retryPolicy = retryPolicy;
+        this.config = config;
+        this.httpClient = httpClient;
+        this.downloadPolicy = downloadPolicy;
+    }
+
     /**
      * Verifica revogação via CRL para a URL informada.
      * Consulta o cache antes de fazer a requisição HTTP.
@@ -76,11 +86,16 @@ public class CrlClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> download(url));
 
+            downloadPolicy.validateCrlResponseSize(crlBytes, url);
+
             RevocationStatus result = parse(crlBytes, cert, issuer);
             if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
                 cache.putCrl(url, crlBytes);
             }
             return result;
+        } catch (DownloadPolicyException e) {
+            log.warn("Resposta CRL bloqueada pela política de download: {}", e.getMessage());
+            return new RevocationStatus.CrlUnavailable();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação CRL interrompida para {}", url);
@@ -101,7 +116,6 @@ public class CrlClient {
         if (response.statusCode() != 200) {
             throw new IOException("CRL HTTP status: " + response.statusCode());
         }
-        downloadPolicy.validateCrlResponseSize(response.body(), url);
         return response.body();
     }
 
