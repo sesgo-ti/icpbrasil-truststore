@@ -6,6 +6,7 @@ import br.gov.go.saude.fhir.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
@@ -34,6 +35,7 @@ public class CrlClient {
     private final HttpClient httpClient;
     private final DownloadPolicy downloadPolicy;
 
+    @Autowired
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy,
                      TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;

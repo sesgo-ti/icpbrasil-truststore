@@ -16,6 +16,7 @@ import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.security.auth.x500.X500Principal;
@@ -46,6 +47,7 @@ public class OcspClient {
     private final HttpClient httpClient;
     private final DownloadPolicy downloadPolicy;
 
+    @Autowired
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
                       TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;
