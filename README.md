@@ -251,6 +251,9 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 | Download do acervo de ACs (repositório ITI) | Apenas CAs de `registries/certificates/` |
 | Conexão S3 sem `S3_CA_CERT_PATH` | JVM default truststore (`cacerts`) |
 | Conexão S3 com `S3_CA_CERT_PATH` | TrustManager dedicado com aquela CA |
+| Downloads de AIA CA Issuers, OCSP e CRL | JVM default truststore (`cacerts`) — sem `SSLContext` personalizado |
+
+> **Diferença importante:** Ao contrário das conexões acima, os downloads disparados por extensões de certificados X.509 (AIA CA Issuers, endpoints OCSP, CRL Distribution Points) **não possuem isolamento de `SSLContext`**. Esses endpoints são públicos, operados pelas próprias ACs, e a confiança no certificado TLS deles recai sobre a truststore padrão da JVM. A camada de segurança aplicada a esses downloads é o `DownloadPolicy` — um mecanismo distinto que atua na validação da URL de destino (bloqueio de SSRF, IPs privados, esquemas não-HTTP(S)) e no limite de tamanho da resposta antes de carregá-la em memória. Veja a seção [Política de download](#política-de-download-ssrf-e-limites-de-tamanho) para detalhes de configuração.
 
 **CAs embutidas em `registries/certificates/`:**
 
