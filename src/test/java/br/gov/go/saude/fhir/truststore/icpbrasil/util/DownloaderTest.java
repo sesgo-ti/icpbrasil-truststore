@@ -10,7 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-public class DownloaderTest {
+class DownloaderTest {
     @Autowired
     Downloader downloader;
 
@@ -19,7 +19,7 @@ public class DownloaderTest {
 
     @SneakyThrows
     @Test
-    void testDownlaodBytes() {
+    void testDownloadBytesDeveRetornarConteudoNaoVazio() {
         byte[] bytes = downloader.downloadBytes(trustStoreConfig.getCertificateUrl());
 
         assertTrue(bytes.length > 0);
@@ -28,7 +28,7 @@ public class DownloaderTest {
 
     @SneakyThrows
     @Test
-    void testDownloadText() {
+    void testDownloadTextDeveConterHashUrl() {
         String text = downloader.downloadText(trustStoreConfig.getHashUrl());
 
         assertNotNull(text);
