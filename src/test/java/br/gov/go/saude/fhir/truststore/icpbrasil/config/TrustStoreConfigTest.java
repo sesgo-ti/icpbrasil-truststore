@@ -10,16 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 class TrustStoreConfigTest {
 
-    // Válid
     @Autowired
     private TrustStoreConfig trustStoreConfig;
-
 
     private TrustStoreConfig testTrustStoreConfig;
 
     @BeforeEach
     void setUp() {
-        // Valid
         testTrustStoreConfig = new TrustStoreConfig();
         testTrustStoreConfig.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
         testTrustStoreConfig.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
