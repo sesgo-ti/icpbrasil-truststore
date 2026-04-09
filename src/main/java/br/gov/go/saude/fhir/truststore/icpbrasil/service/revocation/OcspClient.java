@@ -25,6 +25,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Optional;
@@ -40,6 +41,8 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class OcspClient {
+
+    private static final String BC_PROVIDER = "BC";
 
     private final RevocationCache cache;
     private final RetryPolicy retryPolicy;
@@ -208,10 +211,7 @@ public class OcspClient {
      */
     private boolean verifySignature(BasicOCSPResp basicResp, X509Certificate issuer) {
         try {
-            ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
-                    .setProvider("BC")
-                    .build(issuer.getPublicKey());
-            if (basicResp.isSignatureValid(verifier)) {
+            if (basicResp.isSignatureValid(buildContentVerifier(issuer.getPublicKey()))) {
                 return true;
             }
         } catch (Exception e) {
@@ -228,7 +228,7 @@ public class OcspClient {
             JcaX509CertificateHolder issuerHolder = new JcaX509CertificateHolder(issuer);
 
             for (var responderCert : certs) {
-                if (isAuthorizedResponder(responderCert, issuerHolder, issuer)
+                if (isAuthorizedResponder(responderCert, issuerHolder)
                         && isSignatureValid(basicResp, responderCert)) {
                     return true;
                 }
@@ -241,8 +241,7 @@ public class OcspClient {
     }
 
     private boolean isAuthorizedResponder(X509CertificateHolder responderCert,
-                                          JcaX509CertificateHolder issuerHolder,
-                                          X509Certificate issuer) {
+                                          JcaX509CertificateHolder issuerHolder) {
         try {
             if (!responderCert.getIssuer().equals(issuerHolder.getSubject())) {
                 return false;
@@ -258,10 +257,7 @@ public class OcspClient {
                 return false;
             }
 
-            ContentVerifierProvider issuerVerifier = new JcaContentVerifierProviderBuilder()
-                    .setProvider("BC")
-                    .build(issuer.getPublicKey());
-            return responderCert.isSignatureValid(issuerVerifier);
+            return responderCert.isSignatureValid(buildContentVerifier(issuerHolder));
         } catch (Exception e) {
             log.debug("Certificado delegado OCSP inválido: {}", e.getMessage());
             return false;
@@ -270,12 +266,18 @@ public class OcspClient {
 
     private boolean isSignatureValid(BasicOCSPResp basicResp, X509CertificateHolder signer) {
         try {
-            ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
-                    .setProvider("BC")
-                    .build(signer);
-            return basicResp.isSignatureValid(verifier);
+            return basicResp.isSignatureValid(buildContentVerifier(signer));
         } catch (Exception e) {
+            log.debug("Falha ao verificar assinatura OCSP com responder {}: {}", signer.getSubject(), e.getMessage());
             return false;
         }
+    }
+
+    private ContentVerifierProvider buildContentVerifier(PublicKey key) throws Exception {
+        return new JcaContentVerifierProviderBuilder().setProvider(BC_PROVIDER).build(key);
+    }
+
+    private ContentVerifierProvider buildContentVerifier(X509CertificateHolder holder) throws Exception {
+        return new JcaContentVerifierProviderBuilder().setProvider(BC_PROVIDER).build(holder);
     }
 }
