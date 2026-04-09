@@ -2,8 +2,7 @@ package br.gov.go.saude.fhir.truststore.icpbrasil.support;
 
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
@@ -71,6 +70,15 @@ public final class TestCertificateFactory {
     public static void addAki(X509v3CertificateBuilder builder, KeyPair issuerKeyPair) {
         builder.addExtension(Extension.authorityKeyIdentifier, false,
                 EXT_UTILS.createAuthorityKeyIdentifier(issuerKeyPair.getPublic()));
+    }
+
+    @SneakyThrows
+    public static void addAia(X509v3CertificateBuilder builder, String url) {
+        AccessDescription ad = new AccessDescription(
+                AccessDescription.id_ad_caIssuers,
+                new GeneralName(GeneralName.uniformResourceIdentifier, url));
+        builder.addExtension(Extension.authorityInfoAccess, false,
+                new AuthorityInformationAccess(ad));
     }
 
     @SneakyThrows
