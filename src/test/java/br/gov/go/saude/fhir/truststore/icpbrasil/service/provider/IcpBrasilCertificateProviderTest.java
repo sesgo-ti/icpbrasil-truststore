@@ -4,7 +4,7 @@ import br.gov.go.saude.fhir.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.fhir.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.fhir.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.fhir.truststore.icpbrasil.http.Downloader;
-import br.gov.go.saude.fhir.truststore.icpbrasil.util.Util;
+import br.gov.go.saude.fhir.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,9 +29,6 @@ public class IcpBrasilCertificateProviderTest {
     TrustStoreConfig trustStoreConfig;
 
     @Autowired
-    Util util;
-
-    @Autowired
     TrustStoreRepository trustStoreRepository;
 
     @MockitoBean
@@ -42,20 +39,19 @@ public class IcpBrasilCertificateProviderTest {
     @SneakyThrows
     @BeforeEach
     void setUp() {
-        // Configurar o mock do downloader para retornar os recursos locais
-        byte[] zipBytes = util.getResource("ACcompactado.zip").readAllBytes();
-        String hashContent = new String(util.getResource("hashsha512.txt").readAllBytes());
-        
+        byte[] zipBytes = TestResourceLoader.getResource("ACcompactado.zip").readAllBytes();
+        String hashContent = new String(TestResourceLoader.getResource("hashsha512.txt").readAllBytes());
+
         when(downloader.downloadBytes(trustStoreConfig.getCertificateUrl())).thenReturn(zipBytes);
         when(downloader.downloadText(trustStoreConfig.getHashUrl())).thenReturn(hashContent);
-        
+
         icpBrasilCertificateProvider = new IcpBrasilCertificateProvider(
                 trustStoreConfig,
                 downloader,
                 trustStoreRepository
         );
 
-        testCertificate = CertificateParser.parse(util.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
+        testCertificate = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
 
     @Test

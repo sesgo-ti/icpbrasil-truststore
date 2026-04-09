@@ -31,7 +31,7 @@ public class DownloadPolicy {
         this.config = trustStoreConfig.getDownloadPolicy();
     }
 
-    DownloadPolicy(TrustStoreConfig.DownloadPolicyConfig config) {
+    public DownloadPolicy(TrustStoreConfig.DownloadPolicyConfig config) {
         this.config = config;
     }
 
