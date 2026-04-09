@@ -68,7 +68,7 @@ class CertificateParserTest {
 
 
     @Test
-    void testAuthorityKeyIdentifier() {
+    void testAuthorityKeyIdentifierCorrespondeAoSkiDoEmissor() {
         assertEquals(
                 CertificateParser.getAuthorityKeyIdentifier(certificate),
                 CertificateParser.getSubjectKeyIdentifier(authorityCertificate)
@@ -76,7 +76,7 @@ class CertificateParserTest {
     }
 
     @Test
-    void testSubjectAlternativeNames() {
+    void testSubjectAlternativeNamesDeveConterQuatroEntradas() {
         GeneralNames generalNames = CertificateParser.getSubjectAlternativeNames(certificate);
 
         assertEquals(4, generalNames.getNames().length);
@@ -89,7 +89,7 @@ class CertificateParserTest {
     }
 
     @Test
-    void testAuthorityInformationAccess() {
+    void testAuthorityInformationAccessDeveConterUmaDescricao() {
 
         AccessDescription[] accessDescriptions = CertificateParser.getCertificateAuthorityInformationAccess(certificate);
 
