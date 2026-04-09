@@ -281,7 +281,7 @@ class CertificateChainResolverTest {
     }
 
     @SneakyThrows
-    private X509Certificate generateLeafCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
+    private static X509Certificate generateLeafCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                              X509Certificate issuerCert, String aiaUrl) {
         X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
         X500Name subject = new X500Name("CN=Test Leaf, O=Test, C=BR");
@@ -323,15 +323,6 @@ class CertificateChainResolverTest {
                 new SubjectKeyIdentifier(HexFormat.of().parseHex(spoofedSkiHex)));
 
         return sign(builder, fakeKeyPair);
-    }
-
-    @SneakyThrows
-    private void addAia(X509v3CertificateBuilder builder, String url) {
-        AccessDescription ad = new AccessDescription(
-                AccessDescription.id_ad_caIssuers,
-                new GeneralName(GeneralName.uniformResourceIdentifier, url));
-        builder.addExtension(Extension.authorityInfoAccess, false,
-                new AuthorityInformationAccess(ad));
     }
 
     @SneakyThrows
