@@ -1,12 +1,9 @@
 package br.gov.go.saude.fhir.truststore.icpbrasil.repository;
 
-import br.gov.go.saude.fhir.truststore.icpbrasil.util.Util;
+import br.gov.go.saude.fhir.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -16,26 +13,23 @@ import java.util.Optional;
 import org.apache.commons.compress.utils.IOUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
 public class S3RepositoryTest {
-    @MockitoBean
-    TrustStoreRepository trustStoreRepository;
 
-    @Autowired
-    Util util;
+    TrustStoreRepository trustStoreRepository = mock(TrustStoreRepository.class);
 
     @SneakyThrows
     @BeforeEach
     void setUp() {
-        byte[] zipBytes = IOUtils.toByteArray(util.getResource("ACcompactado.zip"));
+        byte[] zipBytes = IOUtils.toByteArray(TestResourceLoader.getResource("ACcompactado.zip"));
         String hashContent = new String(
-                IOUtils.toByteArray(util.getResource("hashsha512.txt")),
+                IOUtils.toByteArray(TestResourceLoader.getResource("hashsha512.txt")),
                 StandardCharsets.UTF_8
         );
         String ultimaConfirmacaoString = new String(
-                IOUtils.toByteArray(util.getResource("ultima_confirmacao.txt")),
+                IOUtils.toByteArray(TestResourceLoader.getResource("ultima_confirmacao.txt")),
                 StandardCharsets.UTF_8
         );
 

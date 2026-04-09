@@ -59,9 +59,8 @@ public class CertificateChainResolver {
                 .build();
     }
 
-    // Package-private para testes
-    CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
-                             HttpClient httpClient, DownloadPolicy downloadPolicy) {
+    public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
+                                    HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.retryPolicy = retryPolicy;
         this.chainConfig = chainConfig;
         this.httpClient = httpClient;

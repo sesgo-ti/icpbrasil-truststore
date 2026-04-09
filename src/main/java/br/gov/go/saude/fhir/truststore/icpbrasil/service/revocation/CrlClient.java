@@ -48,9 +48,8 @@ public class CrlClient {
                 .build();
     }
 
-    // Package-private para testes
-    CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
-              HttpClient httpClient, DownloadPolicy downloadPolicy) {
+    public CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+                     HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
