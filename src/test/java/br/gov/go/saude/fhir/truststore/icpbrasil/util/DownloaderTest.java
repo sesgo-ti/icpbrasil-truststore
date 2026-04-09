@@ -19,7 +19,7 @@ class DownloaderTest {
 
     @SneakyThrows
     @Test
-    void testDownloadBytesDeveRetornarConteudoNaoVazio() {
+    void testDownloadBytesRetornaConteudoNaoVazio() {
         byte[] bytes = downloader.downloadBytes(trustStoreConfig.getCertificateUrl());
 
         assertTrue(bytes.length > 0);
@@ -28,7 +28,7 @@ class DownloaderTest {
 
     @SneakyThrows
     @Test
-    void testDownloadTextDeveConterHashUrl() {
+    void testDownloadTextExtraiHash() {
         String text = downloader.downloadText(trustStoreConfig.getHashUrl());
 
         assertNotNull(text);
