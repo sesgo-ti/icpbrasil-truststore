@@ -9,7 +9,7 @@ import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class IcpBrasilCertificateParserTest {
+class IcpBrasilCertificateParserTest {
     X509Certificate certificate;
 
     X509Certificate authorityCertificate;
