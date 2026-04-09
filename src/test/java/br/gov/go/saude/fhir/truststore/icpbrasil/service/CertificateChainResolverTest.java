@@ -266,7 +266,7 @@ class CertificateChainResolverTest {
     // --- Helpers: geração de certificados ---
 
     @SneakyThrows
-    private X509Certificate generateIntermediateCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
+    private static X509Certificate generateIntermediateCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                                      X509Certificate issuerCert, String aiaUrl) {
         X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
         X500Name subject = new X500Name("CN=Test Intermediate CA, O=Test, C=BR");
