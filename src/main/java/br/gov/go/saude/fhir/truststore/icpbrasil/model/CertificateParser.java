@@ -267,8 +267,8 @@ public class CertificateParser {
                             return authorityInformationAccess.getAccessDescriptions();
                         })
                 .orElseThrow(() -> {
-                    log.error("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
-                    return new IllegalArgumentException("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
+                    log.warn("Extensão Authority Information Access (1.3.6.1.5.5.7.1.1) não encontrada no certificado");
+                    return new IllegalArgumentException("Extensão Authority Information Access (1.3.6.1.5.5.7.1.1) não encontrada no certificado");
                 });
     }
 
@@ -284,7 +284,7 @@ public class CertificateParser {
                             return crlDistPoint.getDistributionPoints();
                         })
                 .orElseThrow(() -> {
-                    log.error("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
+                    log.warn("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
                     return new IllegalArgumentException("Extensão CRL Distribution Points (2.5.29.31) não encontrada no certificado");
                 });
     }
