@@ -219,13 +219,6 @@ public class TrustStoreConfig {
             return;
         }
 
-        if (bootstrap.timeoutSeconds < 10 || bootstrap.timeoutSeconds > 600) {
-            throw new IllegalStateException(String.format(
-                    "[Erro de Configuração] Bootstrap Timeout: Deve ser entre 10 e 600 segundos. " +
-                    "Propriedade: 'truststore-icpbrasil.bootstrap.timeout-seconds' (Valor: '%d')",
-                    bootstrap.timeoutSeconds));
-        }
-
         log.debug("Configurações de bootstrap validadas com sucesso");
     }
 
@@ -617,11 +610,5 @@ public class TrustStoreConfig {
          * cenários de desenvolvimento onde a indisponibilidade do repositório ITI é aceitável.
          */
         private boolean failFast = true;
-
-        /**
-         * Timeout total (em segundos) para a carga inicial completar (padrão 120, intervalo [10, 600]).
-         * Deve acomodar retries e cold start de rede.
-         */
-        private int timeoutSeconds = 120;
     }
 }

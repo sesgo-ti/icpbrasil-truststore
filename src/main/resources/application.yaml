@@ -50,7 +50,6 @@ truststore-icpbrasil:
   bootstrap:
     enabled: true                 # Executa ApplicationRunner síncrono no startup
     fail-fast: true               # Aborta startup se a carga inicial falhar (recomendado em produção)
-    timeout-seconds: 120          # Limite total da carga inicial (10-600s)
 
   # Estratégia de Armazenamento
   # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível)
