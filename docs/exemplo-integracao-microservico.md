@@ -159,7 +159,6 @@ Com `fail-fast=false`, o pod sobe mas `/actuator/health` responderá `DOWN` (o `
 
 - [ ] Build com perfil `standalone` (fat JAR).
 - [ ] `rest.enabled=true` (senão o endpoint `/certificate` não existe).
-- [ ] `bootstrap.enabled=true` e `fail-fast=true` (defaults).
 - [ ] Volume persistente para o `base-dir` — evita downloads repetidos.
 - [ ] `startupProbe` com `failureThreshold` suficiente para cobrir o pior cenário de download (download-timeout × max-retries × retry-interval). Com defaults (`60s × 3 × 30s`), considerar até ~5 min.
 - [ ] Monitoramento: alarmar quando `/actuator/health` reportar `CRITICAL` ou `EXPIRED` (veja [manual-monitoramento.md](manual-monitoramento.md)).

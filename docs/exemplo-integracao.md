@@ -60,11 +60,7 @@ truststore-icpbrasil:
     fail-fast: false   # não aborta startup; loga erro e sobe com cache vazio
 ```
 
-**Checklist do consumidor em modo lib:**
-
-- [ ] `application.yaml` do host mantém defaults do bootstrap (`enabled=true`, `fail-fast=true`).
-- [ ] `src/test/resources/application.yaml` desabilita o bootstrap (`enabled=false`) ou mocka `Downloader`.
-- [ ] Observabilidade: os logs `Iniciando bootstrap síncrono ...` e `Bootstrap síncrono concluído com sucesso em X ms` devem aparecer no startup. Se não aparecerem, o bean não foi registrado (checar `@ComponentScan` do host ou se `bootstrap.enabled=false` foi herdado).
+**Única ação exigida do consumidor:** em `src/test/resources/application.yaml`, desabilitar o bootstrap (`truststore-icpbrasil.bootstrap.enabled: false`) ou mockar o `Downloader` — assim os testes que sobem `@SpringBootTest` não dependem de rede. Em produção, os defaults da lib já cobrem tudo.
 
 ---
 
