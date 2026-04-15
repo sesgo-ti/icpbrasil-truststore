@@ -44,7 +44,7 @@ Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs
 
 Se a carga inicial falhar (rede indisponível, hash inválido, timeout), o startup é abortado por padrão (`bootstrap.fail-fast=true`). Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap) para ajustar esse comportamento em testes ou cenários de desenvolvimento sem conectividade.
 
-Para um exemplo completo de integração (incluindo o comportamento do bootstrap síncrono e testes), veja [docs/exemplo-integracao.md](docs/exemplo-integracao.md).
+Para um exemplo completo de integração (incluindo o comportamento do bootstrap síncrono e testes), veja [docs/exemplo-integracao.md](docs/exemplo-integracao-lib.md).
 
 **Configuração mínima:**
 

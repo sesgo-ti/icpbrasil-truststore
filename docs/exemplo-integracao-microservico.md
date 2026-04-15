@@ -77,35 +77,3 @@ curl http://localhost:8080/actuator/health
 | `server.port` | `8080` | Padrão Spring Boot |
 
 Credenciais para `storage.type=s3` são definidas via variáveis de ambiente (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`). Veja o [README](../README.md#armazenamento-s3-compatível).
-
-## 5. Exemplo de consumo em Java (client externo)
-
-```java
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
-HttpClient client = HttpClient.newHttpClient();
-HttpRequest req = HttpRequest.newBuilder()
-        .uri(URI.create("http://trust-store:8080/certificate?ski=" + ski + "&type=pem"))
-        .GET()
-        .build();
-
-HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
-
-switch (resp.statusCode()) {
-    case 200 -> processarPem(resp.body());
-    case 404 -> caDesconhecida(ski);
-    default  -> throw new IllegalStateException("Trust store indisponível: HTTP " + resp.statusCode());
-}
-```
-
-## 6. Diferenças em relação ao modo biblioteca
-
-| Aspecto | Modo biblioteca | Modo microserviço |
-|---|---|---|
-| Execução | Incorporado ao host | Processo próprio (fat JAR) |
-| Consumo | `Cache.getCertificateBySki(ski)` (estático) | `GET /certificate?ski=...` |
-| `rest.enabled` | `false` (default) | `true` (obrigatório) |
-| Quem reage ao fail-fast | Host decide | Orquestrador (systemd, Docker, K8s) via exit code |
