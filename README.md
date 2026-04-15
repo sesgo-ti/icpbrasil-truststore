@@ -90,7 +90,7 @@ curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
 curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado.der
 ```
 
-Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md). Para um guia completo de deploy (Kubernetes, probes, PVC para cache e escolha das flags de bootstrap), veja [docs/exemplo-integracao-microservico.md](docs/exemplo-integracao-microservico.md).
+Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md). Para um guia completo do modo standalone (endpoints, parâmetros e variáveis relevantes), veja [docs/exemplo-integracao-microservico.md](docs/exemplo-integracao-microservico.md).
 
 ---
 
