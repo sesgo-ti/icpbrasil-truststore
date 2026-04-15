@@ -23,8 +23,14 @@ public class TrustStoreScheduler {
 
     /**
      * Executa a verificação automática periódica de sincronização do repositório local.
+     * <p>
+     * O {@code initialDelayString} é igual ao {@code fixedRateString} para adiar a
+     * primeira execução em um intervalo completo — o {@link TrustStoreBootstrap}
+     * já realiza a carga inicial no startup, evitando competir com o scheduler.
      */
-    @Scheduled(fixedRateString = "#{${truststore-icpbrasil.refresh-interval-hours:2} * 60 * 60 * 1000}")
+    @Scheduled(
+            fixedRateString = "#{${truststore-icpbrasil.refresh-interval-hours:2} * 60 * 60 * 1000}",
+            initialDelayString = "#{${truststore-icpbrasil.refresh-interval-hours:2} * 60 * 60 * 1000}")
     public void scheduleRefresh() {
         log.info("Executando atualização agendada do TrustStore");
         trustStoreService.refresh();
