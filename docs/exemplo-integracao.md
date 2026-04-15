@@ -1,10 +1,8 @@
-# Exemplo de integração — modo biblioteca
+# Integração — modo biblioteca
 
-## Caso típico: sincronização automática
+Uso embutido em uma aplicação Spring Boot que precisa consultar em memória os certificados das ACs vigentes da ICP-Brasil.
 
-O consumidor quer que a aplicação mantenha atualizado o acervo de certificados das Autoridades Certificadoras (ACs) vigentes da ICP-Brasil e consiga consultá-los por SKI em tempo de execução.
-
-### 1. Dependência
+## 1. Dependência
 
 ```xml
 <dependency>
@@ -14,7 +12,9 @@ O consumidor quer que a aplicação mantenha atualizado o acervo de certificados
 </dependency>
 ```
 
-### 2. Configuração mínima (`application.yml`)
+Auto-configuração: nenhuma anotação `@Import` ou registro manual de beans é necessário.
+
+## 2. Configuração mínima
 
 ```yaml
 truststore-icpbrasil:
@@ -24,49 +24,24 @@ truststore-icpbrasil:
     base-dir: .data/truststore-icpbrasil
 ```
 
-Isso é tudo. A partir daqui:
+Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. Se não, baixa do ITI. O cache em memória é populado **antes** de o Spring declarar o contexto "Started", eliminando qualquer janela em que requisições cheguem com cache vazio.
 
-- Na inicialização, a lib executa um **bootstrap síncrono**: verifica se o acervo de ACs já existe no `base-dir`; se não, baixa do ITI e popula o cache **antes** de o Spring declarar o contexto "Started".
-- A cada 2 horas (padrão), compara o hash remoto com o local e sincroniza se houver atualização.
-- O cache em memória é populado automaticamente — nenhum código adicional é necessário.
+## 3. Consultar certificados
 
----
+A API de consumo é a classe estática `Cache`:
 
-### 2.1 Bootstrap síncrono — implicações para o consumidor
+```java
+import br.gov.go.saude.fhir.truststore.icpbrasil.service.Cache;
+import java.security.cert.X509Certificate;
+import java.util.Map;
 
-O bootstrap bloqueia o startup até o cache estar pronto. Isso elimina a race condition em que requisições chegavam antes do cache ser populado (consultas a `Cache.getCertificateBySki(...)` retornavam `null` mesmo para CAs válidas), mas tem três consequências práticas:
-
-**1. O startup pode demorar alguns segundos a mais no primeiro boot** — tempo do download ZIP + hash + validação de integridade. Execuções subsequentes reutilizam o cache no disco e sobem instantaneamente.
-
-**2. Se a rede estiver indisponível no primeiro boot, a aplicação falha com `IllegalStateException` (fail-fast ativo por padrão)**. Esse é o comportamento correto em produção: é preferível a aplicação não subir a subir servindo 404 para certificados válidos.
-
-**3. Testes que sobem `@SpringBootTest` precisam lidar com isso.** Três opções, em ordem de preferência:
-
-```yaml
-# src/test/resources/application.yaml
-truststore-icpbrasil:
-  bootstrap:
-    enabled: false   # desliga o bootstrap em testes
+X509Certificate cert = Cache.getCertificateBySki(ski);          // null se não encontrado
+boolean valido       = Cache.isCacheValid();                     // false se cache ainda não pronto ou expirado
+Map<String, X509Certificate> todos  = Cache.getAllCertificates();
+Map<String, X509Certificate> raizes = Cache.getRootCertificates();
 ```
 
-Se o teste precisa do cache populado, mocke o `Downloader` (padrão já usado em `IcpBrasilCertificateProviderTest`) e mantenha `bootstrap.enabled=true` — o bootstrap vai popular via mock.
-
-Último recurso (só em dev local):
-
-```yaml
-truststore-icpbrasil:
-  bootstrap:
-    enabled: true
-    fail-fast: false   # não aborta startup; loga erro e sobe com cache vazio
-```
-
-**Única ação exigida do consumidor:** em `src/test/resources/application.yaml`, desabilitar o bootstrap (`truststore-icpbrasil.bootstrap.enabled: false`) ou mockar o `Downloader` — assim os testes que sobem `@SpringBootTest` não dependem de rede. Em produção, os defaults da lib já cobrem tudo.
-
----
-
-### 3. Consultar um certificado pelo SKI
-
-Quando precisar verificar se um determinado certificado pertence a uma AC da cadeia de confiança ICP-Brasil, use `Cache` e consulte pelo SKI:
+Exemplo de uso típico:
 
 ```java
 import br.gov.go.saude.fhir.truststore.icpbrasil.service.Cache;
@@ -81,29 +56,36 @@ public class ValidacaoAssinaturaService {
     }
 
     public X509Certificate buscarCA(String ski) {
-        return Cache.getCertificateBySki(ski); // null se não encontrado ou cache inválido
+        return Cache.getCertificateBySki(ski);
     }
 }
 ```
 
-> `Cache` é uma classe com métodos estáticos — não é necessário injetá-la via `@Autowired`.
+## 4. Variáveis de configuração relevantes
 
----
+| Propriedade | Default | Quando mudar |
+|---|---|---|
+| `truststore-icpbrasil.storage.type` | `filesystem` | Usar `s3` quando o cache precisa ser compartilhado entre instâncias |
+| `truststore-icpbrasil.filesystem.base-dir` | — | Sempre definir (caminho do cache em disco) |
+| `truststore-icpbrasil.bootstrap.enabled` | `true` | **Desligar apenas em testes** que sobem `@SpringBootTest` sem rede |
+| `truststore-icpbrasil.bootstrap.fail-fast` | `true` | Mudar para `false` só em dev local onde a indisponibilidade do ITI é aceitável |
+| `truststore-icpbrasil.rest.enabled` | `false` | **Manter `false`** em modo biblioteca — o endpoint HTTP é para modo server |
+| `truststore-icpbrasil.scheduling.enabled` | `true` | Desligar só em testes |
+| `truststore-icpbrasil.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 
-### O que acontece por baixo (sem código adicional)
+Demais propriedades (rede, revogação, cadeia, política de download) têm defaults adequados — consulte o [README](../README.md) se precisar ajustar.
 
+## 5. Testes
+
+Ao subir o `ApplicationContext` em testes, desabilite o bootstrap para não depender da rede:
+
+```yaml
+# src/test/resources/application.yaml
+truststore-icpbrasil:
+  bootstrap:
+    enabled: false
+  scheduling:
+    enabled: false
 ```
-inicialização
-  └─ TrustStoreBootstrap (ApplicationRunner, síncrono)
-       └─ verifica diretório local
-            ├─ acervo ausente → baixa do ITI (ZIP com ACs vigentes + hash SHA-512)
-            └─ acervo presente → valida integridade
-       └─ popula Cache em memória indexado por SKI
-       └─ se Cache.isCacheValid() = false e fail-fast = true → aborta startup
-  └─ Spring declara "Started" (cache já populado)
 
-a cada 2h (TrustStoreScheduler, com initialDelay = 2h para não competir com bootstrap)
-  └─ compara hash remoto (ITI) com hash local
-       ├─ igual → nenhuma ação
-       └─ diferente → baixa acervo atualizado e recarrega cache
-```
+Alternativa: manter o bootstrap ligado e mockar o `Downloader` — assim o cache é populado a partir de um ZIP de teste. Veja `IcpBrasilCertificateProviderTest` no repositório para o padrão.

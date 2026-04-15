@@ -1,26 +1,6 @@
-# Exemplo de integração — modo microserviço (standalone)
+# Integração — modo microserviço (standalone)
 
-## Quando usar
-
-Consumir como microserviço standalone faz sentido quando:
-
-- Múltiplos serviços precisam consultar o acervo ICP-Brasil — evita que cada um faça seu próprio download.
-- Há restrições de egress (apenas um pod com saída para `acraiz.icpbrasil.gov.br`).
-- O consumidor não é Spring/JVM — integra via HTTP (`GET /certificate?ski=...`).
-
-## Diferenças em relação ao modo biblioteca
-
-| Aspecto | Modo biblioteca | Modo microserviço |
-|---|---|---|
-| Execução | Incorporado ao host (JAR do consumidor) | Processo próprio (fat JAR executável) |
-| Acesso ao cache | `Cache.getCertificateBySki(ski)` (estático) | `GET /certificate?ski=...` (HTTP) |
-| Controle do startup | Host decide como reagir ao `IllegalStateException` | Kubernetes (ou orquestrador) reage ao exit code != 0 |
-| Endpoint REST | `rest.enabled=false` (default) | `rest.enabled=true` (obrigatório) |
-| Probes | N/A — a saúde é a do host | `/actuator/health` com `liveness`/`readiness` separados |
-
-O fluxo de bootstrap é o mesmo nos dois modos: `TrustStoreBootstrap` carrega o cache antes do contexto estar "Started". A diferença é **quem reage** ao fail-fast.
-
----
+Uso como serviço HTTP independente. Consumidores consultam certificados por SKI via REST.
 
 ## 1. Build
 
@@ -28,9 +8,9 @@ O fluxo de bootstrap é o mesmo nos dois modos: `TrustStoreBootstrap` carrega o 
 ./mvnw clean package -P standalone -DskipTests
 ```
 
-Resultado: `target/trust-store-icpbrasil-*-standalone.jar` (fat JAR executável).
+Gera `target/trust-store-icpbrasil-*-standalone.jar` (fat JAR executável).
 
-## 2. Execução local
+## 2. Execução
 
 ```bash
 java -jar target/trust-store-icpbrasil-*-standalone.jar \
@@ -38,128 +18,94 @@ java -jar target/trust-store-icpbrasil-*-standalone.jar \
   --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
 ```
 
-## 3. Consumo por HTTP
+O parâmetro `rest.enabled=true` é obrigatório — é ele que registra o `TrustStoreController` com o endpoint `/certificate`.
 
-PEM:
+Na primeira subida, a aplicação baixa o acervo ICP-Brasil do ITI e popula o cache antes de aceitar requisições. Se o download falhar, o processo encerra com erro (fail-fast). Nas subidas seguintes, se o `base-dir` contém um acervo válido, o startup é imediato.
+
+## 3. Endpoints
+
+### `GET /certificate`
+
+Retorna um certificado indexado por SKI.
+
+**Query params:**
+
+| Param | Obrigatório | Valores | Default | Descrição |
+|---|---|---|---|---|
+| `ski` | sim | hex lowercase | — | Subject Key Identifier do certificado |
+| `type` | não | `pem` \| `der` | `pem` | Formato de saída |
+
+**Respostas:**
+
+| Código | Content-Type | Corpo |
+|---|---|---|
+| `200 OK` (pem) | `text/plain` | Certificado em PEM (`-----BEGIN CERTIFICATE-----` ...) |
+| `200 OK` (der) | `application/x-x509-ca-cert` | Bytes DER. `Content-Disposition: attachment; filename=<ski>.der` |
+| `400 Bad Request` | `text/plain` | `type` fora de `pem`/`der` |
+| `404 Not Found` | — | SKI não está no cache |
+| `500 Internal Server Error` | — | Erro interno (conversão ou leitura do certificado) |
+
+**Exemplos:**
 
 ```bash
 curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
 ```
 
-DER:
-
 ```bash
 curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado.der
 ```
 
-Health:
+### `GET /actuator/health`
+
+Saúde da aplicação, inclui o estado do cache (`VALID`, `CRITICAL`, `EXPIRED`). Detalhes em [manual-monitoramento.md](manual-monitoramento.md).
 
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
----
+## 4. Variáveis de configuração relevantes
 
-## 4. Deploy em Kubernetes — fluxo recomendado
+| Propriedade | Default | Quando mudar |
+|---|---|---|
+| `truststore-icpbrasil.rest.enabled` | `false` | **Obrigatório `true`** no modo server |
+| `truststore-icpbrasil.storage.type` | `filesystem` | Usar `s3` para cache compartilhado entre instâncias |
+| `truststore-icpbrasil.filesystem.base-dir` | — | Sempre definir (recomenda-se disco persistente para evitar re-download a cada restart) |
+| `truststore-icpbrasil.bootstrap.enabled` | `true` | Manter `true` em produção |
+| `truststore-icpbrasil.bootstrap.fail-fast` | `true` | Manter `true` em produção; trocar para `false` só em staging/dev que tolera subir degradado |
+| `truststore-icpbrasil.scheduling.enabled` | `true` | Manter `true` (sincronização automática em background) |
+| `truststore-icpbrasil.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
+| `server.port` | `8080` | Padrão Spring Boot |
 
-O bootstrap síncrono + `fail-fast=true` é a combinação ideal para Kubernetes. Se o primeiro download falhar, o processo sai com exit code != 0, o pod fica em `CrashLoopBackOff` e o K8s reagenda — em vez de um pod subindo "Ready" e servindo 404 para certificados válidos.
+Credenciais para `storage.type=s3` são definidas via variáveis de ambiente (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`). Veja o [README](../README.md#armazenamento-s3-compatível).
 
-### Dockerfile mínimo
+## 5. Exemplo de consumo em Java (client externo)
 
-```dockerfile
-FROM eclipse-temurin:21-jre
-COPY target/trust-store-icpbrasil-*-standalone.jar /app/app.jar
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+HttpClient client = HttpClient.newHttpClient();
+HttpRequest req = HttpRequest.newBuilder()
+        .uri(URI.create("http://trust-store:8080/certificate?ski=" + ski + "&type=pem"))
+        .GET()
+        .build();
+
+HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+
+switch (resp.statusCode()) {
+    case 200 -> processarPem(resp.body());
+    case 404 -> caDesconhecida(ski);
+    default  -> throw new IllegalStateException("Trust store indisponível: HTTP " + resp.statusCode());
+}
 ```
 
-### Manifesto com probes
+## 6. Diferenças em relação ao modo biblioteca
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: trust-store-icpbrasil
-spec:
-  replicas: 2
-  template:
-    spec:
-      containers:
-        - name: trust-store
-          image: registry.example/trust-store-icpbrasil:0.0.2
-          args:
-            - --truststore-icpbrasil.rest.enabled=true
-            - --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
-          ports:
-            - name: http
-              containerPort: 8080
-          volumeMounts:
-            - name: cache
-              mountPath: /data/truststore
-          # startupProbe cobre o bootstrap: o pod ganha tempo para baixar o ZIP
-          # na primeira subida sem que liveness/readiness falhem prematuramente.
-          startupProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: http
-            failureThreshold: 30   # 30 * 5s = 150s total — acomoda retries do downloader
-            periodSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: http
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: http
-            periodSeconds: 30
-      volumes:
-        - name: cache
-          persistentVolumeClaim:
-            claimName: trust-store-cache   # recomendado: persistir o cache entre restarts
-```
-
-### Por que um `PersistentVolumeClaim`?
-
-Sem PVC, cada restart do pod começa com cache vazio → bootstrap baixa do ITI novamente. Isso:
-
-- Adiciona latência ao startup (alguns segundos de download).
-- Depende da disponibilidade do ITI durante todo restart.
-- Gera tráfego desnecessário contra o repositório oficial.
-
-Com PVC, restarts rápidos reutilizam o cache no disco — o bootstrap valida o hash existente e popula o cache em memória sem I/O de rede.
-
----
-
-## 5. Configuração das propriedades de bootstrap
-
-Em produção (K8s):
-
-```yaml
-truststore-icpbrasil:
-  bootstrap:
-    enabled: true       # default — mantenha
-    fail-fast: true     # default — deixar o K8s decidir via CrashLoopBackOff
-```
-
-Em staging com rede intermitente (aceita subir degradado):
-
-```yaml
-truststore-icpbrasil:
-  bootstrap:
-    enabled: true
-    fail-fast: false    # aplicação sobe com cache vazio; readinessProbe sinaliza DOWN
-```
-
-Com `fail-fast=false`, o pod sobe mas `/actuator/health` responderá `DOWN` (o `TrustStoreCacheHealthIndicator` verifica `Cache.isCacheValid()`). O `readinessProbe` então retira o pod do load balancer até o scheduler (2h depois, por padrão) popular o cache. Em geral, não recomendado para produção — prefira `fail-fast=true` + `PersistentVolumeClaim` para o cache.
-
----
-
-## 6. Checklist do consumidor em modo microserviço
-
-- [ ] Build com perfil `standalone` (fat JAR).
-- [ ] `rest.enabled=true` (senão o endpoint `/certificate` não existe).
-- [ ] Volume persistente para o `base-dir` — evita downloads repetidos.
-- [ ] `startupProbe` com `failureThreshold` suficiente para cobrir o pior cenário de download (download-timeout × max-retries × retry-interval). Com defaults (`60s × 3 × 30s`), considerar até ~5 min.
-- [ ] Monitoramento: alarmar quando `/actuator/health` reportar `CRITICAL` ou `EXPIRED` (veja [manual-monitoramento.md](manual-monitoramento.md)).
-- [ ] Egress liberado para `acraiz.icpbrasil.gov.br` (TLS).
+| Aspecto | Modo biblioteca | Modo microserviço |
+|---|---|---|
+| Execução | Incorporado ao host | Processo próprio (fat JAR) |
+| Consumo | `Cache.getCertificateBySki(ski)` (estático) | `GET /certificate?ski=...` |
+| `rest.enabled` | `false` (default) | `true` (obrigatório) |
+| Quem reage ao fail-fast | Host decide | Orquestrador (systemd, Docker, K8s) via exit code |
