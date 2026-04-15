@@ -20,7 +20,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Comportamento controlado por {@code truststore-icpbrasil.bootstrap.*}:</p>
  * <ul>
- *   <li>{@code enabled} (padrão {@code true}): desabilita o bootstrap por completo.</li>
+ *   <li>{@code enabled} (padrão {@code true}): quando {@code false}, desabilita o bootstrap por completo —
+ *       o bean não é registrado e o cache só será populado na primeira execução do scheduler.</li>
  *   <li>{@code fail-fast} (padrão {@code true}): se a carga falhar, aborta o startup.</li>
  * </ul>
  */
