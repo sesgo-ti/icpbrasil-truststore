@@ -45,6 +45,12 @@ truststore-icpbrasil:
   scheduling:
     enabled: true                 # Ativa a rotina automática (Cron) de atualização em background
 
+  # Bootstrap Síncrono
+  # [Resultado]: Carga inicial do cache antes de o Spring declarar "Started" — elimina race condition
+  bootstrap:
+    enabled: true                 # Executa ApplicationRunner síncrono no startup
+    fail-fast: true               # Aborta startup se a carga inicial falhar (recomendado em produção)
+
   # Estratégia de Armazenamento
   # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível)
   storage:
