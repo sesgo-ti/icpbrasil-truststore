@@ -44,7 +44,7 @@ Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs
 
 Se a carga inicial falhar (rede indisponível, hash inválido, timeout), o startup é abortado por padrão (`bootstrap.fail-fast=true`). Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap) para ajustar esse comportamento em testes ou cenários de desenvolvimento sem conectividade.
 
-Para um exemplo de integração com consulta por SKI, veja [docs/exemplo-integracao.md](docs/exemplo-integracao.md).
+Para um exemplo completo de integração (incluindo o comportamento do bootstrap síncrono e testes), veja [docs/exemplo-integracao.md](docs/exemplo-integracao.md).
 
 **Configuração mínima:**
 
@@ -90,7 +90,7 @@ curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
 curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado.der
 ```
 
-Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md).
+Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md). Para um guia completo de deploy (Kubernetes, probes, PVC para cache e escolha das flags de bootstrap), veja [docs/exemplo-integracao-microservico.md](docs/exemplo-integracao-microservico.md).
 
 ---
 
