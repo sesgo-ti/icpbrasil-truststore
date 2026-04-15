@@ -40,9 +40,11 @@ Adicione a dependência:
 
 A biblioteca se auto-configura via mecanismo de auto-configuração do Spring Boot — nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
-Na inicialização, verifica se o acervo de ACs da ICP-Brasil já está disponível localmente. Se não, baixa do repositório oficial do ITI. O cache em memória é populado com os certificados das ACs vigentes, indexados por SKI.
+Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs da ICP-Brasil já está disponível localmente. Se não, baixa do repositório oficial do ITI e popula o cache em memória (indexado por SKI) **antes** de o Spring declarar o contexto "Started". Requisições só chegam à aplicação após o cache estar pronto — eliminando a race condition entre startup e scheduler.
 
-Para um exemplo de integração com consulta por SKI, veja [docs/exemplo-integracao.md](docs/exemplo-integracao.md).
+Se a carga inicial falhar (rede indisponível, hash inválido, timeout), o startup é abortado por padrão (`bootstrap.fail-fast=true`). Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap) para ajustar esse comportamento em testes ou cenários de desenvolvimento sem conectividade.
+
+Para um exemplo completo de integração (incluindo o comportamento do bootstrap síncrono e testes), veja [docs/exemplo-integracao-lib.md](docs/exemplo-integracao-lib.md).
 
 **Configuração mínima:**
 
@@ -88,7 +90,7 @@ curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
 curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado.der
 ```
 
-Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md).
+Para detalhes sobre health check, estados do cache e logs de monitoramento, veja [docs/manual-monitoramento.md](docs/manual-monitoramento.md). Para um guia completo do modo standalone (endpoints, parâmetros e variáveis relevantes), veja [docs/exemplo-integracao-microservico.md](docs/exemplo-integracao-microservico.md).
 
 ---
 
@@ -106,6 +108,8 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 | `storage.type` | `filesystem` | `filesystem` ou `s3` |
 | `rest.enabled` | `false` | Ativa o endpoint `/certificate` |
 | `scheduling.enabled` | `true` | Ativa a rotina de atualização em background |
+| `bootstrap.enabled` | `true` | Executa carga síncrona do cache no startup |
+| `bootstrap.fail-fast` | `true` | Falha no bootstrap aborta o startup |
 | `trusted-certs.dir` | `classpath:registries/certificates` | Diretório com CAs fixas (JSON) |
 
 ### Armazenamento: filesystem
@@ -237,6 +241,32 @@ truststore-icpbrasil:
 ```
 
 Se a seção `download-policy` não for definida no YAML, valores padrão são aplicados automaticamente.
+
+### Inicialização síncrona (bootstrap)
+
+```yaml
+truststore-icpbrasil:
+  bootstrap:
+    enabled: true           # default — carga síncrona no startup
+    fail-fast: true         # default — aborta startup se a carga falhar
+```
+
+A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBootstrap`) de forma **síncrona**, antes de o Spring Boot declarar o contexto "Started". Isso garante que nenhuma requisição seja atendida enquanto o cache estiver vazio — eliminando a race condition em que a aplicação aceitava assinaturas antes de o scheduler completar o primeiro download.
+
+**Comportamento conforme as flags:**
+
+| `enabled` | `fail-fast` | Efeito no startup |
+|---|---|---|
+| `true` (padrão) | `true` (padrão) | Baixa e carrega o cache; se falhar, lança `IllegalStateException` e a aplicação **não sobe** |
+| `true` | `false` | Baixa e carrega o cache; se falhar, loga erro e a aplicação sobe com cache vazio (não recomendado em produção) |
+| `false` | — | Bootstrap desativado; cache só será populado na primeira execução do scheduler (útil em testes sem rede) |
+
+**Quando desabilitar (`enabled: false`):**
+
+- Testes que sobem o `ApplicationContext` sem acesso à internet e mockam `IcpBrasilCertificateProvider` ou o `Downloader`.
+- Desenvolvimento local onde o consumidor deseja iterar rapidamente sem esperar o download.
+
+**Relação com o scheduler:** com o bootstrap habilitado, a primeira execução do `TrustStoreScheduler` ocorre apenas após um intervalo completo (`refresh-interval-hours`) — o `initialDelay` do `@Scheduled` foi ajustado para não competir com a carga do bootstrap.
 
 ---
 
