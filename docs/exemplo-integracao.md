@@ -34,7 +34,7 @@ Isso é tudo. A partir daqui:
 
 ### 2.1 Bootstrap síncrono — implicações para o consumidor
 
-O bootstrap bloqueia o startup até o cache estar pronto. Isso elimina a race condition em que requisições chegavam antes do cache ser populado (e falhavam com `CERT.NOT-TRUSTED-ROOT`), mas tem três consequências práticas:
+O bootstrap bloqueia o startup até o cache estar pronto. Isso elimina a race condition em que requisições chegavam antes do cache ser populado (consultas a `Cache.getCertificateBySki(...)` retornavam `null` mesmo para CAs válidas), mas tem três consequências práticas:
 
 **1. O startup pode demorar alguns segundos a mais no primeiro boot** — tempo do download ZIP + hash + validação de integridade. Execuções subsequentes reutilizam o cache no disco e sobem instantaneamente.
 
