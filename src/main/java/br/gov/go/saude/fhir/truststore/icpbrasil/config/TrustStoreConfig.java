@@ -100,6 +100,11 @@ public class TrustStoreConfig {
     private DownloadPolicyConfig downloadPolicy;
 
     /**
+     * Configurações do bootstrap síncrono (carga do cache durante o startup).
+     */
+    private BootstrapConfig bootstrap;
+
+    /**
      * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
      */
     @Data
@@ -199,8 +204,29 @@ public class TrustStoreConfig {
         validateRevocationConfig();
         validateChainConfig();
         validateDownloadPolicyConfig();
+        validateBootstrapConfig();
 
         log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
+    }
+
+    /**
+     * Valida as configurações do bootstrap síncrono.
+     */
+    private void validateBootstrapConfig() {
+        if (bootstrap == null) {
+            bootstrap = new BootstrapConfig();
+            log.info("Configurações de bootstrap não definidas, usando valores padrão");
+            return;
+        }
+
+        if (bootstrap.timeoutSeconds < 10 || bootstrap.timeoutSeconds > 600) {
+            throw new IllegalStateException(String.format(
+                    "[Erro de Configuração] Bootstrap Timeout: Deve ser entre 10 e 600 segundos. " +
+                    "Propriedade: 'truststore-icpbrasil.bootstrap.timeout-seconds' (Valor: '%d')",
+                    bootstrap.timeoutSeconds));
+        }
+
+        log.debug("Configurações de bootstrap validadas com sucesso");
     }
 
     /**
@@ -568,5 +594,34 @@ public class TrustStoreConfig {
          * Subdomínios são automaticamente incluídos. Vazia = qualquer domínio público aceito.
          */
         private List<String> allowedDomains = List.of();
+    }
+
+    /**
+     * Configurações do bootstrap síncrono.
+     * Controla a carga inicial do cache durante o startup do Spring Boot,
+     * antes de o contexto ser declarado "Started".
+     */
+    @Data
+    public static class BootstrapConfig {
+
+        /**
+         * Se true, o bootstrap síncrono é executado no startup (padrão).
+         * Quando desabilitado, o cache só é populado pela primeira execução do scheduler.
+         * Útil em testes que sobem o contexto sem rede disponível.
+         */
+        private boolean enabled = true;
+
+        /**
+         * Se true (padrão), uma falha no bootstrap aborta o startup (lança IllegalStateException).
+         * Se false, loga erro e deixa a aplicação subir com cache vazio — útil apenas em
+         * cenários de desenvolvimento onde a indisponibilidade do repositório ITI é aceitável.
+         */
+        private boolean failFast = true;
+
+        /**
+         * Timeout total (em segundos) para a carga inicial completar (padrão 120, intervalo [10, 600]).
+         * Deve acomodar retries e cold start de rede.
+         */
+        private int timeoutSeconds = 120;
     }
 }
