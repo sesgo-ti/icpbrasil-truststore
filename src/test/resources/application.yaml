@@ -16,6 +16,10 @@ truststore-icpbrasil:
     enabled: false
   rest:
     enabled: false
+  bootstrap:
+    enabled: false
+    fail-fast: true
+    timeout-seconds: 120
   storage:
     type: filesystem
     truststore-archive-path: "ACcompactado.zip"
