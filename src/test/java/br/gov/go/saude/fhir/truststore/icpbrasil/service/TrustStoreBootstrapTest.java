@@ -42,7 +42,7 @@ class TrustStoreBootstrapTest {
 
     @SneakyThrows
     @Test
-    void testRunComBootstrapDesabilitado_NaoChamaService() {
+    void testRun_BootstrapDesabilitado_NaoChamaService() {
         bootstrap.setEnabled(false);
 
         bootstrapRunner.run(new DefaultApplicationArguments());
@@ -52,7 +52,7 @@ class TrustStoreBootstrapTest {
 
     @SneakyThrows
     @Test
-    void testRunComCargaBemSucedida_NaoLancaExcecao() {
+    void testRun_CargaBemSucedida_NaoLancaExcecao() {
         doAnswer(invocation -> {
             Cache.setCacheValid(true);
             return null;
@@ -64,7 +64,7 @@ class TrustStoreBootstrapTest {
 
     @SneakyThrows
     @Test
-    void testRunComCacheInvalidoAposRefresh_FailFastTrue_LancaIllegalStateException() {
+    void testRun_CacheInvalidoAposRefreshComFailFast_LancaIllegalStateException() {
         bootstrap.setFailFast(true);
         doNothing().when(service).refresh();
 
@@ -75,7 +75,7 @@ class TrustStoreBootstrapTest {
 
     @SneakyThrows
     @Test
-    void testRunComCacheInvalidoAposRefresh_FailFastFalse_LogaErroESegue() {
+    void testRun_CacheInvalidoAposRefreshSemFailFast_LogaErroESegue() {
         bootstrap.setFailFast(false);
         doNothing().when(service).refresh();
 
@@ -85,7 +85,7 @@ class TrustStoreBootstrapTest {
 
     @SneakyThrows
     @Test
-    void testRunComServiceLancandoExcecao_FailFastTrue_PropagaComoIllegalStateException() {
+    void testRun_ServiceLancandoExcecaoComFailFast_PropagaIllegalStateException() {
         bootstrap.setFailFast(true);
         doThrow(new RuntimeException("rede indisponível")).when(service).refresh();
 
@@ -96,7 +96,7 @@ class TrustStoreBootstrapTest {
 
     @SneakyThrows
     @Test
-    void testRunComServiceLancandoExcecao_FailFastFalse_NaoPropaga() {
+    void testRun_ServiceLancandoExcecaoSemFailFast_NaoPropaga() {
         bootstrap.setFailFast(false);
         doThrow(new RuntimeException("rede indisponível")).when(service).refresh();
 
