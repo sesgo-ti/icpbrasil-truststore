@@ -249,7 +249,6 @@ truststore-icpbrasil:
   bootstrap:
     enabled: true           # default — carga síncrona no startup
     fail-fast: true         # default — aborta startup se a carga falhar
-    timeout-seconds: 120    # 10–600 — limite total da carga inicial
 ```
 
 A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBootstrap`) de forma **síncrona**, antes de o Spring Boot declarar o contexto "Started". Isso garante que nenhuma requisição seja atendida enquanto o cache estiver vazio — eliminando a race condition em que a aplicação aceitava assinaturas antes de o scheduler completar o primeiro download.
