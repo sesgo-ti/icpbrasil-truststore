@@ -182,6 +182,8 @@
         <version>${surefire.version}</version>
         <configuration>
           <argLine>-javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+          <!-- Testes de integração (dependem de rede externa) não rodam no build padrão -->
+          <excludedGroups>integration</excludedGroups>
         </configuration>
       </plugin>
 
@@ -247,6 +249,23 @@
                 </configuration>
               </execution>
             </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Executa também os testes de integração que dependem de rede externa -->
+    <profile>
+      <id>integration-tests</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${surefire.version}</version>
+            <configuration>
+              <excludedGroups combine.self="override"/>
+            </configuration>
           </plugin>
         </plugins>
       </build>
