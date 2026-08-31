@@ -3,9 +3,6 @@ package br.gov.go.saude.truststore.icpbrasil.repository;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -23,9 +20,7 @@ import java.util.Optional;
  *
  * <p>Ativado quando {@code truststore-icpbrasil.storage.type=filesystem} (padrão).</p>
  */
-@Service
 @Slf4j
-@ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "filesystem", matchIfMissing = true)
 public class FilesystemTrustStoreRepository implements TrustStoreRepository {
 
     private final Path baseDir;
@@ -35,7 +30,7 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
 
     public FilesystemTrustStoreRepository(TrustStoreConfig trustStoreConfig) {
         TrustStoreConfig.FilesystemConfig filesystem = trustStoreConfig.getFilesystem();
-        if (filesystem == null || !StringUtils.hasText(filesystem.getBaseDir())) {
+        if (filesystem == null || filesystem.getBaseDir() == null || filesystem.getBaseDir().isBlank()) {
             throw new IllegalStateException(
                     "[Erro de Configuração] Filesystem base-dir não configurado. Propriedade: 'truststore-icpbrasil.filesystem.base-dir'");
         }

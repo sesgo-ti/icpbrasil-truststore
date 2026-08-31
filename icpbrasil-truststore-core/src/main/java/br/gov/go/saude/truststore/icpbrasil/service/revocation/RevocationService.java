@@ -4,7 +4,6 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 import java.security.cert.X509Certificate;
 import java.util.List;
@@ -25,7 +24,6 @@ import java.util.List;
  * intencionalmente, pois os endpoints de revogação são acessados via CAs públicas.</p>
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class RevocationService {
 

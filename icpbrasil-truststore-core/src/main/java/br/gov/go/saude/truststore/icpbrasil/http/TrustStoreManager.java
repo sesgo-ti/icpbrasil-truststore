@@ -4,9 +4,6 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -24,14 +21,13 @@ import java.util.List;
  * isolando as conexões de download do truststore padrão da JVM e do contexto SSL do consumidor.
  */
 @Slf4j
-@Component
 public class TrustStoreManager {
 
     private final CertificateProvider certificateProvider;
 
     private SSLContext sslContext;
 
-    public TrustStoreManager(@Qualifier("filesystemCertificateProvider") CertificateProvider certificateProvider) {
+    public TrustStoreManager(CertificateProvider certificateProvider) {
         this.certificateProvider = certificateProvider;
     }
 
@@ -126,7 +122,7 @@ public class TrustStoreManager {
     private String extractCertName(X509Certificate certificate) {
         String subjectCN = CertificateParser.getSubjectCommonName(certificate);
 
-        if (StringUtils.hasText(subjectCN)) {
+        if (subjectCN != null && !subjectCN.isBlank()) {
             return sanitizeCertificateName(subjectCN);
         }
 

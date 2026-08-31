@@ -3,7 +3,6 @@ package br.gov.go.saude.truststore.icpbrasil.model;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.*;
-import org.springframework.stereotype.Component;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -17,7 +16,6 @@ import java.util.*;
 import java.util.function.Function;
 
 @Slf4j
-@Component
 public class CertificateParser {
     public static X509Certificate parse(InputStream inputStream) throws CertificateParsingException {
         if (inputStream == null) {

@@ -6,7 +6,6 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
@@ -17,7 +16,6 @@ import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
-import org.springframework.stereotype.Component;
 
 import javax.security.auth.x500.X500Principal;
 import java.io.IOException;
@@ -39,7 +37,6 @@ import java.util.Optional;
  * responder delegado com EKU {@code id-kp-OCSPSigning}.</p>
  */
 @Slf4j
-@Component
 public class OcspClient {
 
     private static final String BC_PROVIDER = "BC";
@@ -50,7 +47,6 @@ public class OcspClient {
     private final HttpClient httpClient;
     private final DownloadPolicy downloadPolicy;
 
-    @Autowired
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
                       TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
         this.cache = cache;

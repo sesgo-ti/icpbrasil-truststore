@@ -2,7 +2,6 @@ package br.gov.go.saude.truststore.icpbrasil.http;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.io.ByteArrayOutputStream;
@@ -17,7 +16,6 @@ import java.nio.charset.StandardCharsets;
  * Utiliza SSLContext customizado via {@link TrustStoreManager} e retry via {@link RetryPolicy}.
  */
 @Slf4j
-@Component
 public class Downloader {
 
     private final TrustStoreManager trustStoreManager;

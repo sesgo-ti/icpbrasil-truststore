@@ -6,8 +6,6 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
@@ -38,7 +36,6 @@ import java.util.Set;
  * acessados via CAs públicas.</p>
  */
 @Slf4j
-@Service
 public class CertificateChainResolver {
     private static final int MAX_CHAIN_DEPTH = 10;
 
@@ -47,7 +44,6 @@ public class CertificateChainResolver {
     private final TrustStoreConfig.ChainConfig chainConfig;
     private final DownloadPolicy downloadPolicy;
 
-    @Autowired
     public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig trustStoreConfig,
                                     DownloadPolicy downloadPolicy) {
         this.retryPolicy = retryPolicy;

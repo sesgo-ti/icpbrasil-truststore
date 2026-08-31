@@ -4,8 +4,6 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.security.cert.X509Certificate;
 import java.time.Instant;
@@ -13,7 +11,6 @@ import java.util.Arrays;
 import java.util.Optional;
 
 @Slf4j
-@Service
 public class TrustStoreService {
     private final TrustStoreRepository trustStoreRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
@@ -83,7 +80,7 @@ public class TrustStoreService {
         Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
 
         boolean disponivel = zipOpt.isPresent()
-                && hashOpt.filter(StringUtils::hasText).isPresent()
+                && hashOpt.filter(s -> s != null && !s.isBlank()).isPresent()
                 && confirmacaoOpt.isPresent();
 
         return disponivel ? DisponibilidadeRepositorio.DISPONIVEL :
