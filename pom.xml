@@ -9,10 +9,40 @@
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
 
-  <groupId>br.gov.go.saude.fhir</groupId>
-  <artifactId>trust-store-icpbrasil</artifactId>
+  <groupId>br.gov.go.saude</groupId>
+  <artifactId>icpbrasil-truststore</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
+
+  <name>ICP-Brasil TrustStore</name>
+  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, montagem de cadeia via AIA, verificação de revogação OCSP/CRL e SSLContext dedicado.</description>
+  <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Daniel Nogueira</name>
+      <url>https://github.com/nogueiralegacy</url>
+    </developer>
+    <developer>
+      <name>Fabio Lucena</name>
+      <url>https://github.com/kyriosdata</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/sesgo-ti/icpbrasil-truststore.git</connection>
+    <developerConnection>scm:git:git@github.com:sesgo-ti/icpbrasil-truststore.git</developerConnection>
+    <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
+    <tag>HEAD</tag>
+  </scm>
 
   <properties>
     <java.version>21</java.version>
@@ -217,6 +247,71 @@
                 </configuration>
               </execution>
             </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Perfil de release: sources + javadoc + assinatura GPG + publicação no Maven Central -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals><goal>jar-no-fork</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals><goal>jar</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <doclint>none</doclint>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+                <configuration>
+                  <!-- Necessário para assinatura não interativa (CI) -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.7.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
           </plugin>
         </plugins>
       </build>

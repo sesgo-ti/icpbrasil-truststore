@@ -6,8 +6,8 @@ Uso embutido em uma aplicação Spring Boot que precisa consultar em memória os
 
 ```xml
 <dependency>
-    <groupId>br.gov.go.saude.fhir</groupId>
-    <artifactId>trust-store-icpbrasil</artifactId>
+    <groupId>br.gov.go.saude</groupId>
+    <artifactId>icpbrasil-truststore</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
@@ -31,7 +31,7 @@ Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. 
 A API de consumo é a classe estática `Cache`:
 
 ```java
-import br.gov.go.saude.fhir.truststore.icpbrasil.service.Cache;
+import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import java.security.cert.X509Certificate;
 import java.util.Map;
 
@@ -44,7 +44,7 @@ Map<String, X509Certificate> raizes = Cache.getRootCertificates();
 Exemplo de uso típico:
 
 ```java
-import br.gov.go.saude.fhir.truststore.icpbrasil.service.Cache;
+import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import org.springframework.stereotype.Service;
 import java.security.cert.X509Certificate;
 

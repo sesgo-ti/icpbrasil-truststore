@@ -32,8 +32,8 @@ Adicione a dependência:
 
 ```xml
 <dependency>
-    <groupId>br.gov.go.saude.fhir</groupId>
-    <artifactId>trust-store-icpbrasil</artifactId>
+    <groupId>br.gov.go.saude</groupId>
+    <artifactId>icpbrasil-truststore</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
@@ -66,12 +66,12 @@ truststore-icpbrasil:
 ./mvnw clean package -P standalone -DskipTests
 ```
 
-Gera `target/trust-store-icpbrasil-*-standalone.jar` (fat JAR executável).
+Gera `target/icpbrasil-truststore-*-standalone.jar` (fat JAR executável).
 
 ### Execução
 
 ```bash
-java -jar target/trust-store-icpbrasil-*-standalone.jar \
+java -jar target/icpbrasil-truststore-*-standalone.jar \
   --truststore-icpbrasil.rest.enabled=true \
   --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
 ```
