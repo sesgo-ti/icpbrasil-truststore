@@ -3,7 +3,6 @@ package br.gov.go.saude.truststore.icpbrasil.http;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
@@ -21,7 +20,6 @@ import java.util.function.Supplier;
  * </ul>
  */
 @Slf4j
-@Component
 public class RetryPolicy {
 
     private final TrustStoreConfig.NetworkConfig config;

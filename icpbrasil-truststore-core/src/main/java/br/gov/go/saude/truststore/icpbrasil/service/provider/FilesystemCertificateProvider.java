@@ -7,21 +7,23 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.springframework.core.io.support.ResourcePatternResolver;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 
 /**
@@ -37,22 +39,21 @@ import java.util.List;
  * definido no manual de gestão de certificados confiáveis.</p>
  */
 @Slf4j
-@Component
 public class FilesystemCertificateProvider implements CertificateProvider {
+
+    private static final String CLASSPATH_PREFIX = "classpath:";
 
     private final ObjectMapper objectMapper;
     private final String configuredDir;
-    private final ResourcePatternResolver resourceResolver;
 
     public FilesystemCertificateProvider(TrustStoreConfig trustStoreConfig) {
         this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         this.configuredDir = trustStoreConfig.getTrustedCerts().getDir();
-        this.resourceResolver = new PathMatchingResourcePatternResolver();
     }
 
     @PostConstruct
     public void validate() {
-        if (!StringUtils.hasText(configuredDir)) {
+        if (configuredDir == null || configuredDir.isBlank()) {
             throw new IllegalStateException(
                     "Diretório de certificados confiáveis não configurado. " +
                     "Configure a propriedade 'truststore.trusted-certs.dir'");
@@ -66,14 +67,18 @@ public class FilesystemCertificateProvider implements CertificateProvider {
     }
 
     private boolean isClasspath() {
-        return configuredDir.startsWith("classpath:");
+        return configuredDir.startsWith(CLASSPATH_PREFIX);
+    }
+
+    private String classpathDir() {
+        return configuredDir.substring(CLASSPATH_PREFIX.length());
     }
 
     private void validateClasspath() {
         try {
-            Resource[] resources = resourceResolver.getResources(configuredDir + "/*.json");
+            List<URL> urls = listClasspathJsonUrls();
             log.info("Certificados confiáveis configurados via classpath: {} ({} arquivo(s) JSON encontrado(s))",
-                    configuredDir, resources.length);
+                    configuredDir, urls.size());
         } catch (IOException e) {
             throw new IllegalStateException(
                     "Erro ao acessar diretório de certificados no classpath: " + configuredDir, e);
@@ -109,20 +114,20 @@ public class FilesystemCertificateProvider implements CertificateProvider {
         List<X509Certificate> certificates = new ArrayList<>();
 
         try {
-            Resource[] resources = resourceResolver.getResources(configuredDir + "/*.json");
-            for (Resource resource : resources) {
-                try (InputStream is = resource.getInputStream()) {
+            List<URL> urls = listClasspathJsonUrls();
+            for (URL url : urls) {
+                String fileName = extractFileName(url);
+                try (InputStream is = url.openStream()) {
                     byte[] jsonBytes = is.readAllBytes();
                     String jsonContent = new String(jsonBytes, StandardCharsets.UTF_8);
-                    X509Certificate cert = parseCertificateFromJson(jsonContent, resource.getFilename());
+                    X509Certificate cert = parseCertificateFromJson(jsonContent, fileName);
                     if (cert != null) {
                         certificates.add(cert);
-                        log.debug("Certificado carregado do classpath: {}", resource.getFilename());
+                        log.debug("Certificado carregado do classpath: {}", fileName);
                     }
                 } catch (Exception e) {
-                    log.error("Erro ao carregar certificado do classpath {}: {}",
-                            resource.getFilename(), e.getMessage(), e);
-                    throw new RuntimeException("Falha ao carregar certificado: " + resource.getFilename(), e);
+                    log.error("Erro ao carregar certificado do classpath {}: {}", fileName, e.getMessage(), e);
+                    throw new RuntimeException("Falha ao carregar certificado: " + fileName, e);
                 }
             }
         } catch (IOException e) {
@@ -132,6 +137,75 @@ public class FilesystemCertificateProvider implements CertificateProvider {
 
         log.info("Carregados {} certificados confiáveis do classpath", certificates.size());
         return certificates;
+    }
+
+    /**
+     * Lista todas as URLs de arquivos .json dentro do diretório de classpath configurado.
+     * Suporta tanto recursos em diretórios explodidos quanto dentro de JARs.
+     */
+    private List<URL> listClasspathJsonUrls() throws IOException {
+        String dir = classpathDir();
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        if (cl == null) {
+            cl = FilesystemCertificateProvider.class.getClassLoader();
+        }
+
+        Enumeration<URL> dirUrls = cl.getResources(dir);
+        List<URL> jsonUrls = new ArrayList<>();
+
+        while (dirUrls.hasMoreElements()) {
+            URL dirUrl = dirUrls.nextElement();
+            String protocol = dirUrl.getProtocol();
+
+            if ("file".equals(protocol)) {
+                try {
+                    Path dirPath = Path.of(dirUrl.toURI());
+                    if (Files.isDirectory(dirPath)) {
+                        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath, "*.json")) {
+                            for (Path p : stream) {
+                                jsonUrls.add(p.toUri().toURL());
+                            }
+                        }
+                    }
+                } catch (URISyntaxException e) {
+                    log.warn("URI inválida para recurso de classpath: {}", dirUrl);
+                }
+            } else if ("jar".equals(protocol)) {
+                String jarUrlStr = dirUrl.toString();
+                // jar:file:/path/to.jar!/inner/dir
+                String[] parts = jarUrlStr.split("!");
+                if (parts.length >= 2) {
+                    URI jarUri;
+                    try {
+                        jarUri = new URI(parts[0].substring(4)); // remove "jar:"
+                    } catch (URISyntaxException e) {
+                        log.warn("URI de JAR inválida: {}", jarUrlStr);
+                        continue;
+                    }
+                    String innerDir = parts[1].startsWith("/") ? parts[1].substring(1) : parts[1];
+                    try (FileSystem fs = FileSystems.newFileSystem(jarUri, Collections.emptyMap())) {
+                        Path jarDirPath = fs.getPath(innerDir);
+                        if (Files.isDirectory(jarDirPath)) {
+                            try (DirectoryStream<Path> stream = Files.newDirectoryStream(jarDirPath, "*.json")) {
+                                for (Path p : stream) {
+                                    jsonUrls.add(new URL("jar:" + jarUri.toASCIIString() + "!/" + innerDir + "/" + p.getFileName()));
+                                }
+                            }
+                        }
+                    } catch (IOException e) {
+                        log.warn("Erro ao acessar JAR {}: {}", jarUri, e.getMessage());
+                    }
+                }
+            }
+        }
+
+        return jsonUrls;
+    }
+
+    private String extractFileName(URL url) {
+        String path = url.getPath();
+        int lastSlash = path.lastIndexOf('/');
+        return lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
     }
 
     private List<X509Certificate> loadFromFilesystem() {
@@ -166,7 +240,7 @@ public class FilesystemCertificateProvider implements CertificateProvider {
         try {
             CertificateDTO dto = objectMapper.readValue(jsonContent, CertificateDTO.class);
 
-            if (dto == null || !StringUtils.hasText(dto.getPem())) {
+            if (dto == null || dto.getPem() == null || dto.getPem().isBlank()) {
                 log.warn("Arquivo JSON sem conteúdo PEM: {}", fileName);
                 return null;
             }

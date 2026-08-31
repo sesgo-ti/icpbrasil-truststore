@@ -3,7 +3,6 @@ package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -17,7 +16,6 @@ import java.util.concurrent.TimeUnit;
  * <p>Parâmetros configuráveis via {@code truststore-icpbrasil.revocation.*}
  * em {@code application.yaml}.</p>
  */
-@Service
 public class RevocationCache {
 
     private final Cache<String, byte[]> ocspCache;

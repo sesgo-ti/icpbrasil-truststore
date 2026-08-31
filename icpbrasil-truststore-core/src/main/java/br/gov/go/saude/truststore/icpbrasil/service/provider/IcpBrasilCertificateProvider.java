@@ -8,8 +8,6 @@ import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.util.HashValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.utils.IOUtils;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -22,7 +20,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @Slf4j
-@Component
 public class IcpBrasilCertificateProvider implements CertificateProvider {
     private final Downloader downloader;
     private final String icpBrasilZipUrl;
@@ -78,7 +75,7 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
         // Tenta primeiro do repositório local
         try {
             Optional<String> hashOpt = trustStoreRepository.recuperarHash();
-            if (hashOpt.filter(StringUtils::hasText).isPresent()) {
+            if (hashOpt.filter(s -> s != null && !s.isBlank()).isPresent()) {
                 log.info("Hash obtido do repositório local");
                 return hashOpt.get();
             }
@@ -106,7 +103,7 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
         log.info("Baixando hash da URL remota");
         try {
             String hashContent = downloader.downloadText(icpBrasilHashUrl);
-            if (!StringUtils.hasText(hashContent)) {
+            if (hashContent == null || hashContent.isBlank()) {
                 throw new IOException("Hash vazio ou inválido");
             }
             return hashContent.split("\\s+")[0].trim();
