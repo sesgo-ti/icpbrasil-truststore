@@ -8,12 +8,12 @@ Uso como serviço HTTP independente. Consumidores consultam certificados por SKI
 ./mvnw clean package -P standalone -DskipTests
 ```
 
-Gera `target/trust-store-icpbrasil-*-standalone.jar` (fat JAR executável).
+Gera `target/icpbrasil-truststore-*-standalone.jar` (fat JAR executável).
 
 ## 2. Execução
 
 ```bash
-java -jar target/trust-store-icpbrasil-*-standalone.jar \
+java -jar target/icpbrasil-truststore-*-standalone.jar \
   --truststore-icpbrasil.rest.enabled=true \
   --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
 ```

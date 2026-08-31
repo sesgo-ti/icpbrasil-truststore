@@ -1,6 +1,6 @@
 spring:
   application:
-    name: trust-store-icpbrasil
+    name: icpbrasil-truststore
 
 truststore-icpbrasil:
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
