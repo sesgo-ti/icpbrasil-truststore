@@ -13,13 +13,6 @@
   <description>Implementações: download, validação, cache, revogação OCSP/CRL, montagem de cadeia via AIA e repositórios.</description>
 
   <dependencies>
-    <!-- Contratos do módulo API -->
-    <dependency>
-      <groupId>br.gov.go.saude</groupId>
-      <artifactId>icpbrasil-truststore-api</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-
     <!-- Spring Boot Web — RestTemplate, @Service, @Component, @ConfigurationProperties, etc. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -75,13 +68,26 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- Classes de suporte a testes definidas no módulo api (TestCertificateFactory, TestResourceLoader) -->
+    <!-- BouncyCastle — criptografia e parsing de certificados X.509 -->
     <dependency>
-      <groupId>br.gov.go.saude</groupId>
-      <artifactId>icpbrasil-truststore-api</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+    </dependency>
+
+    <!-- Commons Codec — hash/encoding utilitário -->
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+    </dependency>
+
+    <!-- Jackson JSR-310 — serialização de java.time -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
   </dependencies>
 
