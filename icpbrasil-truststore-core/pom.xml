@@ -1,0 +1,88 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>br.gov.go.saude</groupId>
+    <artifactId>icpbrasil-truststore</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>icpbrasil-truststore-core</artifactId>
+  <name>ICP-Brasil TrustStore — Core</name>
+  <description>Implementações: download, validação, cache, revogação OCSP/CRL, montagem de cadeia via AIA e repositórios.</description>
+
+  <dependencies>
+    <!-- Contratos do módulo API -->
+    <dependency>
+      <groupId>br.gov.go.saude</groupId>
+      <artifactId>icpbrasil-truststore-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Spring Boot Web — RestTemplate, @Service, @Component, @ConfigurationProperties, etc. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- Validação de beans -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
+    <!-- Actuator — HealthIndicator (opcional; não transitivo para consumidores da lib) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Lombok -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Cache em memória (Caffeine) -->
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+
+    <!-- AWS SDK S3 + Apache HTTP Client -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>apache-client</artifactId>
+    </dependency>
+
+    <!-- Commons Compress — leitura de ZIP (IcpBrasilCertificateProvider) -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+    </dependency>
+
+    <!-- Testes -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Classes de suporte a testes definidas no módulo api (TestCertificateFactory, TestResourceLoader) -->
+    <dependency>
+      <groupId>br.gov.go.saude</groupId>
+      <artifactId>icpbrasil-truststore-api</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>

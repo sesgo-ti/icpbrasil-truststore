@@ -12,7 +12,11 @@
   <groupId>br.gov.go.saude</groupId>
   <artifactId>icpbrasil-truststore</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>icpbrasil-truststore-core</module>
+  </modules>
 
   <name>ICP-Brasil TrustStore</name>
   <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, montagem de cadeia via AIA, verificação de revogação OCSP/CRL e SSLContext dedicado.</description>
@@ -61,106 +65,30 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <!-- Versões de dependências compartilhadas — módulos herdam sem repetir a versão -->
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>1.78.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk18on</artifactId>
+        <version>1.78.1</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-codec</groupId>
+        <artifactId>commons-codec</artifactId>
+        <version>1.19.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>1.27.1</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <optional>true</optional>
-    </dependency>
-
-    <dependency>
-      <groupId>com.fasterxml.jackson.datatype</groupId>
-      <artifactId>jackson-datatype-jsr310</artifactId>
-    </dependency>
-
-    <!-- Spring Boot Web para RestTemplate -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-
-    <!-- Spring Boot DevTools -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-devtools</artifactId>
-      <scope>runtime</scope>
-      <optional>true</optional>
-    </dependency>
-
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-validation</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.github.ben-manes.caffeine</groupId>
-      <artifactId>caffeine</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk18on</artifactId>
-      <version>1.78.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.78.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-      <version>1.19.0</version>
-    </dependency>
-
-    <dependency>
-      <groupId>software.amazon.awssdk</groupId>
-      <artifactId>s3</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-compress</artifactId>
-      <version>1.27.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>software.amazon.awssdk</groupId>
-      <artifactId>apache-client</artifactId>
-    </dependency>
-
-    <!-- Gerador de Metadados para Autocomplete no IDE -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-configuration-processor</artifactId>
-      <optional>true</optional>
-    </dependency>
-
-    <!-- Actuator (opcional — não transitivo para consumidores da biblioteca) -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-actuator</artifactId>
-      <optional>true</optional>
-    </dependency>
-
-  </dependencies>
 
   <build>
     <plugins>
@@ -205,55 +133,10 @@
         </configuration>
       </plugin>
 
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>repackage</id>
-            <goals>
-              <goal>repackage</goal>
-            </goals>
-            <configuration>
-              <skip>true</skip>
-            </configuration>
-          </execution>
-        </executions>
-        <configuration>
-          <excludes>
-            <exclude>
-              <groupId>org.projectlombok</groupId>
-              <artifactId>lombok</artifactId>
-            </exclude>
-          </excludes>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
 
   <profiles>
-    <profile>
-      <id>standalone</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>repackage</id>
-                <goals><goal>repackage</goal></goals>
-                <configuration>
-                  <skip>false</skip>
-                  <classifier>standalone</classifier>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
     <!-- Executa também os testes de integração que dependem de rede externa -->
     <profile>
       <id>integration-tests</id>
