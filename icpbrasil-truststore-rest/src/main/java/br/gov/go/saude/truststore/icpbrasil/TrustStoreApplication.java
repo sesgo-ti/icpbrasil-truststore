@@ -1,15 +1,10 @@
 package br.gov.go.saude.truststore.icpbrasil;
 
-import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-@EnableConfigurationProperties({
-    TrustStoreConfig.class
-})
 @SpringBootApplication
 public class TrustStoreApplication {
     public static void main(String[] args) {
