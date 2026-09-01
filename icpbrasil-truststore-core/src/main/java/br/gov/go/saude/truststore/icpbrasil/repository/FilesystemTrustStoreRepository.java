@@ -1,7 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.repository;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -38,10 +37,10 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
         this.zipPath = baseDir.resolve(trustStoreConfig.getStorage().getTruststoreArchivePath());
         this.hashPath = baseDir.resolve(trustStoreConfig.getStorage().getHashFilePath());
         this.confirmationPath = baseDir.resolve(trustStoreConfig.getStorage().getConfirmationFilePath());
+        init();
     }
 
-    @PostConstruct
-    public void init() {
+    private void init() {
         try {
             Files.createDirectories(zipPath.getParent());
             Files.createDirectories(hashPath.getParent());

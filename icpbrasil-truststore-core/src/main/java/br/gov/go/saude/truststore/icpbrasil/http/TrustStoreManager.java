@@ -2,7 +2,6 @@ package br.gov.go.saude.truststore.icpbrasil.http;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.net.ssl.SSLContext;
@@ -29,10 +28,10 @@ public class TrustStoreManager {
 
     public TrustStoreManager(CertificateProvider certificateProvider) {
         this.certificateProvider = certificateProvider;
+        init();
     }
 
-    @PostConstruct
-    void init() {
+    private void init() {
         X509TrustManager trustManager = buildTrustManager();
         sslContext = buildSslContext(trustManager);
     }

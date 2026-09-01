@@ -1,11 +1,8 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
-import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.util.StringUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -19,7 +16,6 @@ import java.util.List;
  */
 @Data
 @Slf4j
-@ConfigurationProperties(prefix = "truststore-icpbrasil")
 public class TrustStoreConfig {
 
     // BouncyCastle é necessário para operações OCSP e CRL (assinaturas, parsing de extensões).
@@ -189,11 +185,10 @@ public class TrustStoreConfig {
     }
 
     /**
-     * Valida todas as propriedades após a inicialização do bean.
-     * 
+     * Valida todas as propriedades.
+     *
      * @throws IllegalStateException se alguma configuração for inválida
      */
-    @PostConstruct
     public void validateProperties() {
         log.info("Iniciando validação das propriedades de configuração do TrustStore ICP-Brasil");
 
@@ -226,13 +221,13 @@ public class TrustStoreConfig {
      * Valida as URLs de certificado e hash
      */
     private void validateUrls() {
-        if (!StringUtils.hasText(certificateUrl)) {
+        if (certificateUrl == null || certificateUrl.isBlank()) {
             throw new IllegalStateException("[Erro de Configuração] URL do Certificado: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.certificate-url'");
         }
 
         validateUrl(certificateUrl, "URL do Certificado", "truststore-icpbrasil.certificate-url");
 
-        if (!StringUtils.hasText(hashUrl)) {
+        if (hashUrl == null || hashUrl.isBlank()) {
             throw new IllegalStateException("[Erro de Configuração] URL do Hash: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.hash-url'");
         }
 
@@ -329,19 +324,19 @@ public class TrustStoreConfig {
             throw new IllegalStateException("[Erro de Configuração] Storage: As configurações de armazenamento não podem ser nulas. Propriedade: 'truststore-icpbrasil.storage.*'");
         }
 
-        if ("filesystem".equalsIgnoreCase(storage.getType()) && (filesystem == null || !StringUtils.hasText(filesystem.getBaseDir()))) {
+        if ("filesystem".equalsIgnoreCase(storage.getType()) && (filesystem == null || filesystem.getBaseDir() == null || filesystem.getBaseDir().isBlank())) {
             throw new IllegalStateException("[Erro de Configuração] Filesystem Base Dir: Não pode ser nulo ou vazio quando storage.type=filesystem. Propriedade: 'truststore-icpbrasil.filesystem.base-dir'");
         }
 
-        if (!StringUtils.hasText(storage.truststoreArchivePath)) {
+        if (storage.truststoreArchivePath == null || storage.truststoreArchivePath.isBlank()) {
             throw new IllegalStateException("[Erro de Configuração] Caminho do Arquivo ZIP: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.truststore-archive-path'");
         }
 
-        if (!StringUtils.hasText(storage.hashFilePath)) {
+        if (storage.hashFilePath == null || storage.hashFilePath.isBlank()) {
             throw new IllegalStateException("[Erro de Configuração] Caminho do Arquivo Hash: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.hash-file-path'");
         }
 
-        if (!StringUtils.hasText(storage.confirmationFilePath)) {
+        if (storage.confirmationFilePath == null || storage.confirmationFilePath.isBlank()) {
             throw new IllegalStateException("[Erro de Configuração] Caminho da Confirmação: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.confirmation-file-path'");
         }
 
