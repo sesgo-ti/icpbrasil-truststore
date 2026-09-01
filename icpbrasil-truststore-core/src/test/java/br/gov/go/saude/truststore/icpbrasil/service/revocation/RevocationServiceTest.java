@@ -6,60 +6,56 @@ import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 import javax.security.auth.x500.X500Principal;
 import java.math.BigInteger;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @Slf4j
-@SpringBootTest
 class RevocationServiceTest {
 
-    @Autowired
-    RevocationService revocationService;
+    private OcspClient ocspClient;
+    private CrlClient crlClient;
+    private RevocationService revocationService;
 
-    @Autowired
-    RevocationCache revocationCache;
-
-    @Autowired
-    TrustStoreConfig trustStoreConfig;
-
-    X509Certificate leafCert;
-    X509Certificate issuerCert;
+    private X509Certificate leafCert;
+    private X509Certificate issuerCert;
 
     @SneakyThrows
     @BeforeEach
     void setUp() {
+        ocspClient = mock(OcspClient.class);
+        crlClient = mock(CrlClient.class);
+        revocationService = new RevocationService(ocspClient, crlClient);
+
         leafCert = CertificateParser.parse(TestResourceLoader.getResource("DANIEL_NOGUEIRA_DA_COSTA-02057377148.cer"));
         issuerCert = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
 
     @Test
-    void testCheck_ComCrlNoCache_DeveRetornarGood() throws Exception {
-        // Given - baixa a CRL real e coloca no cache antes de chamar check
+    void testCheck_ComCrlRetornandoGood_DeveRetornarGood() {
+        // Given - OCSP retorna inconclusivo; CRL retorna Good
         List<String> crlUrls = CertificateParser.getCrlUrls(leafCert);
         assertFalse(crlUrls.isEmpty());
 
-        String crlUrl = crlUrls.get(0);
-        byte[] crlBytes = downloadCrl(crlUrl);
-        revocationCache.putCrl(crlUrl, crlBytes);
+        List<String> ocspUrls = CertificateParser.getOcspUrls(leafCert);
+        for (String url : ocspUrls) {
+            when(ocspClient.check(leafCert, issuerCert, url))
+                    .thenReturn(new RevocationStatus.OcspUnavailable());
+        }
+        when(crlClient.check(leafCert, issuerCert, crlUrls.get(0)))
+                .thenReturn(new RevocationStatus.Good("CRL", null));
 
         // When
         RevocationStatus status = revocationService.check(leafCert, issuerCert);
@@ -71,9 +67,14 @@ class RevocationServiceTest {
     }
 
     @Test
-    void testCheck_CertificadoSemDistributionPoints_DeveRetornarNoDistributionPoints() throws Exception {
+    void testCheck_CertificadoSemDistributionPoints_DeveRetornarNoDistributionPoints() {
         // Given - certificado auto-assinado sem AIA e sem CRL DP
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator kpg;
+        try {
+            kpg = KeyPairGenerator.getInstance("RSA");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         kpg.initialize(2048);
         KeyPair kp = kpg.generateKeyPair();
 
@@ -86,8 +87,14 @@ class RevocationServiceTest {
         certGen.setPublicKey(kp.getPublic());
         certGen.setSignatureAlgorithm("SHA256WithRSA");
 
-        @SuppressWarnings("deprecation")
-        X509Certificate selfSigned = certGen.generate(kp.getPrivate());
+        X509Certificate selfSigned;
+        try {
+            @SuppressWarnings("deprecation")
+            X509Certificate generated = certGen.generate(kp.getPrivate());
+            selfSigned = generated;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         // When
         RevocationStatus status = revocationService.check(selfSigned, selfSigned);
@@ -97,31 +104,16 @@ class RevocationServiceTest {
     }
 
     @Test
-    void testRevocationConfig_DeveEstarConfigurada() {
-        TrustStoreConfig.RevocationConfig config = trustStoreConfig.getRevocation();
+    void testRevocationConfig_ValoresPadrao_DeveEstarConfigurada() {
+        // Given - RevocationConfig com valores padrão (sem binding de properties)
+        TrustStoreConfig.RevocationConfig config = new TrustStoreConfig.RevocationConfig();
 
-        assertNotNull(config);
+        // Then - os defaults declarados na classe devem estar corretos
         assertEquals(10, config.getOcspTimeoutSeconds());
         assertEquals(10, config.getCrlTimeoutSeconds());
         assertEquals(2, config.getMaxRetries());
         assertEquals(3, config.getRetryIntervalSeconds());
         assertEquals(3600, config.getOcspCacheTtlSeconds());
         assertEquals(3600, config.getCrlCacheTtlSeconds());
-    }
-
-    private byte[] downloadCrl(String url) throws Exception {
-        HttpClient client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(30))
-                .GET()
-                .build();
-        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("Falha ao baixar CRL: HTTP " + response.statusCode());
-        }
-        return response.body();
     }
 }

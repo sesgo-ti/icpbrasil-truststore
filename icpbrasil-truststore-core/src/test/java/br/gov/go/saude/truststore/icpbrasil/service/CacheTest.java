@@ -1,43 +1,39 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
-import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.security.cert.X509Certificate;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @Slf4j
-@SpringBootTest
 class CacheTest {
-    @Autowired
+
     TrustStoreConfig trustStoreConfig;
-
-    @MockitoBean
     Downloader downloader;
-
-    @Autowired
     TrustStoreRepository trustStoreRepository;
-
     X509Certificate testCertificate;
 
     @SneakyThrows
     @BeforeEach
     void setUp() {
-        // Configurar o mock do downloader para retornar os recursos locais
+        trustStoreConfig = buildTrustStoreConfig();
+        trustStoreRepository = new FilesystemTrustStoreRepository(trustStoreConfig);
+        downloader = mock(Downloader.class);
+
         byte[] zipBytes = TestResourceLoader.getResource("ACcompactado.zip").readAllBytes();
         String hashContent = new String(TestResourceLoader.getResource("hashsha512.txt").readAllBytes());
 
@@ -77,7 +73,6 @@ class CacheTest {
         Map<String, X509Certificate> roots = Cache.getRootCertificates();
 
         assertFalse(roots.isEmpty());
-        // Quantidade de roots atualmente
         assertEquals(5, roots.size());
 
         roots.values().forEach(cert -> {
@@ -108,4 +103,28 @@ class CacheTest {
         assertEquals(originalSize, Cache.getAllCertificates().size());
     }
 
+    private TrustStoreConfig buildTrustStoreConfig() {
+        TrustStoreConfig config = new TrustStoreConfig();
+        config.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
+        config.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
+
+        TrustStoreConfig.NetworkConfig network = new TrustStoreConfig.NetworkConfig();
+        network.setDownloadTimeoutSeconds(30);
+        network.setMaxRetries(3);
+        network.setRetryIntervalSeconds(30);
+        config.setNetwork(network);
+
+        TrustStoreConfig.StorageConfig storage = new TrustStoreConfig.StorageConfig();
+        storage.setType("filesystem");
+        storage.setTruststoreArchivePath("ACcompactado.zip");
+        storage.setHashFilePath("hash.txt");
+        storage.setConfirmationFilePath("ultima_confirmacao.txt");
+        config.setStorage(storage);
+
+        TrustStoreConfig.FilesystemConfig filesystem = new TrustStoreConfig.FilesystemConfig();
+        filesystem.setBaseDir("target/test-cache-data");
+        config.setFilesystem(filesystem);
+
+        return config;
+    }
 }
