@@ -4,10 +4,8 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 /**
  * Garante que o cache ICP-Brasil esteja carregado antes de o Spring Boot
@@ -26,13 +24,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  */
 @Slf4j
-@Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@ConditionalOnProperty(
-        prefix = "truststore-icpbrasil.bootstrap",
-        name = "enabled",
-        havingValue = "true",
-        matchIfMissing = true)
 public class TrustStoreBootstrap implements ApplicationRunner {
 
     private final TrustStoreService trustStoreService;
