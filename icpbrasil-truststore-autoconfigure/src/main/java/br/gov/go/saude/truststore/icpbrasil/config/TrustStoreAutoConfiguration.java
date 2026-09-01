@@ -1,21 +1,20 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
-import br.gov.go.saude.truststore.icpbrasil.controller.TrustStoreController;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
+import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreBootstrap;
+import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
+import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
-import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreBootstrap;
-import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreCacheHealthIndicator;
-import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreScheduler;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.FilesystemCertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
+import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.CrlClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.OcspClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationCache;
@@ -25,25 +24,57 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.validation.annotation.Validated;
 import software.amazon.awssdk.services.s3.S3Client;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Auto-configuração do icpbrasil-truststore.
  *
  * <p>Registra explicitamente (via {@link Bean @Bean}) todos os componentes do
- * core, sem component scan, seguindo o padrão recomendado para starters.
+ * core, sem component scan, seguindo o padrão recomendado para módulos de auto-configuração.
  * Todos os beans usam {@link ConditionalOnMissingBean @ConditionalOnMissingBean},
  * permitindo que o consumidor sobrescreva qualquer componente.</p>
+ *
+ * <p>O binding de {@link TrustStoreConfig} e {@link S3Properties} é feito aqui
+ * via {@code @Bean @ConfigurationProperties} — as classes são POJOs puros no core,
+ * sem anotações Spring, o que as torna testáveis de forma isolada.</p>
  */
 @AutoConfiguration
 @EnableScheduling
-@EnableConfigurationProperties(TrustStoreConfig.class)
-@Import({S3Properties.class, TrustStoreController.class})
 public class TrustStoreAutoConfiguration {
+
+    /**
+     * Binding de {@link TrustStoreConfig} com validação diferida via {@code initMethod}.
+     * O Spring faz o binding dos campos ANTES de chamar {@code validateProperties()},
+     * garantindo que a validação veja os valores já preenchidos.
+     */
+    @Bean(initMethod = "validateProperties")
+    @ConfigurationProperties(prefix = "truststore-icpbrasil")
+    TrustStoreConfig trustStoreConfig() {
+        return new TrustStoreConfig();
+    }
+
+    /**
+     * Binding de {@link S3Properties} ativado apenas quando o storage type é S3.
+     * A validação Bean Validation ({@code @Validated}) roda após o binding.
+     */
+    @Bean
+    @ConfigurationProperties(prefix = "truststore-icpbrasil.s3")
+    @Validated
+    @ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
+    S3Properties s3Properties() {
+        return new S3Properties();
+    }
 
     @Bean
     @ConditionalOnMissingBean
@@ -57,16 +88,39 @@ public class TrustStoreAutoConfiguration {
         return new DownloadPolicy(trustStoreConfig);
     }
 
+    /**
+     * Lê os documentos JSON do diretório de certificados confiáveis usando o
+     * {@link ResourcePatternResolver} do Spring, que funciona corretamente em fat jars.
+     * Os bytes lidos são repassados ao {@link TrustedCertsProvider}, que não realiza I/O.
+     */
     @Bean
-    @ConditionalOnMissingBean
-    public FilesystemCertificateProvider filesystemCertificateProvider(TrustStoreConfig trustStoreConfig) {
-        return new FilesystemCertificateProvider(trustStoreConfig);
+    @ConditionalOnMissingBean(name = "trustedCertsProvider")
+    CertificateProvider trustedCertsProvider(TrustStoreConfig config,
+                                              ResourcePatternResolver resolver) {
+        String dir = config.getTrustedCerts().getDir();
+        String pattern = dir.startsWith("classpath:")
+                ? "classpath*:" + dir.substring("classpath:".length()) + "/*.json"
+                : "file:" + dir + "/*.json";
+        List<byte[]> docs = new ArrayList<>();
+        try {
+            for (Resource r : resolver.getResources(pattern)) {
+                try (InputStream in = r.getInputStream()) {
+                    docs.add(in.readAllBytes());
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler certificados confiáveis de: " + dir, e);
+        }
+        if (docs.isEmpty()) {
+            throw new IllegalStateException("Nenhum certificado confiável (.json) encontrado em: " + dir);
+        }
+        return new TrustedCertsProvider(docs);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public TrustStoreManager trustStoreManager(
-            @Qualifier("filesystemCertificateProvider") CertificateProvider certificateProvider) {
+            @Qualifier("trustedCertsProvider") CertificateProvider certificateProvider) {
         return new TrustStoreManager(certificateProvider);
     }
 
