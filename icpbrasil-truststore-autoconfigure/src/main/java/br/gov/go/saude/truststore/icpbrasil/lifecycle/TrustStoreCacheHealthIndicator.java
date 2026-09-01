@@ -1,7 +1,8 @@
-package br.gov.go.saude.truststore.icpbrasil.service;
+package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
+import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
