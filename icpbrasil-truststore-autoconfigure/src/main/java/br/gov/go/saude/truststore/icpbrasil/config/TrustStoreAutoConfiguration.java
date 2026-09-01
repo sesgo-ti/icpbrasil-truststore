@@ -57,9 +57,12 @@ public class TrustStoreAutoConfiguration {
      * Binding de {@link TrustStoreConfig} com validação diferida via {@code initMethod}.
      * O Spring faz o binding dos campos ANTES de chamar {@code validateProperties()},
      * garantindo que a validação veja os valores já preenchidos.
+     * {@code @ConditionalOnMissingBean} permite que o consumidor forneça o próprio bean
+     * sem causar {@code NoUniqueBeanDefinitionException}.
      */
     @Bean(initMethod = "validateProperties")
     @ConfigurationProperties(prefix = "truststore-icpbrasil")
+    @ConditionalOnMissingBean(TrustStoreConfig.class)
     TrustStoreConfig trustStoreConfig() {
         return new TrustStoreConfig();
     }
@@ -67,11 +70,14 @@ public class TrustStoreAutoConfiguration {
     /**
      * Binding de {@link S3Properties} ativado apenas quando o storage type é S3.
      * A validação Bean Validation ({@code @Validated}) roda após o binding.
+     * {@code @ConditionalOnMissingBean} permite que o consumidor forneça o próprio bean
+     * sem causar {@code NoUniqueBeanDefinitionException}.
      */
     @Bean
     @ConfigurationProperties(prefix = "truststore-icpbrasil.s3")
     @Validated
     @ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
+    @ConditionalOnMissingBean(S3Properties.class)
     S3Properties s3Properties() {
         return new S3Properties();
     }
@@ -97,10 +103,22 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnMissingBean(name = "trustedCertsProvider")
     CertificateProvider trustedCertsProvider(TrustStoreConfig config,
                                               ResourcePatternResolver resolver) {
-        String dir = config.getTrustedCerts().getDir();
-        String pattern = dir.startsWith("classpath:")
-                ? "classpath*:" + dir.substring("classpath:".length()) + "/*.json"
-                : "file:" + dir + "/*.json";
+        // Valida antes de usar para evitar NPE com mensagem opaca
+        TrustStoreConfig.TrustedCertsConfig trustedCerts = config.getTrustedCerts();
+        if (trustedCerts == null || trustedCerts.getDir() == null || trustedCerts.getDir().isBlank()) {
+            throw new IllegalStateException(
+                    "Propriedade 'truststore-icpbrasil.trusted-certs.dir' é obrigatória");
+        }
+        String dir = trustedCerts.getDir();
+        // classpath: e classpath*: são equivalentes para o usuário; normaliza para classpath*:
+        // para que o resolver busque em todos os JARs do classpath (necessário em fat jars)
+        String pattern;
+        if (dir.startsWith("classpath")) {
+            String semPrefixo = dir.substring(dir.indexOf(':') + 1);
+            pattern = "classpath*:" + semPrefixo + "/*.json";
+        } else {
+            pattern = "file:" + dir + "/*.json";
+        }
         List<byte[]> docs = new ArrayList<>();
         try {
             for (Resource r : resolver.getResources(pattern)) {
