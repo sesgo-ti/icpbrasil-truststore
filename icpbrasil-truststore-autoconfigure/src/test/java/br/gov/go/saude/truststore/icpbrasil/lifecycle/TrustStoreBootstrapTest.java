@@ -1,6 +1,8 @@
-package br.gov.go.saude.truststore.icpbrasil.service;
+package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.service.Cache;
+import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
