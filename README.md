@@ -1,6 +1,24 @@
 # Trust Store ICP-Brasil
 
+[![Build](https://github.com/sesgo-ti/icpbrasil-truststore/actions/workflows/ci.yml/badge.svg)](https://github.com/sesgo-ti/icpbrasil-truststore/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/br.gov.go.saude/icpbrasil-truststore)](https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore)
+
 Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de certificados das Autoridades Certificadoras (ACs) vigentes da ICP-Brasil. Realiza download do repositório oficial publicado pelo ITI, verificação de integridade por hash SHA-512, cache em memória e sincronização automática.
+
+## Módulos
+
+| Módulo | Papel | Publicado no Maven Central |
+|---|---|---|
+| `icpbrasil-truststore-core` | Domínio e lógica (parsers X.509, cache, revogação OCSP/CRL, download) — **Java puro, zero Spring/AWS** | ✅ |
+| `icpbrasil-truststore-autoconfigure` | Auto-configuração Spring Boot: beans, binding de properties, scheduler, bootstrap, health, S3 | ✅ |
+| `icpbrasil-truststore-rest` | Microserviço standalone (endpoint REST + fat jar) | ❌ (artefato de deploy) |
+
+Para consumir como **biblioteca**, dependa de `icpbrasil-truststore-autoconfigure`. Para rodar como **serviço**, use o fat jar do módulo `rest`.
+
+## Manutenção (mantenedores)
+
+> ⚠️ **A chave GPG de release (Key ID `566A199A481E3355`) expira em 2028-08-30.** Antes dessa data: `gpg --edit-key 566A199A481E3355` → `expire`, reenviar ao keyserver (`gpg --keyserver keyserver.ubuntu.com --send-keys 566A199A481E3355`) e atualizar o secret `MAVEN_GPG_PRIVATE_KEY` se a chave mudar. Fingerprint completo em [SECURITY.md](SECURITY.md).
 
 ---
 
