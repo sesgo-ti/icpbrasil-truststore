@@ -17,7 +17,6 @@
   <modules>
     <module>icpbrasil-truststore-core</module>
     <module>icpbrasil-truststore-autoconfigure</module>
-    <module>icpbrasil-truststore-spring-boot-starter</module>
   </modules>
 
   <name>ICP-Brasil TrustStore</name>

@@ -51,6 +51,18 @@
       <optional>true</optional>
     </dependency>
 
+    <!-- AWS SDK S3 + Apache HTTP Client — necessários para S3ClientFactory -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>apache-client</artifactId>
+      <optional>true</optional>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
