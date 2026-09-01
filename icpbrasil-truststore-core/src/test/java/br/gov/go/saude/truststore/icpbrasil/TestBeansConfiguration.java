@@ -10,8 +10,8 @@ import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.FilesystemCertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
+import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.CrlClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.OcspClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationCache;
@@ -20,6 +20,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.util.List;
 
 /**
  * Configuração Spring exclusiva para os testes do módulo core.
@@ -43,13 +48,30 @@ public class TestBeansConfiguration {
     }
 
     @Bean
-    FilesystemCertificateProvider filesystemCertificateProvider(TrustStoreConfig trustStoreConfig) {
-        return new FilesystemCertificateProvider(trustStoreConfig);
+    TrustedCertsProvider trustedCertsProvider() {
+        List<String> resourceNames = List.of(
+                "registries/certificates/isrgrootx1.json",
+                "registries/certificates/isrgrootx2.json",
+                "registries/certificates/letsencrypt_e7.json"
+        );
+        List<byte[]> docs = resourceNames.stream()
+                .map(name -> {
+                    try (InputStream is = TestBeansConfiguration.class.getClassLoader().getResourceAsStream(name)) {
+                        if (is == null) {
+                            throw new IllegalStateException("Recurso de teste não encontrado: " + name);
+                        }
+                        return is.readAllBytes();
+                    } catch (IOException e) {
+                        throw new UncheckedIOException("Erro ao ler recurso: " + name, e);
+                    }
+                })
+                .toList();
+        return new TrustedCertsProvider(docs);
     }
 
     @Bean
     TrustStoreManager trustStoreManager(
-            @Qualifier("filesystemCertificateProvider") CertificateProvider certificateProvider) {
+            @Qualifier("trustedCertsProvider") CertificateProvider certificateProvider) {
         return new TrustStoreManager(certificateProvider);
     }
 
