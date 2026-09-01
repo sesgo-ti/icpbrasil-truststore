@@ -1,19 +1,13 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 
 /**
  * Componente responsável pelo agendamento da atualização do TrustStore.
  * Pode ser desativado via configuração truststore-icpbrasil.scheduling.enabled=false.
  */
 @Slf4j
-@Component
-@EnableScheduling
-@ConditionalOnProperty(prefix = "truststore-icpbrasil.scheduling", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TrustStoreScheduler {
     private final TrustStoreService trustStoreService;
 

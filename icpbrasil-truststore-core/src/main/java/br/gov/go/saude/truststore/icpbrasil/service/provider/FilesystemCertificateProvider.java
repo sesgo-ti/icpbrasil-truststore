@@ -23,6 +23,7 @@ import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 
@@ -199,6 +200,8 @@ public class FilesystemCertificateProvider implements CertificateProvider {
             }
         }
 
+        // Ordena por nome de arquivo para comportamento determinístico
+        jsonUrls.sort(Comparator.comparing(this::extractFileName));
         return jsonUrls;
     }
 

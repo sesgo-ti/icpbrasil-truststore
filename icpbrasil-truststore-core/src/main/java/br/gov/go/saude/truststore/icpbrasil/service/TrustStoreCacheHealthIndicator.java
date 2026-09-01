@@ -5,15 +5,11 @@ import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Optional;
 
 @Slf4j
-@Component
-@ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
 public class TrustStoreCacheHealthIndicator implements HealthIndicator {
 
     private final TrustStoreRepository repository;
