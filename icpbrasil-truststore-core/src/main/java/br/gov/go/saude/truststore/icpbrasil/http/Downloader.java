@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
@@ -97,7 +98,8 @@ public class Downloader {
     }
 
     private HttpURLConnection createConnection(String url) throws IOException {
-        URL targetUrl = new URL(url);
+        // URI.create + toURL substitui o construtor new URL(String), deprecado desde o Java 20
+        URL targetUrl = URI.create(url).toURL();
         HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
 
         connection.setConnectTimeout(networkConfig.getDownloadTimeoutMillis());
