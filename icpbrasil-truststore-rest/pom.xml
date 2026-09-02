@@ -75,6 +75,23 @@
           </execution>
         </executions>
       </plugin>
+
+      <!-- Relatório de cobertura CONSOLIDADO do projeto: este módulo depende
+           (transitivamente) de core e autoconfigure, então o report-aggregate
+           soma a cobertura de todos em target/site/jacoco-aggregate/index.html -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>report-aggregate</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report-aggregate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
