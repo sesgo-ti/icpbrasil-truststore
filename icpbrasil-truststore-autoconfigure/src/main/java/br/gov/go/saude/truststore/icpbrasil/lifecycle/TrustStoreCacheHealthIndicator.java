@@ -15,15 +15,17 @@ public class TrustStoreCacheHealthIndicator implements HealthIndicator {
 
     private final TrustStoreRepository repository;
     private final TrustStoreConfig config;
+    private final Cache cache;
 
-    public TrustStoreCacheHealthIndicator(TrustStoreRepository repository, TrustStoreConfig config) {
+    public TrustStoreCacheHealthIndicator(TrustStoreRepository repository, TrustStoreConfig config, Cache cache) {
         this.repository = repository;
         this.config = config;
+        this.cache = cache;
     }
 
     @Override
     public Health health() {
-        if (!Cache.isCacheValid()) {
+        if (!cache.isCacheValid()) {
             return Health.down()
                 .withDetail("status", "EXPIRED")
                 .withDetail("message", "Cache expirado — certificados não disponíveis")

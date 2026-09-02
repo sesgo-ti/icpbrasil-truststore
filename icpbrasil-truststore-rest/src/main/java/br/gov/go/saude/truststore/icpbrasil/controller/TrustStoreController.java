@@ -30,6 +30,12 @@ public class TrustStoreController {
     private static final String TYPE_DER = "der";
     private static final String DEFAULT_TYPE = TYPE_PEM;
 
+    private final Cache cache;
+
+    public TrustStoreController(Cache cache) {
+        this.cache = cache;
+    }
+
     /**
      * Retorna o certificado com base no Subject Key Identifier (SKI).
      * Por padrão retorna em formato PEM, mas pode ser especificado DER através do parâmetro type.
@@ -43,7 +49,16 @@ public class TrustStoreController {
                                            @RequestParam(defaultValue = DEFAULT_TYPE) String type) {
         try {
             log.info("Buscando certificado para SKI: {}", ski);
-            X509Certificate cert = Cache.getCertificateBySki(ski);
+
+            // Cache inválido = acervo não confiável no momento: 503 (indisponível),
+            // distinto de 404 (SKI não existe no acervo vigente)
+            if (!cache.isCacheValid()) {
+                log.warn("Cache do trust store inválido/expirado — consulta indisponível");
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Acervo ICP-Brasil temporariamente indisponível");
+            }
+
+            X509Certificate cert = cache.getCertificateBySki(ski);
 
             if (cert == null) {
                 log.warn("Certificado não encontrado para SKI: {}", ski);

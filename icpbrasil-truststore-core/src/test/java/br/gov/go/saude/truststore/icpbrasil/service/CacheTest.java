@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 @Slf4j
 class CacheTest {
 
+    Cache cache;
     TrustStoreConfig trustStoreConfig;
     Downloader downloader;
     TrustStoreRepository trustStoreRepository;
@@ -45,8 +46,9 @@ class CacheTest {
                 downloader,
                 trustStoreRepository
         );
-        Cache.setCacheValid(true);
-        Cache.refreshCache(icpBrasilCertificateProvider.getCertificates());
+        // Instância isolada por teste — escrita acessível por estar no mesmo pacote do pipeline
+        cache = new Cache();
+        cache.load(icpBrasilCertificateProvider.getCertificates());
 
         testCertificate = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
@@ -55,12 +57,12 @@ class CacheTest {
     void testGetCertificateBySki() {
         String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate);
 
-        assertEquals(testCertificate, Cache.getCertificateBySki(testSki));
+        assertEquals(testCertificate, cache.getCertificateBySki(testSki));
     }
 
     @Test
     void testGetAllCertificates() {
-        Map<String, X509Certificate> all = Cache.getAllCertificates();
+        Map<String, X509Certificate> all = cache.getAllCertificates();
 
         assertFalse(all.isEmpty());
 
@@ -70,7 +72,7 @@ class CacheTest {
 
     @Test
     void testGetRootCertificates() {
-        Map<String, X509Certificate> roots = Cache.getRootCertificates();
+        Map<String, X509Certificate> roots = cache.getRootCertificates();
 
         assertFalse(roots.isEmpty());
         assertEquals(5, roots.size());
@@ -83,7 +85,7 @@ class CacheTest {
 
     @Test
     void testGetRootCertificatesNaoContemIntermediarios() {
-        Map<String, X509Certificate> roots = Cache.getRootCertificates();
+        Map<String, X509Certificate> roots = cache.getRootCertificates();
         String testSki = CertificateParser.getSubjectKeyIdentifier(testCertificate);
 
         assertNotEquals(
@@ -95,12 +97,12 @@ class CacheTest {
 
     @Test
     void testGetAllCertificatesRetornaCopiaDefensiva() {
-        Map<String, X509Certificate> all = Cache.getAllCertificates();
+        Map<String, X509Certificate> all = cache.getAllCertificates();
         int originalSize = all.size();
 
         all.clear();
 
-        assertEquals(originalSize, Cache.getAllCertificates().size());
+        assertEquals(originalSize, cache.getAllCertificates().size());
     }
 
     private TrustStoreConfig buildTrustStoreConfig() {

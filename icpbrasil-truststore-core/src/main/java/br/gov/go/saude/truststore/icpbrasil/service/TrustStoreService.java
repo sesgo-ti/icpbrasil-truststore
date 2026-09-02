@@ -15,14 +15,25 @@ public class TrustStoreService {
     private final TrustStoreRepository trustStoreRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
     private final TrustStoreConfig trustStoreConfig;
+    private final Cache cache;
     private boolean artefatosCarregadosNestaExecucao = false;
 
     public TrustStoreService(TrustStoreRepository trustStoreRepository,
                              IcpBrasilCertificateProvider icpBrasilCertificateProvider,
-                             TrustStoreConfig trustStoreConfig) {
+                             TrustStoreConfig trustStoreConfig,
+                             Cache cache) {
         this.trustStoreRepository = trustStoreRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
         this.trustStoreConfig = trustStoreConfig;
+        this.cache = cache;
+    }
+
+    /**
+     * Indica se o cache gerenciado por este serviço está válido.
+     * Fachada pública de leitura — a escrita da validade é interna ao pipeline.
+     */
+    public boolean isCacheValid() {
+        return cache.isCacheValid();
     }
 
     public void assegurarDisponibilidade() {
@@ -110,7 +121,7 @@ public class TrustStoreService {
             Optional<Instant> ultimaConfirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
             if (ultimaConfirmacaoOpt.isEmpty()) {
                 log.warn("Última confirmação não encontrada. Cache será marcado como inválido.");
-                Cache.setCacheValid(false);
+                cache.setCacheValid(false);
                 return;
             }
             Instant ultimaConfirmacao = ultimaConfirmacaoOpt.get();
@@ -118,14 +129,14 @@ public class TrustStoreService {
 
             if (idadeCache <= trustStoreConfig.getRefreshIntervalMillis()) {
                 log.info("Cache está atualizado e válido");
-                Cache.setCacheValid(true);
+                cache.setCacheValid(true);
                 return;
             }
 
             // Falha na atualização do cache, mas ainda estável
             if (idadeCache <= trustStoreConfig.getCacheTtlCriticalMillis()) {
                 log.warn("Falha na atualização do cache, utilizando cache local válido");
-                Cache.setCacheValid(true);
+                cache.setCacheValid(true);
                 return;
             }
 
@@ -135,7 +146,7 @@ public class TrustStoreService {
 
                 // TODO: Implementar notificação ao operador (e-mail, SMS, etc.)
                 log.info("Operador notificado sobre estado crítico do cache");
-                Cache.setCacheValid(true);
+                cache.setCacheValid(true);
                 return;
             }
 
@@ -145,11 +156,11 @@ public class TrustStoreService {
 
                 // TODO: Implementar notificação ao operador (e-mail, SMS, etc.)
                 log.info("Operador notificado sobre expiração do cache");
-                Cache.setCacheValid(false);
+                cache.setCacheValid(false);
             }
         } catch (Exception e) {
             log.error("Erro ao assegurar não expiração do cache", e);
-            Cache.setCacheValid(false);
+            cache.setCacheValid(false);
         }
     }
 
@@ -163,9 +174,9 @@ public class TrustStoreService {
             log.error("Erro durante a verificação automática de sincronização do repositório local", e);
         } finally {
             assegurrarNaoExpiracaoCache();
-            if (Cache.isCacheValid()) {
+            if (cache.isCacheValid()) {
                 var certificates = icpBrasilCertificateProvider.getCertificates();
-                Cache.refreshCache(certificates);
+                cache.refreshCache(certificates);
             } else {
                 log.warn("Cache inválido, não será atualizado");
             }
@@ -175,7 +186,7 @@ public class TrustStoreService {
     public boolean isTrustedRoot(X509Certificate cert) {
         try {
             byte[] encoded = cert.getEncoded();
-            return Cache.getRootCertificates().values().stream()
+            return cache.getRootCertificates().values().stream()
                     .anyMatch(trusted -> {
                         try {
                             return Arrays.equals(trusted.getEncoded(), encoded);

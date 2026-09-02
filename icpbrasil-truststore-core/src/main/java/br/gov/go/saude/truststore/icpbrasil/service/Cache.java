@@ -8,35 +8,45 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Índice em memória do acervo ICP-Brasil (SKI → certificado), servido aos consumidores.
+ *
+ * <p><strong>Modelo de segurança:</strong> a leitura é pública; a <em>escrita</em> é
+ * restrita ao pipeline legítimo de carga ({@link TrustStoreService}, mesmo pacote),
+ * preservando a cadeia de custódia: download com TLS dedicado → validação SHA-512 →
+ * armazenamento → indexação. Código fora do pipeline não consegue substituir nem
+ * revalidar o acervo.</p>
+ *
+ * <p><strong>Concorrência:</strong> o índice é reconstruído em um mapa local e publicado
+ * por troca atômica de referência {@code volatile} — leitores nunca observam estado
+ * parcial durante uma atualização.</p>
+ *
+ * <p>Uma instância por aplicação: a auto-configuração expõe o bean compartilhado.</p>
+ */
 @Slf4j
 public class Cache {
-    private static volatile boolean isCacheValid = false;
-    private static volatile Map<String, X509Certificate> skiIndex = new HashMap<>();
+
+    private volatile boolean cacheValid = false;
+    private volatile Map<String, X509Certificate> skiIndex = Map.of();
 
     /**
-     * Carrega os certificados no cache incondicionalmente, marcando-o como válido.
-     * Este é o entry point recomendado para consumidores da lib que desejam
-     * popular o cache manualmente.
-     *
-     * @param certificates Lista de certificados para carregar no cache
+     * Carrega os certificados no cache e o marca como válido.
+     * A validade só é sinalizada após o índice estar completamente populado.
      */
-    public static void load(List<X509Certificate> certificates) {
+    void load(List<X509Certificate> certificates) {
         log.info("Carregando cache de certificados...");
-        isCacheValid = true;
-        createMapSkiToCertificate(certificates);
+        skiIndex = indexarPorSki(certificates);
+        cacheValid = true;
         log.info("Cache de certificados carregado com {} entradas.", skiIndex.size());
     }
 
     /**
-     * Se a cache estiver válida, atualiza o cache de certificados.
-     * Se a cache estiver inválida, não faz nada.
-     *
-     * @param certificates Lista de certificados para atualizar o cache
+     * Atualiza o índice se o cache estiver válido; caso contrário, não faz nada.
      */
-    public static void refreshCache(List<X509Certificate> certificates) {
-        if (isCacheValid) {
+    void refreshCache(List<X509Certificate> certificates) {
+        if (cacheValid) {
             log.info("Atualizando cache de certificados...");
-            createMapSkiToCertificate(certificates);
+            skiIndex = indexarPorSki(certificates);
             log.info("Cache de certificados atualizado com {} entradas.", skiIndex.size());
             return;
         }
@@ -44,22 +54,26 @@ public class Cache {
         log.warn("Cache inválido, não foi possível atualizar.");
     }
 
-    private static void createMapSkiToCertificate(List<X509Certificate> certificates) {
-        skiIndex = new HashMap<>();
+    /**
+     * Constrói o índice em um mapa local — a publicação acontece por atribuição
+     * atômica da referência, nunca por mutação do mapa visível aos leitores.
+     */
+    private static Map<String, X509Certificate> indexarPorSki(List<X509Certificate> certificates) {
+        Map<String, X509Certificate> novoIndice = new HashMap<>();
 
         for (X509Certificate certificate : certificates) {
             try {
                 String ski = CertificateParser.getSubjectKeyIdentifier(certificate);
-                skiIndex.put(ski, certificate);
+                novoIndice.put(ski, certificate);
             } catch (RuntimeException e) {
                 log.error("Erro ao extrair Subject Key Identifier do certificado: {}", e.getMessage(), e);
             }
         }
 
-        log.info("Cache ski criado com sucesso");
+        return novoIndice;
     }
 
-    public static X509Certificate getCertificateBySki(String ski) {
+    public X509Certificate getCertificateBySki(String ski) {
         return skiIndex.get(ski);
     }
 
@@ -68,7 +82,7 @@ public class Cache {
      *
      * @return Mapa SKI → X509Certificate (cópia defensiva)
      */
-    public static Map<String, X509Certificate> getAllCertificates() {
+    public Map<String, X509Certificate> getAllCertificates() {
         return new HashMap<>(skiIndex);
     }
 
@@ -79,7 +93,7 @@ public class Cache {
      *
      * @return Mapa SKI → X509Certificate contendo apenas certificados raiz
      */
-    public static Map<String, X509Certificate> getRootCertificates() {
+    public Map<String, X509Certificate> getRootCertificates() {
         Map<String, X509Certificate> roots = new HashMap<>();
         for (Map.Entry<String, X509Certificate> entry : skiIndex.entrySet()) {
             X509Certificate cert = entry.getValue();
@@ -90,14 +104,17 @@ public class Cache {
         return roots;
     }
 
-    public static void setCacheValid(boolean cacheValid) {
-        isCacheValid = cacheValid;
+    /**
+     * Marca a validade do cache; ao invalidar, o índice é descartado (fail-closed).
+     */
+    void setCacheValid(boolean cacheValid) {
+        this.cacheValid = cacheValid;
         if (!cacheValid) {
-            skiIndex = new HashMap<>();
+            skiIndex = Map.of();
         }
     }
 
-    public static boolean isCacheValid() {
-        return isCacheValid;
+    public boolean isCacheValid() {
+        return cacheValid;
     }
 }

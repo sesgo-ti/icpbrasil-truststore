@@ -10,6 +10,7 @@ import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
+import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
@@ -172,12 +173,25 @@ public class TrustStoreAutoConfiguration {
         return new IcpBrasilCertificateProvider(trustStoreConfig, downloader, trustStoreRepository);
     }
 
+    /**
+     * Índice em memória do acervo — instância única por aplicação (escopo singleton
+     * do Spring). A escrita é restrita ao {@link TrustStoreService}; consumidores
+     * injetam este bean apenas para leitura.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public Cache trustStoreCache() {
+        return new Cache();
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public TrustStoreService trustStoreService(TrustStoreRepository trustStoreRepository,
                                                IcpBrasilCertificateProvider icpBrasilCertificateProvider,
-                                               TrustStoreConfig trustStoreConfig) {
-        return new TrustStoreService(trustStoreRepository, icpBrasilCertificateProvider, trustStoreConfig);
+                                               TrustStoreConfig trustStoreConfig,
+                                               Cache trustStoreCache) {
+        return new TrustStoreService(trustStoreRepository, icpBrasilCertificateProvider, trustStoreConfig,
+                trustStoreCache);
     }
 
     @Bean
@@ -235,7 +249,8 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
     public TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
-                                                                         TrustStoreConfig config) {
-        return new TrustStoreCacheHealthIndicator(repository, config);
+                                                                         TrustStoreConfig config,
+                                                                         Cache trustStoreCache) {
+        return new TrustStoreCacheHealthIndicator(repository, config, trustStoreCache);
     }
 }
