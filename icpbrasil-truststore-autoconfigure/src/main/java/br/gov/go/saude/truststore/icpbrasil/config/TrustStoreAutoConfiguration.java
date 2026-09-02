@@ -61,7 +61,7 @@ public class TrustStoreAutoConfiguration {
      * sem causar {@code NoUniqueBeanDefinitionException}.
      */
     @Bean(initMethod = "validateProperties")
-    @ConfigurationProperties(prefix = "truststore-icpbrasil")
+    @ConfigurationProperties(prefix = "icpbrasil-truststore")
     @ConditionalOnMissingBean(TrustStoreConfig.class)
     TrustStoreConfig trustStoreConfig() {
         return new TrustStoreConfig();
@@ -74,9 +74,9 @@ public class TrustStoreAutoConfiguration {
      * sem causar {@code NoUniqueBeanDefinitionException}.
      */
     @Bean
-    @ConfigurationProperties(prefix = "truststore-icpbrasil.s3")
+    @ConfigurationProperties(prefix = "icpbrasil-truststore.s3")
     @Validated
-    @ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
+    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
     @ConditionalOnMissingBean(S3Properties.class)
     S3Properties s3Properties() {
         return new S3Properties();
@@ -107,7 +107,7 @@ public class TrustStoreAutoConfiguration {
         TrustStoreConfig.TrustedCertsConfig trustedCerts = config.getTrustedCerts();
         if (trustedCerts == null || trustedCerts.getDir() == null || trustedCerts.getDir().isBlank()) {
             throw new IllegalStateException(
-                    "Propriedade 'truststore-icpbrasil.trusted-certs.dir' é obrigatória");
+                    "Propriedade 'icpbrasil-truststore.trusted-certs.dir' é obrigatória");
         }
         String dir = trustedCerts.getDir();
         // classpath: e classpath*: são equivalentes para o usuário; normaliza para classpath*:
@@ -151,14 +151,14 @@ public class TrustStoreAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(TrustStoreRepository.class)
-    @ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "filesystem", matchIfMissing = true)
+    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "filesystem", matchIfMissing = true)
     public FilesystemTrustStoreRepository filesystemTrustStoreRepository(TrustStoreConfig trustStoreConfig) {
         return new FilesystemTrustStoreRepository(trustStoreConfig);
     }
 
     @Bean
     @ConditionalOnMissingBean(TrustStoreRepository.class)
-    @ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
+    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
     public S3Repository s3Repository(S3Client s3Client, TrustStoreConfig trustStoreConfig,
                                      S3Properties s3Properties) {
         return new S3Repository(s3Client, trustStoreConfig, s3Properties);
@@ -216,7 +216,7 @@ public class TrustStoreAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "truststore-icpbrasil.bootstrap", name = "enabled",
+    @ConditionalOnProperty(prefix = "icpbrasil-truststore.bootstrap", name = "enabled",
             havingValue = "true", matchIfMissing = true)
     public TrustStoreBootstrap trustStoreBootstrap(TrustStoreService trustStoreService,
                                                    TrustStoreConfig trustStoreConfig) {
@@ -225,7 +225,7 @@ public class TrustStoreAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "truststore-icpbrasil.scheduling", name = "enabled",
+    @ConditionalOnProperty(prefix = "icpbrasil-truststore.scheduling", name = "enabled",
             havingValue = "true", matchIfMissing = true)
     public TrustStoreScheduler trustStoreScheduler(TrustStoreService trustStoreService) {
         return new TrustStoreScheduler(trustStoreService);

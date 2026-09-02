@@ -17,7 +17,7 @@ import java.util.Optional;
  * em um diretório configurável no disco local. Alternativa ao S3 para ambientes
  * com infraestrutura mínima.</p>
  *
- * <p>Ativado quando {@code truststore-icpbrasil.storage.type=filesystem} (padrão).</p>
+ * <p>Ativado quando {@code icpbrasil-truststore.storage.type=filesystem} (padrão).</p>
  */
 @Slf4j
 public class FilesystemTrustStoreRepository implements TrustStoreRepository {
@@ -31,7 +31,7 @@ public class FilesystemTrustStoreRepository implements TrustStoreRepository {
         TrustStoreConfig.FilesystemConfig filesystem = trustStoreConfig.getFilesystem();
         if (filesystem == null || filesystem.getBaseDir() == null || filesystem.getBaseDir().isBlank()) {
             throw new IllegalStateException(
-                    "[Erro de Configuração] Filesystem base-dir não configurado. Propriedade: 'truststore-icpbrasil.filesystem.base-dir'");
+                    "[Erro de Configuração] Filesystem base-dir não configurado. Propriedade: 'icpbrasil-truststore.filesystem.base-dir'");
         }
         this.baseDir = Path.of(filesystem.getBaseDir()).normalize();
         this.zipPath = baseDir.resolve(trustStoreConfig.getStorage().getTruststoreArchivePath());

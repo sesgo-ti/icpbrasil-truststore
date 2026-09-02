@@ -6,7 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 /**
  * Componente responsável pelo agendamento da atualização do TrustStore.
- * Pode ser desativado via configuração truststore-icpbrasil.scheduling.enabled=false.
+ * Pode ser desativado via configuração icpbrasil-truststore.scheduling.enabled=false.
  */
 @Slf4j
 public class TrustStoreScheduler {
@@ -24,8 +24,8 @@ public class TrustStoreScheduler {
      * já realiza a carga inicial no startup, evitando competir com o scheduler.
      */
     @Scheduled(
-            fixedRateString = "#{${truststore-icpbrasil.refresh-interval-hours:2} * 60 * 60 * 1000}",
-            initialDelayString = "#{${truststore-icpbrasil.refresh-interval-hours:2} * 60 * 60 * 1000}")
+            fixedRateString = "#{${icpbrasil-truststore.refresh-interval-hours:2} * 60 * 60 * 1000}",
+            initialDelayString = "#{${icpbrasil-truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
     public void scheduleRefresh() {
         log.info("Executando atualização agendada do TrustStore");
         trustStoreService.refresh();

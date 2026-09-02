@@ -18,7 +18,7 @@ import org.springframework.core.annotation.Order;
  * imediatamente antes de {@code SpringApplication.run()} retornar. Qualquer
  * exceção propagada daqui aborta o startup.</p>
  *
- * <p>Comportamento controlado por {@code truststore-icpbrasil.bootstrap.*}:</p>
+ * <p>Comportamento controlado por {@code icpbrasil-truststore.bootstrap.*}:</p>
  * <ul>
  *   <li>{@code enabled} (padrão {@code true}): quando {@code false}, desabilita o bootstrap por completo —
  *       o bean não é registrado e o cache só será populado na primeira execução do scheduler.</li>

@@ -53,7 +53,7 @@ grep -E "ERROR.*(TrustStoreService|Cache)" app.log
 
 ## Endpoint REST de certificados
 
-Requer `truststore-icpbrasil.rest.enabled=true`.
+Requer `icpbrasil-truststore.rest.enabled=true`.
 
 ```bash
 curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"

@@ -25,20 +25,20 @@ import java.time.Duration;
 import java.util.Arrays;
 
 /**
- * Fábrica do {@link S3Client}, ativada apenas quando {@code truststore-icpbrasil.storage.type=s3}.
+ * Fábrica do {@link S3Client}, ativada apenas quando {@code icpbrasil-truststore.storage.type=s3}.
  *
  * <p>Separada de {@link S3Properties} para manter o core livre de dependências do AWS SDK:
  * {@code S3Properties} é um POJO puro; este módulo ({@code autoconfigure}) detém a dependência
  * do SDK e toda a lógica de construção do cliente.</p>
  *
- * <p>Quando {@code truststore-icpbrasil.s3.ca-cert-path} é definido, o cliente usa um
+ * <p>Quando {@code icpbrasil-truststore.s3.ca-cert-path} é definido, o cliente usa um
  * {@code TrustManager} exclusivo para aquele certificado CA, isolando a confiança do S3
  * do SSLContext principal da aplicação. Quando omitido, usa o JVM default truststore (cacerts),
  * adequado para AWS S3 e endpoints com CA pública reconhecida.</p>
  */
 @Slf4j
 @Configuration
-@ConditionalOnProperty(name = "truststore-icpbrasil.storage.type", havingValue = "s3")
+@ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
 public class S3ClientFactory {
 
     /**

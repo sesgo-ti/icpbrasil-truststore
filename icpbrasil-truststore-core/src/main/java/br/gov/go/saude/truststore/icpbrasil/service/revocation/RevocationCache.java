@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  * <p>Utiliza Caffeine para eviction automática por TTL ({@code expireAfterWrite})
  * e por tamanho ({@code maximumSize}), eliminando a necessidade de limpeza manual.</p>
  *
- * <p>Parâmetros configuráveis via {@code truststore-icpbrasil.revocation.*}
+ * <p>Parâmetros configuráveis via {@code icpbrasil-truststore.revocation.*}
  * em {@code application.yaml}.</p>
  */
 public class RevocationCache {

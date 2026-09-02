@@ -67,11 +67,11 @@ Para um exemplo completo de integração (incluindo o comportamento do bootstrap
 **Configuração mínima:**
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: filesystem
   filesystem:
-    base-dir: .data/truststore-icpbrasil
+    base-dir: .data/icpbrasil-truststore
 ```
 
 ---
@@ -90,8 +90,8 @@ Gera `target/icpbrasil-truststore-*-standalone.jar` (fat JAR executável).
 
 ```bash
 java -jar target/icpbrasil-truststore-*-standalone.jar \
-  --truststore-icpbrasil.rest.enabled=true \
-  --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
+  --icpbrasil-truststore.rest.enabled=true \
+  --icpbrasil-truststore.storage.filesystem.base-dir=/data/truststore
 ```
 
 ### Verificação
@@ -133,17 +133,17 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 ### Armazenamento: filesystem
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: filesystem
   filesystem:
-    base-dir: .data/truststore-icpbrasil
+    base-dir: .data/icpbrasil-truststore
 ```
 
 ### Armazenamento: S3-compatível
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: s3
 ```
@@ -162,7 +162,7 @@ Credenciais via variáveis de ambiente:
 ### Rede
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   network:
     download-timeout-seconds: 60  # 30–300
     max-retries: 3                 # 1–10
@@ -172,7 +172,7 @@ truststore-icpbrasil:
 ### Revogação (OCSP e CRL)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   revocation:
     ocsp-timeout-seconds: 10
     crl-timeout-seconds: 10
@@ -205,7 +205,7 @@ Se a seção `revocation` não for definida no YAML, valores padrão são aplica
 ### Montagem de cadeia (AIA CA Issuers)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   chain:
     download-timeout-seconds: 10  # 1–60
     max-retries: 1                # 0–5
@@ -227,7 +227,7 @@ Se a seção `chain` não for definida no YAML, valores padrão são aplicados a
 ### Política de download (SSRF e limites de tamanho)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   download-policy:
     max-ocsp-response-bytes: 1048576   # 1 MB — padrão; intervalo válido: 1024–10485760
     max-crl-response-bytes: 52428800   # 50 MB — padrão; intervalo válido: 1024–524288000
@@ -250,7 +250,7 @@ O `DownloadPolicy` protege contra SSRF (Server-Side Request Forgery) e exaustão
 **`allowed-domains`:** lista de sufixos de domínio. Quando vazia (padrão), qualquer domínio público é aceito. A correspondência é por sufixo do hostname: `icpbrasil.gov.br` cobre `ocsp.icpbrasil.gov.br`, `crl.icpbrasil.gov.br`, etc. Exemplo para restringir apenas a domínios governamentais:
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   download-policy:
     allowed-domains:
       - icpbrasil.gov.br
@@ -263,7 +263,7 @@ Se a seção `download-policy` não for definida no YAML, valores padrão são a
 ### Inicialização síncrona (bootstrap)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   bootstrap:
     enabled: true           # default — carga síncrona no startup
     fail-fast: true         # default — aborta startup se a carga falhar
