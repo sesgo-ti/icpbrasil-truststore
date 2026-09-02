@@ -1,10 +1,8 @@
 package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
-import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
@@ -13,12 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class TrustStoreBootstrapTest {
 
@@ -34,12 +32,8 @@ class TrustStoreBootstrapTest {
         bootstrap = new TrustStoreConfig.BootstrapConfig();
         config.setBootstrap(bootstrap);
         bootstrapRunner = new TrustStoreBootstrap(service, config);
-        Cache.setCacheValid(false);
-    }
-
-    @AfterEach
-    void tearDown() {
-        Cache.setCacheValid(false);
+        // Validade do cache é lida via TrustStoreService (mock) — sem estado estático a limpar
+        when(service.isCacheValid()).thenReturn(false);
     }
 
     @SneakyThrows
@@ -55,10 +49,8 @@ class TrustStoreBootstrapTest {
     @SneakyThrows
     @Test
     void testRun_CargaBemSucedida_NaoLancaExcecao() {
-        doAnswer(invocation -> {
-            Cache.setCacheValid(true);
-            return null;
-        }).when(service).refresh();
+        doNothing().when(service).refresh();
+        when(service.isCacheValid()).thenReturn(true);
 
         assertDoesNotThrow(() -> bootstrapRunner.run(new DefaultApplicationArguments()));
         verify(service).refresh();
