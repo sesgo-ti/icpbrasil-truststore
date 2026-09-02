@@ -14,8 +14,8 @@ Gera `target/icpbrasil-truststore-*-standalone.jar` (fat JAR executável).
 
 ```bash
 java -jar target/icpbrasil-truststore-*-standalone.jar \
-  --truststore-icpbrasil.rest.enabled=true \
-  --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
+  --icpbrasil-truststore.rest.enabled=true \
+  --icpbrasil-truststore.storage.filesystem.base-dir=/data/truststore
 ```
 
 O parâmetro `rest.enabled=true` é obrigatório — é ele que registra o `TrustStoreController` com o endpoint `/certificate`.
@@ -67,13 +67,13 @@ curl http://localhost:8080/actuator/health
 
 | Propriedade | Default | Quando mudar |
 |---|---|---|
-| `truststore-icpbrasil.rest.enabled` | `false` | **Obrigatório `true`** no modo server |
-| `truststore-icpbrasil.storage.type` | `filesystem` | Usar `s3` para cache compartilhado entre instâncias |
-| `truststore-icpbrasil.filesystem.base-dir` | — | Sempre definir (recomenda-se disco persistente para evitar re-download a cada restart) |
-| `truststore-icpbrasil.bootstrap.enabled` | `true` | Manter `true` em produção |
-| `truststore-icpbrasil.bootstrap.fail-fast` | `true` | Manter `true` em produção; trocar para `false` só em staging/dev que tolera subir degradado |
-| `truststore-icpbrasil.scheduling.enabled` | `true` | Manter `true` (sincronização automática em background) |
-| `truststore-icpbrasil.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
+| `icpbrasil-truststore.rest.enabled` | `false` | **Obrigatório `true`** no modo server |
+| `icpbrasil-truststore.storage.type` | `filesystem` | Usar `s3` para cache compartilhado entre instâncias |
+| `icpbrasil-truststore.filesystem.base-dir` | — | Sempre definir (recomenda-se disco persistente para evitar re-download a cada restart) |
+| `icpbrasil-truststore.bootstrap.enabled` | `true` | Manter `true` em produção |
+| `icpbrasil-truststore.bootstrap.fail-fast` | `true` | Manter `true` em produção; trocar para `false` só em staging/dev que tolera subir degradado |
+| `icpbrasil-truststore.scheduling.enabled` | `true` | Manter `true` (sincronização automática em background) |
+| `icpbrasil-truststore.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 | `server.port` | `8080` | Padrão Spring Boot |
 
 Credenciais para `storage.type=s3` são definidas via variáveis de ambiente (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`). Veja o [README](../README.md#armazenamento-s3-compatível).

@@ -19,7 +19,7 @@ management:
         enabled: true
 
 # Configurações do TrustStore ICP-Brasil
-truststore-icpbrasil:
+icpbrasil-truststore:
   # URLs Oficiais da ICP-Brasil para download dos certificados e hash
   # [Resultado]: Define de onde o sistema baixa as atualizações
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
@@ -62,7 +62,7 @@ truststore-icpbrasil:
   # Configurações para armazenamento no Filesystem Local
   # [Resultado]: Local onde os artefatos são mantidos em disco
   filesystem:
-    base-dir: "${STORAGE_FILESYSTEM_DIR:.data/truststore-icpbrasil}"
+    base-dir: "${STORAGE_FILESYSTEM_DIR:.data/icpbrasil-truststore}"
 
   # Configurações para S3-compatible Storage (AWS S3, MinIO, etc.)
   # [Resultado]: Conexão com serviço de objetos S3

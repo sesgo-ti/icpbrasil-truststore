@@ -13,7 +13,7 @@ public class TrustStoreApplication {
         // Ajusta o tipo de aplicação web (Standalone) com base na propriedade rest.enabled
         app.addListeners((ApplicationEnvironmentPreparedEvent event) -> {
             Boolean restEnabled = event.getEnvironment()
-                .getProperty("truststore-icpbrasil.rest.enabled", Boolean.class, true);
+                .getProperty("icpbrasil-truststore.rest.enabled", Boolean.class, true);
             
             if (!Boolean.TRUE.equals(restEnabled)) {
                 app.setWebApplicationType(WebApplicationType.NONE);

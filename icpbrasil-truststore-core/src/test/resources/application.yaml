@@ -2,7 +2,7 @@ spring:
   application:
     name: icpbrasil-truststore
 
-truststore-icpbrasil:
+icpbrasil-truststore:
   certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
   hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
   network:
@@ -26,7 +26,7 @@ truststore-icpbrasil:
     confirmation-file-path: "ultima_confirmacao.txt"
 
   filesystem:
-    base-dir: "target/test-truststore-icpbrasil"
+    base-dir: "target/test-icpbrasil-truststore"
 
   s3:
     endpoint: "${S3_ENDPOINT:minio.clusterb.saude-go.net}"

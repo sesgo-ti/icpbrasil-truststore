@@ -23,22 +23,22 @@ class TrustStoreAutoConfigurationTest {
 
     /** Conjunto mínimo de propriedades para um contexto válido (storage filesystem). */
     private static final String[] PROPS_MINIMAS = {
-            "truststore-icpbrasil.certificate-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip",
-            "truststore-icpbrasil.hash-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt",
-            "truststore-icpbrasil.network.download-timeout-seconds=30",
-            "truststore-icpbrasil.network.max-retries=3",
-            "truststore-icpbrasil.network.retry-interval-seconds=10",
-            "truststore-icpbrasil.cache-ttl-critical-hours=72",
-            "truststore-icpbrasil.cache-ttl-max-hours=168",
-            "truststore-icpbrasil.refresh-interval-hours=1",
-            "truststore-icpbrasil.storage.type=filesystem",
-            "truststore-icpbrasil.storage.truststore-archive-path=ACcompactado.zip",
-            "truststore-icpbrasil.storage.hash-file-path=hash.txt",
-            "truststore-icpbrasil.storage.confirmation-file-path=confirmacao.txt",
-            "truststore-icpbrasil.filesystem.base-dir=target/test-truststore",
-            "truststore-icpbrasil.trusted-certs.dir=classpath:registries/certificates",
-            "truststore-icpbrasil.bootstrap.enabled=false",
-            "truststore-icpbrasil.scheduling.enabled=false",
+            "icpbrasil-truststore.certificate-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip",
+            "icpbrasil-truststore.hash-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt",
+            "icpbrasil-truststore.network.download-timeout-seconds=30",
+            "icpbrasil-truststore.network.max-retries=3",
+            "icpbrasil-truststore.network.retry-interval-seconds=10",
+            "icpbrasil-truststore.cache-ttl-critical-hours=72",
+            "icpbrasil-truststore.cache-ttl-max-hours=168",
+            "icpbrasil-truststore.refresh-interval-hours=1",
+            "icpbrasil-truststore.storage.type=filesystem",
+            "icpbrasil-truststore.storage.truststore-archive-path=ACcompactado.zip",
+            "icpbrasil-truststore.storage.hash-file-path=hash.txt",
+            "icpbrasil-truststore.storage.confirmation-file-path=confirmacao.txt",
+            "icpbrasil-truststore.filesystem.base-dir=target/test-truststore",
+            "icpbrasil-truststore.trusted-certs.dir=classpath:registries/certificates",
+            "icpbrasil-truststore.bootstrap.enabled=false",
+            "icpbrasil-truststore.scheduling.enabled=false",
     };
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -61,11 +61,11 @@ class TrustStoreAutoConfigurationTest {
 
     @Test
     void testContexto_SemCertificateUrl_FalhaComMensagemDaPropriedade() {
-        runner.withPropertyValues(remover(PROPS_MINIMAS, "truststore-icpbrasil.certificate-url"))
+        runner.withPropertyValues(remover(PROPS_MINIMAS, "icpbrasil-truststore.certificate-url"))
                 .run(context -> {
                     assertNotNull(context.getStartupFailure());
                     String causa = mensagemRaiz(context.getStartupFailure());
-                    assertTrue(causa.contains("truststore-icpbrasil.certificate-url"),
+                    assertTrue(causa.contains("icpbrasil-truststore.certificate-url"),
                             "Mensagem deve apontar a propriedade ausente. Recebido: " + causa);
                 });
     }
@@ -73,7 +73,7 @@ class TrustStoreAutoConfigurationTest {
     @Test
     void testContexto_ComCertificateUrlHttp_FalhaExigindoHttps() {
         runner.withPropertyValues(substituir(PROPS_MINIMAS,
-                        "truststore-icpbrasil.certificate-url=http://acraiz.icpbrasil.gov.br/x.zip"))
+                        "icpbrasil-truststore.certificate-url=http://acraiz.icpbrasil.gov.br/x.zip"))
                 .run(context -> {
                     assertNotNull(context.getStartupFailure());
                     assertTrue(mensagemRaiz(context.getStartupFailure()).contains("HTTPS"));
@@ -82,29 +82,29 @@ class TrustStoreAutoConfigurationTest {
 
     @Test
     void testContexto_SemTrustedCertsDir_FalhaComMensagemDaPropriedade() {
-        runner.withPropertyValues(remover(PROPS_MINIMAS, "truststore-icpbrasil.trusted-certs.dir"))
+        runner.withPropertyValues(remover(PROPS_MINIMAS, "icpbrasil-truststore.trusted-certs.dir"))
                 .run(context -> {
                     assertNotNull(context.getStartupFailure());
                     assertTrue(mensagemRaiz(context.getStartupFailure())
-                            .contains("truststore-icpbrasil.trusted-certs.dir"));
+                            .contains("icpbrasil-truststore.trusted-certs.dir"));
                 });
     }
 
     @Test
     void testContexto_SemFilesystemBaseDir_FalhaComMensagemDaPropriedade() {
-        runner.withPropertyValues(remover(PROPS_MINIMAS, "truststore-icpbrasil.filesystem.base-dir"))
+        runner.withPropertyValues(remover(PROPS_MINIMAS, "icpbrasil-truststore.filesystem.base-dir"))
                 .run(context -> {
                     assertNotNull(context.getStartupFailure());
                     assertTrue(mensagemRaiz(context.getStartupFailure())
-                            .contains("truststore-icpbrasil.filesystem.base-dir"));
+                            .contains("icpbrasil-truststore.filesystem.base-dir"));
                 });
     }
 
     @Test
     void testContexto_StorageS3SemPropriedadesS3_FalhaNoBinding() {
-        runner.withPropertyValues(substituir(PROPS_MINIMAS, "truststore-icpbrasil.storage.type=s3"))
+        runner.withPropertyValues(substituir(PROPS_MINIMAS, "icpbrasil-truststore.storage.type=s3"))
                 .run(context -> assertNotNull(context.getStartupFailure(),
-                        "storage.type=s3 sem truststore-icpbrasil.s3.* deve impedir o startup"));
+                        "storage.type=s3 sem icpbrasil-truststore.s3.* deve impedir o startup"));
     }
 
     @Test

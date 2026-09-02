@@ -17,7 +17,7 @@ import java.util.Base64;
  */
 @Slf4j
 @ConditionalOnProperty(
-    prefix = "truststore-icpbrasil.rest",
+    prefix = "icpbrasil-truststore.rest",
     name = "enabled",
     havingValue = "true",
     matchIfMissing = false

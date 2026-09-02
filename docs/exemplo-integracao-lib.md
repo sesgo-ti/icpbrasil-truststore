@@ -17,11 +17,11 @@ Auto-configuração: nenhuma anotação `@Import` ou registro manual de beans é
 ## 2. Configuração mínima
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: filesystem
   filesystem:
-    base-dir: .data/truststore-icpbrasil
+    base-dir: .data/icpbrasil-truststore
 ```
 
 Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. Se não, baixa do ITI. O cache em memória é populado **antes** de o Spring declarar o contexto "Started", eliminando qualquer janela em que requisições cheguem com cache vazio.
@@ -65,13 +65,13 @@ public class ValidacaoAssinaturaService {
 
 | Propriedade | Default | Quando mudar |
 |---|---|---|
-| `truststore-icpbrasil.storage.type` | `filesystem` | Usar `s3` quando o cache precisa ser compartilhado entre instâncias |
-| `truststore-icpbrasil.filesystem.base-dir` | — | Sempre definir (caminho do cache em disco) |
-| `truststore-icpbrasil.bootstrap.enabled` | `true` | **Desligar apenas em testes** que sobem `@SpringBootTest` sem rede |
-| `truststore-icpbrasil.bootstrap.fail-fast` | `true` | Mudar para `false` só em dev local onde a indisponibilidade do ITI é aceitável |
-| `truststore-icpbrasil.rest.enabled` | `false` | **Manter `false`** em modo biblioteca — o endpoint HTTP é para modo server |
-| `truststore-icpbrasil.scheduling.enabled` | `true` | Desligar só em testes |
-| `truststore-icpbrasil.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
+| `icpbrasil-truststore.storage.type` | `filesystem` | Usar `s3` quando o cache precisa ser compartilhado entre instâncias |
+| `icpbrasil-truststore.filesystem.base-dir` | — | Sempre definir (caminho do cache em disco) |
+| `icpbrasil-truststore.bootstrap.enabled` | `true` | **Desligar apenas em testes** que sobem `@SpringBootTest` sem rede |
+| `icpbrasil-truststore.bootstrap.fail-fast` | `true` | Mudar para `false` só em dev local onde a indisponibilidade do ITI é aceitável |
+| `icpbrasil-truststore.rest.enabled` | `false` | **Manter `false`** em modo biblioteca — o endpoint HTTP é para modo server |
+| `icpbrasil-truststore.scheduling.enabled` | `true` | Desligar só em testes |
+| `icpbrasil-truststore.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 
 Demais propriedades (rede, revogação, cadeia, política de download) têm defaults adequados — consulte o [README](../README.md) se precisar ajustar.
 
@@ -81,7 +81,7 @@ Ao subir o `ApplicationContext` em testes, desabilite o bootstrap para não depe
 
 ```yaml
 # src/test/resources/application.yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   bootstrap:
     enabled: false
   scheduling:

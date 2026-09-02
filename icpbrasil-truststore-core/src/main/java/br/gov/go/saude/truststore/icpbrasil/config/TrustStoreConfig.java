@@ -222,16 +222,16 @@ public class TrustStoreConfig {
      */
     private void validateUrls() {
         if (certificateUrl == null || certificateUrl.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] URL do Certificado: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.certificate-url'");
+            throw new IllegalStateException("[Erro de Configuração] URL do Certificado: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.certificate-url'");
         }
 
-        validateUrl(certificateUrl, "URL do Certificado", "truststore-icpbrasil.certificate-url");
+        validateUrl(certificateUrl, "URL do Certificado", "icpbrasil-truststore.certificate-url");
 
         if (hashUrl == null || hashUrl.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] URL do Hash: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.hash-url'");
+            throw new IllegalStateException("[Erro de Configuração] URL do Hash: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.hash-url'");
         }
 
-        validateUrl(hashUrl, "URL do Hash", "truststore-icpbrasil.hash-url");
+        validateUrl(hashUrl, "URL do Hash", "icpbrasil-truststore.hash-url");
 
         log.debug("URLs validadas com sucesso");
     }
@@ -269,19 +269,19 @@ public class TrustStoreConfig {
 
         // Validar timeout de download (30-300 segundos)
         if (network.downloadTimeoutSeconds < 30 || network.downloadTimeoutSeconds > 300) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Timeout de Download: Deve ser entre 30 e 300 segundos. Propriedade: 'truststore-icpbrasil.network.download-timeout-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Timeout de Download: Deve ser entre 30 e 300 segundos. Propriedade: 'icpbrasil-truststore.network.download-timeout-seconds' (Valor: '%d')",
                     network.downloadTimeoutSeconds));
         }
 
         // Validar número máximo de tentativas (1-10)
         if (network.maxRetries < 1 || network.maxRetries > 10) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Máximo de Tentativas: Deve ser entre 1 e 10. Propriedade: 'truststore-icpbrasil.network.max-retries' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Máximo de Tentativas: Deve ser entre 1 e 10. Propriedade: 'icpbrasil-truststore.network.max-retries' (Valor: '%d')",
                     network.maxRetries));
         }
 
         // Validar intervalo entre tentativas (10-300 segundos)
         if (network.retryIntervalSeconds < 10 || network.retryIntervalSeconds > 300) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Intervalo entre Tentativas: Deve ser entre 10 e 300 segundos. Propriedade: 'truststore-icpbrasil.network.retry-interval-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Intervalo entre Tentativas: Deve ser entre 10 e 300 segundos. Propriedade: 'icpbrasil-truststore.network.retry-interval-seconds' (Valor: '%d')",
                     network.retryIntervalSeconds));
         }
 
@@ -293,12 +293,12 @@ public class TrustStoreConfig {
      */
     private void validateCacheConfig() {
         if (cacheTtlCriticalHours < 24 || cacheTtlCriticalHours > 168) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] TTL Crítico: Deve ser entre 24 e 168 horas. Propriedade: 'truststore-icpbrasil.cache-ttl-critical-hours' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] TTL Crítico: Deve ser entre 24 e 168 horas. Propriedade: 'icpbrasil-truststore.cache-ttl-critical-hours' (Valor: '%d')",
                     cacheTtlCriticalHours));
         }
 
         if (cacheTtlMaxHours < 72 || cacheTtlMaxHours > 720) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] TTL Máximo: Deve ser entre 168 e 720 horas. Propriedade: 'truststore-icpbrasil.cache-ttl-max-hours' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] TTL Máximo: Deve ser entre 168 e 720 horas. Propriedade: 'icpbrasil-truststore.cache-ttl-max-hours' (Valor: '%d')",
                     cacheTtlMaxHours));
         }
 
@@ -309,7 +309,7 @@ public class TrustStoreConfig {
 
         // Validar intervalo de refresh (deve ser positivo)
         if (refreshIntervalHours < 1 || refreshIntervalHours > cacheTtlCriticalHours) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Intervalo de Refresh: Deve estar entre 1 e o TTL Crítico (%d). Propriedade: 'truststore-icpbrasil.refresh-interval-hours' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Intervalo de Refresh: Deve estar entre 1 e o TTL Crítico (%d). Propriedade: 'icpbrasil-truststore.refresh-interval-hours' (Valor: '%d')",
                     cacheTtlCriticalHours, refreshIntervalHours));
         }
 
@@ -321,23 +321,23 @@ public class TrustStoreConfig {
      */
     private void validateStorageConfig() {
         if (storage == null) {
-            throw new IllegalStateException("[Erro de Configuração] Storage: As configurações de armazenamento não podem ser nulas. Propriedade: 'truststore-icpbrasil.storage.*'");
+            throw new IllegalStateException("[Erro de Configuração] Storage: As configurações de armazenamento não podem ser nulas. Propriedade: 'icpbrasil-truststore.storage.*'");
         }
 
         if ("filesystem".equalsIgnoreCase(storage.getType()) && (filesystem == null || filesystem.getBaseDir() == null || filesystem.getBaseDir().isBlank())) {
-            throw new IllegalStateException("[Erro de Configuração] Filesystem Base Dir: Não pode ser nulo ou vazio quando storage.type=filesystem. Propriedade: 'truststore-icpbrasil.filesystem.base-dir'");
+            throw new IllegalStateException("[Erro de Configuração] Filesystem Base Dir: Não pode ser nulo ou vazio quando storage.type=filesystem. Propriedade: 'icpbrasil-truststore.filesystem.base-dir'");
         }
 
         if (storage.truststoreArchivePath == null || storage.truststoreArchivePath.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] Caminho do Arquivo ZIP: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.truststore-archive-path'");
+            throw new IllegalStateException("[Erro de Configuração] Caminho do Arquivo ZIP: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.storage.truststore-archive-path'");
         }
 
         if (storage.hashFilePath == null || storage.hashFilePath.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] Caminho do Arquivo Hash: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.hash-file-path'");
+            throw new IllegalStateException("[Erro de Configuração] Caminho do Arquivo Hash: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.storage.hash-file-path'");
         }
 
         if (storage.confirmationFilePath == null || storage.confirmationFilePath.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] Caminho da Confirmação: Não pode ser nulo ou vazio. Propriedade: 'truststore-icpbrasil.storage.confirmation-file-path'");
+            throw new IllegalStateException("[Erro de Configuração] Caminho da Confirmação: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.storage.confirmation-file-path'");
         }
 
         log.debug("Configurações de storage validadas com sucesso");
@@ -354,42 +354,42 @@ public class TrustStoreConfig {
         }
 
         if (revocation.ocspTimeoutSeconds < 1 || revocation.ocspTimeoutSeconds > 60) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.revocation.ocsp-timeout-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'icpbrasil-truststore.revocation.ocsp-timeout-seconds' (Valor: '%d')",
                     revocation.ocspTimeoutSeconds));
         }
 
         if (revocation.crlTimeoutSeconds < 1 || revocation.crlTimeoutSeconds > 60) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.revocation.crl-timeout-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'icpbrasil-truststore.revocation.crl-timeout-seconds' (Valor: '%d')",
                     revocation.crlTimeoutSeconds));
         }
 
         if (revocation.maxRetries < 0 || revocation.maxRetries > 10) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Revocation Max Retries: Deve ser entre 0 e 10. Propriedade: 'truststore-icpbrasil.revocation.max-retries' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Revocation Max Retries: Deve ser entre 0 e 10. Propriedade: 'icpbrasil-truststore.revocation.max-retries' (Valor: '%d')",
                     revocation.maxRetries));
         }
 
         if (revocation.retryIntervalSeconds < 1 || revocation.retryIntervalSeconds > 60) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Revocation Retry Interval: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.revocation.retry-interval-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Revocation Retry Interval: Deve ser entre 1 e 60 segundos. Propriedade: 'icpbrasil-truststore.revocation.retry-interval-seconds' (Valor: '%d')",
                     revocation.retryIntervalSeconds));
         }
 
         if (revocation.ocspCacheTtlSeconds < 60 || revocation.ocspCacheTtlSeconds > 86400) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache TTL: Deve ser entre 60 e 86400 segundos. Propriedade: 'truststore-icpbrasil.revocation.ocsp-cache-ttl-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache TTL: Deve ser entre 60 e 86400 segundos. Propriedade: 'icpbrasil-truststore.revocation.ocsp-cache-ttl-seconds' (Valor: '%d')",
                     revocation.ocspCacheTtlSeconds));
         }
 
         if (revocation.crlCacheTtlSeconds < 60 || revocation.crlCacheTtlSeconds > 86400) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache TTL: Deve ser entre 60 e 86400 segundos. Propriedade: 'truststore-icpbrasil.revocation.crl-cache-ttl-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache TTL: Deve ser entre 60 e 86400 segundos. Propriedade: 'icpbrasil-truststore.revocation.crl-cache-ttl-seconds' (Valor: '%d')",
                     revocation.crlCacheTtlSeconds));
         }
 
         if (revocation.ocspCacheMaxSize < 100 || revocation.ocspCacheMaxSize > 1_000_000) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache Max Size: Deve ser entre 100 e 1000000. Propriedade: 'truststore-icpbrasil.revocation.ocsp-cache-max-size' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache Max Size: Deve ser entre 100 e 1000000. Propriedade: 'icpbrasil-truststore.revocation.ocsp-cache-max-size' (Valor: '%d')",
                     revocation.ocspCacheMaxSize));
         }
 
         if (revocation.crlCacheMaxSize < 100 || revocation.crlCacheMaxSize > 100_000) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache Max Size: Deve ser entre 100 e 100000. Propriedade: 'truststore-icpbrasil.revocation.crl-cache-max-size' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache Max Size: Deve ser entre 100 e 100000. Propriedade: 'icpbrasil-truststore.revocation.crl-cache-max-size' (Valor: '%d')",
                     revocation.crlCacheMaxSize));
         }
 
@@ -407,17 +407,17 @@ public class TrustStoreConfig {
         }
 
         if (chain.downloadTimeoutSeconds < 1 || chain.downloadTimeoutSeconds > 60) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Download Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'truststore-icpbrasil.chain.download-timeout-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Download Timeout: Deve ser entre 1 e 60 segundos. Propriedade: 'icpbrasil-truststore.chain.download-timeout-seconds' (Valor: '%d')",
                     chain.downloadTimeoutSeconds));
         }
 
         if (chain.maxRetries < 0 || chain.maxRetries > 5) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Max Retries: Deve ser entre 0 e 5. Propriedade: 'truststore-icpbrasil.chain.max-retries' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Max Retries: Deve ser entre 0 e 5. Propriedade: 'icpbrasil-truststore.chain.max-retries' (Valor: '%d')",
                     chain.maxRetries));
         }
 
         if (chain.retryIntervalSeconds < 1 || chain.retryIntervalSeconds > 30) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Retry Interval: Deve ser entre 1 e 30 segundos. Propriedade: 'truststore-icpbrasil.chain.retry-interval-seconds' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] Chain Retry Interval: Deve ser entre 1 e 30 segundos. Propriedade: 'icpbrasil-truststore.chain.retry-interval-seconds' (Valor: '%d')",
                     chain.retryIntervalSeconds));
         }
 
@@ -437,21 +437,21 @@ public class TrustStoreConfig {
         if (downloadPolicy.maxOcspResponseBytes < 1024 || downloadPolicy.maxOcspResponseBytes > 10_485_760L) {
             throw new IllegalStateException(String.format(
                     "[Erro de Configuração] Download Policy OCSP Max Size: Deve ser entre 1024 e 10485760 bytes. " +
-                    "Propriedade: 'truststore-icpbrasil.download-policy.max-ocsp-response-bytes' (Valor: '%d')",
+                    "Propriedade: 'icpbrasil-truststore.download-policy.max-ocsp-response-bytes' (Valor: '%d')",
                     downloadPolicy.maxOcspResponseBytes));
         }
 
         if (downloadPolicy.maxCrlResponseBytes < 1024 || downloadPolicy.maxCrlResponseBytes > 524_288_000L) {
             throw new IllegalStateException(String.format(
                     "[Erro de Configuração] Download Policy CRL Max Size: Deve ser entre 1024 e 524288000 bytes. " +
-                    "Propriedade: 'truststore-icpbrasil.download-policy.max-crl-response-bytes' (Valor: '%d')",
+                    "Propriedade: 'icpbrasil-truststore.download-policy.max-crl-response-bytes' (Valor: '%d')",
                     downloadPolicy.maxCrlResponseBytes));
         }
 
         if (downloadPolicy.maxAiaResponseBytes < 1024 || downloadPolicy.maxAiaResponseBytes > 104_857_600L) {
             throw new IllegalStateException(String.format(
                     "[Erro de Configuração] Download Policy AIA Max Size: Deve ser entre 1024 e 104857600 bytes. " +
-                    "Propriedade: 'truststore-icpbrasil.download-policy.max-aia-response-bytes' (Valor: '%d')",
+                    "Propriedade: 'icpbrasil-truststore.download-policy.max-aia-response-bytes' (Valor: '%d')",
                     downloadPolicy.maxAiaResponseBytes));
         }
 
