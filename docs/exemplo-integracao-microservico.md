@@ -5,17 +5,17 @@ Uso como serviço HTTP independente. Consumidores consultam certificados por SKI
 ## 1. Build
 
 ```bash
-./mvnw clean package -P standalone -DskipTests
+./mvnw clean package -DskipTests
 ```
 
-Gera `target/icpbrasil-truststore-*-standalone.jar` (fat JAR executável).
+Gera `icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar` (fat JAR executável — módulo `rest`).
 
 ## 2. Execução
 
 ```bash
-java -jar target/icpbrasil-truststore-*-standalone.jar \
+java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
   --icpbrasil-truststore.rest.enabled=true \
-  --icpbrasil-truststore.storage.filesystem.base-dir=/data/truststore
+  --icpbrasil-truststore.filesystem.base-dir=/data/truststore
 ```
 
 O parâmetro `rest.enabled=true` é obrigatório — é ele que registra o `TrustStoreController` com o endpoint `/certificate`.
@@ -42,7 +42,8 @@ Retorna um certificado indexado por SKI.
 | `200 OK` (pem) | `text/plain` | Certificado em PEM (`-----BEGIN CERTIFICATE-----` ...) |
 | `200 OK` (der) | `application/x-x509-ca-cert` | Bytes DER. `Content-Disposition: attachment; filename=<ski>.der` |
 | `400 Bad Request` | `text/plain` | `type` fora de `pem`/`der` |
-| `404 Not Found` | — | SKI não está no cache |
+| `404 Not Found` | — | SKI não está no acervo vigente |
+| `503 Service Unavailable` | `text/plain` | Cache inválido/expirado — acervo temporariamente não confiável (distinto de 404) |
 | `500 Internal Server Error` | — | Erro interno (conversão ou leitura do certificado) |
 
 **Exemplos:**
