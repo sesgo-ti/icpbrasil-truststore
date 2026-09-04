@@ -7,10 +7,14 @@ Uso embutido em uma aplicação Spring Boot que precisa consultar em memória os
 ```xml
 <dependency>
     <groupId>br.gov.go.saude</groupId>
-    <artifactId>icpbrasil-truststore</artifactId>
+    <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
+
+> O `autoconfigure` traz o `icpbrasil-truststore-core` transitivamente. Para storage S3,
+> adicione também `software.amazon.awssdk:s3` e `software.amazon.awssdk:apache-client`
+> (são `optional` no autoconfigure).
 
 Auto-configuração: nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
@@ -28,35 +32,35 @@ Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. 
 
 ## 3. Consultar certificados
 
-A API de consumo é a classe estática `Cache`:
-
-```java
-import br.gov.go.saude.truststore.icpbrasil.service.Cache;
-import java.security.cert.X509Certificate;
-import java.util.Map;
-
-X509Certificate cert = Cache.getCertificateBySki(ski);          // null se não encontrado
-boolean valido       = Cache.isCacheValid();                     // false se cache ainda não pronto ou expirado
-Map<String, X509Certificate> todos  = Cache.getAllCertificates();
-Map<String, X509Certificate> raizes = Cache.getRootCertificates();
-```
-
-Exemplo de uso típico:
+A API de consumo é o bean `Cache`, exposto pela auto-configuração — injete-o
+como qualquer dependência (a leitura é pública; a escrita é restrita ao pipeline
+interno da lib, preservando a cadeia de custódia do acervo):
 
 ```java
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import org.springframework.stereotype.Service;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 
 @Service
 public class ValidacaoAssinaturaService {
 
+    private final Cache cache;
+
+    public ValidacaoAssinaturaService(Cache cache) {
+        this.cache = cache;
+    }
+
     public boolean caConhecida(String ski) {
-        return Cache.isCacheValid() && Cache.getCertificateBySki(ski) != null;
+        return cache.isCacheValid() && cache.getCertificateBySki(ski) != null;
     }
 
     public X509Certificate buscarCA(String ski) {
-        return Cache.getCertificateBySki(ski);
+        return cache.getCertificateBySki(ski);                    // null se não encontrado
+    }
+
+    public Map<String, X509Certificate> raizes() {
+        return cache.getRootCertificates();                       // cópia defensiva
     }
 }
 ```

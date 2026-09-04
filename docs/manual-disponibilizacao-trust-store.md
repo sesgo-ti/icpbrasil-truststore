@@ -31,5 +31,5 @@ Descrever o procedimento para disponibilizar o serviço Trust Store, fornecedor 
     Antes de executar é preciso criar o truststore customizado da aplicação contendo o certificado SSL do Vault, conforme descrito no [Manual de Configuração do Certificado Vault](manual-configuracao-certificado-vault.md).
 
     ```bash
-    java -Djavax.net.ssl.trustStore=path/to/mytruststore.jks -Djavax.net.ssl.trustStorePassword=changeit -jar target/icpbrasil-truststore-0.0.1-standalone.jar
+    java -Djavax.net.ssl.trustStore=path/to/mytruststore.jks -Djavax.net.ssl.trustStorePassword=changeit -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-0.0.1.jar
     ```

@@ -51,7 +51,7 @@ Adicione a dependência:
 ```xml
 <dependency>
     <groupId>br.gov.go.saude</groupId>
-    <artifactId>icpbrasil-truststore</artifactId>
+    <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
@@ -81,15 +81,15 @@ icpbrasil-truststore:
 ### Build
 
 ```bash
-./mvnw clean package -P standalone -DskipTests
+./mvnw clean package -DskipTests
 ```
 
-Gera `target/icpbrasil-truststore-*-standalone.jar` (fat JAR executável).
+Gera `icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar` (fat JAR executável — módulo `rest`).
 
 ### Execução
 
 ```bash
-java -jar target/icpbrasil-truststore-*-standalone.jar \
+java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
   --icpbrasil-truststore.rest.enabled=true \
   --icpbrasil-truststore.storage.filesystem.base-dir=/data/truststore
 ```
@@ -324,7 +324,7 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 ```
 
 ```bash
-./mvnw clean package -P standalone -DskipTests
+./mvnw clean package -DskipTests
 ```
 
 ---
