@@ -16,9 +16,7 @@ Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de
 
 Para consumir como **biblioteca**, dependa de `icpbrasil-truststore-autoconfigure`. Para rodar como **serviço**, use o fat jar do módulo `rest`.
 
-## Manutenção (mantenedores)
-
-> ⚠️ **A chave GPG de release (Key ID `566A199A481E3355`) expira em 2028-08-30.** Antes dessa data: `gpg --edit-key 566A199A481E3355` → `expire`, reenviar ao keyserver (`gpg --keyserver keyserver.ubuntu.com --send-keys 566A199A481E3355`) e atualizar o secret `MAVEN_GPG_PRIVATE_KEY` se a chave mudar. Fingerprint completo em [SECURITY.md](SECURITY.md).
+Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets estão centralizados em [MAINTAINERS.md](MAINTAINERS.md).
 
 ---
 
