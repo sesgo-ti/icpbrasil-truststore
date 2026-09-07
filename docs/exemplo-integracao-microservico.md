@@ -14,11 +14,10 @@ Gera `icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar` (fat JAR
 
 ```bash
 java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
-  --icpbrasil-truststore.rest.enabled=true \
   --icpbrasil-truststore.filesystem.base-dir=/data/truststore
 ```
 
-O parâmetro `rest.enabled=true` é obrigatório — é ele que registra o `TrustStoreController` com o endpoint `/certificate`.
+O endpoint `/certificate` está sempre ativo — servir REST é a função deste módulo.
 
 Na primeira subida, a aplicação baixa o acervo ICP-Brasil do ITI e popula o cache antes de aceitar requisições. Se o download falhar, o processo encerra com erro (fail-fast). Nas subidas seguintes, se o `base-dir` contém um acervo válido, o startup é imediato.
 
@@ -68,7 +67,6 @@ curl http://localhost:8080/actuator/health
 
 | Propriedade | Default | Quando mudar |
 |---|---|---|
-| `icpbrasil-truststore.rest.enabled` | `false` | **Obrigatório `true`** no modo server |
 | `icpbrasil-truststore.storage.type` | `filesystem` | Usar `s3` para cache compartilhado entre instâncias |
 | `icpbrasil-truststore.filesystem.base-dir` | — | Sempre definir (recomenda-se disco persistente para evitar re-download a cada restart) |
 | `icpbrasil-truststore.bootstrap.enabled` | `true` | Manter `true` em produção |

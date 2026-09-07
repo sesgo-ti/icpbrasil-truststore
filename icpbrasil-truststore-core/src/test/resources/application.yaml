@@ -14,8 +14,6 @@ icpbrasil-truststore:
   refresh-interval-hours: 2
   scheduling:
     enabled: false
-  rest:
-    enabled: false
   bootstrap:
     enabled: false
     fail-fast: true

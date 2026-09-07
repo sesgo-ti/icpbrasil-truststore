@@ -88,8 +88,7 @@ Gera `icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar` (fat JAR
 
 ```bash
 java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
-  --icpbrasil-truststore.rest.enabled=true \
-  --icpbrasil-truststore.storage.filesystem.base-dir=/data/truststore
+  --icpbrasil-truststore.filesystem.base-dir=/data/truststore
 ```
 
 ### Verificação
@@ -122,7 +121,6 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 | `cache-ttl-critical-hours` | `72` | Horas sem atualização para estado CRITICAL (24–168) |
 | `cache-ttl-max-hours` | `168` | Horas até o cache expirar (72–720, deve ser > critical) |
 | `storage.type` | `filesystem` | `filesystem` ou `s3` |
-| `rest.enabled` | `false` | Ativa o endpoint `/certificate` |
 | `scheduling.enabled` | `true` | Ativa a rotina de atualização em background |
 | `bootstrap.enabled` | `true` | Executa carga síncrona do cache no startup |
 | `bootstrap.fail-fast` | `true` | Falha no bootstrap aborta o startup |

@@ -39,9 +39,6 @@ icpbrasil-truststore:
   cache-ttl-max-hours: 168        # Tempo máximo de vida do cache antes de expirar (Horas)
 
   # Ativação de Componentes Opcionais
-  # [Resultado]: Permite desligar partes do sistema se usado apenas como biblioteca
-  rest:
-    enabled: false                 # Expõe o endpoint /certificate para consulta externa
   scheduling:
     enabled: true                 # Ativa a rotina automática (Cron) de atualização em background
 
