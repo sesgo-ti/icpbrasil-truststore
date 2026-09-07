@@ -73,7 +73,6 @@ public class ValidacaoAssinaturaService {
 | `icpbrasil-truststore.filesystem.base-dir` | — | Sempre definir (caminho do cache em disco) |
 | `icpbrasil-truststore.bootstrap.enabled` | `true` | **Desligar apenas em testes** que sobem `@SpringBootTest` sem rede |
 | `icpbrasil-truststore.bootstrap.fail-fast` | `true` | Mudar para `false` só em dev local onde a indisponibilidade do ITI é aceitável |
-| `icpbrasil-truststore.rest.enabled` | `false` | **Manter `false`** em modo biblioteca — o endpoint HTTP é para modo server |
 | `icpbrasil-truststore.scheduling.enabled` | `true` | Desligar só em testes |
 | `icpbrasil-truststore.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 
