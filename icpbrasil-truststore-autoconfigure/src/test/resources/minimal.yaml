@@ -1,0 +1,5 @@
+icpbrasil-truststore:
+  storage:
+    type: filesystem
+  filesystem:
+    base-dir: .data/icpbrasil-truststore

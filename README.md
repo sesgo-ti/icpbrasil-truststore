@@ -72,6 +72,24 @@ icpbrasil-truststore:
     base-dir: .data/icpbrasil-truststore
 ```
 
+Este exemplo não requer AWS SDK nem Actuator. Os defaults existem no próprio
+`TrustStoreConfig` (Java puro), inclusive quando nenhuma propriedade é informada.
+O health indicator só é registrado se o Actuator estiver no classpath; para expor
+`/actuator/health`, adicione `spring-boot-starter-actuator` à aplicação consumidora.
+
+Para inicializar um contexto de teste **sem downloads nem agendamento**, acrescente
+ao mesmo bloco `icpbrasil-truststore`:
+
+```yaml
+  bootstrap:
+    enabled: false
+  scheduling:
+    enabled: false
+```
+
+Nesse caso o cache inicia vazio. Em produção, bootstrap e agendamento continuam
+habilitados por padrão e precisam de acesso ao repositório oficial.
+
 ---
 
 ## Modo 2: Serviço standalone
@@ -121,6 +139,10 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 | `cache-ttl-critical-hours` | `72` | Horas sem atualização para estado CRITICAL (24–168) |
 | `cache-ttl-max-hours` | `168` | Horas até o cache expirar (72–720, deve ser > critical) |
 | `storage.type` | `filesystem` | `filesystem` ou `s3` |
+| `storage.truststore-archive-path` | `ACcompactado.zip` | Nome relativo ao diretório base ou chave S3 do ZIP |
+| `storage.hash-file-path` | `hash.txt` | Nome relativo ao diretório base ou chave S3 do hash |
+| `storage.confirmation-file-path` | `ultima_confirmacao.txt` | Nome relativo ao diretório base ou chave S3 da confirmação |
+| `filesystem.base-dir` | `.data/icpbrasil-truststore` | Diretório local de armazenamento |
 | `scheduling.enabled` | `true` | Ativa a rotina de atualização em background |
 | `bootstrap.enabled` | `true` | Executa carga síncrona do cache no startup |
 | `bootstrap.fail-fast` | `true` | Falha no bootstrap aborta o startup |
@@ -138,13 +160,42 @@ icpbrasil-truststore:
 
 ### Armazenamento: S3-compatível
 
+Na **biblioteca**, adicione `software.amazon.awssdk:s3` e
+`software.amazon.awssdk:apache-client` (versões alinhadas pelo BOM AWS SDK, atualmente
+`2.29.52`). Essas dependências são opcionais e não chegam transitivamente ao consumidor.
+O standalone já inclui ambas. Selecionar `storage.type=s3` sem o SDK falha no startup
+com uma mensagem indicando as dependências necessárias.
+
+Configure todas as propriedades abaixo na aplicação consumidora. Este exemplo
+faz explicitamente a ponte para os aliases de ambiente `S3_*`:
+
 ```yaml
 icpbrasil-truststore:
   storage:
     type: s3
+  s3:
+    endpoint: "${S3_ENDPOINT:https://s3.amazonaws.com}"
+    region: "${S3_REGION:us-east-1}"
+    access-key: "${S3_ACCESS_KEY}"
+    secret-key: "${S3_SECRET_KEY}"
+    bucket: "${S3_BUCKET}"
+    ca-cert-path: "${S3_CA_CERT_PATH:}"
 ```
 
-Credenciais via variáveis de ambiente:
+Os aliases `S3_*` são definidos pelo **YAML do REST**, não pela auto-configuração.
+Na biblioteca, use o YAML acima ou as propriedades canônicas
+`icpbrasil-truststore.s3.endpoint`, `.region`, `.access-key`, `.secret-key`, `.bucket`
+e `.ca-cert-path`. Endpoint, região, credenciais e bucket são obrigatórios e não têm
+defaults no `S3Properties`; somente a CA é opcional. Não versione credenciais reais.
+
+A auto-configuração registra um `S3Client` e o conecta ao `S3Repository`, sem operações
+remotas durante a construção dos beans. Um bean `S3Client` fornecido pelo consumidor
+é respeitado (inclusive sem `apache-client`); as propriedades S3 continuam validadas.
+Nesse caso endpoint, credenciais e TLS do cliente são responsabilidade do consumidor,
+e o repositório usa o bucket configurado. O cliente criado pela biblioteca é fechado
+no shutdown. Bootstrap/agendamento podem acessar S3 após o wiring.
+
+Aliases disponíveis no standalone (ou mediante a ponte YAML acima):
 
 | Variável | Descrição |
 |---|---|

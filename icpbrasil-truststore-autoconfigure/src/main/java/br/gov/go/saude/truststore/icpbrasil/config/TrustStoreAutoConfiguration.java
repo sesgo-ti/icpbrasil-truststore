@@ -24,9 +24,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.validation.annotation.Validated;
@@ -45,11 +48,15 @@ import java.util.List;
  * Todos os beans usam {@link ConditionalOnMissingBean @ConditionalOnMissingBean},
  * permitindo que o consumidor sobrescreva qualquer componente.</p>
  *
- * <p>O binding de {@link TrustStoreConfig} e {@link S3Properties} é feito aqui
- * via {@code @Bean @ConfigurationProperties} — as classes são POJOs puros no core,
- * sem anotações Spring, o que as torna testáveis de forma isolada.</p>
+ * <p>O binding usa {@code @Bean @ConfigurationProperties}, sem anotações Spring
+ * nos objetos de configuração. Adaptadores opcionais são importados somente
+ * quando suas dependências estão disponíveis.</p>
  */
 @AutoConfiguration
+@EnableConfigurationProperties
+@Import({TrustStoreAutoConfiguration.S3Configuration.class,
+        TrustStoreAutoConfiguration.MissingS3Configuration.class,
+        TrustStoreAutoConfiguration.HealthConfiguration.class})
 public class TrustStoreAutoConfiguration {
 
     /**
@@ -64,21 +71,6 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnMissingBean(TrustStoreConfig.class)
     TrustStoreConfig trustStoreConfig() {
         return new TrustStoreConfig();
-    }
-
-    /**
-     * Binding de {@link S3Properties} ativado apenas quando o storage type é S3.
-     * A validação Bean Validation ({@code @Validated}) roda após o binding.
-     * {@code @ConditionalOnMissingBean} permite que o consumidor forneça o próprio bean
-     * sem causar {@code NoUniqueBeanDefinitionException}.
-     */
-    @Bean
-    @ConfigurationProperties(prefix = "icpbrasil-truststore.s3")
-    @Validated
-    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-    @ConditionalOnMissingBean(S3Properties.class)
-    S3Properties s3Properties() {
-        return new S3Properties();
     }
 
     @Bean
@@ -153,14 +145,6 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "filesystem", matchIfMissing = true)
     public FilesystemTrustStoreRepository filesystemTrustStoreRepository(TrustStoreConfig trustStoreConfig) {
         return new FilesystemTrustStoreRepository(trustStoreConfig);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(TrustStoreRepository.class)
-    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-    public S3Repository s3Repository(S3Client s3Client, TrustStoreConfig trustStoreConfig,
-                                     S3Properties s3Properties) {
-        return new S3Repository(s3Client, trustStoreConfig, s3Properties);
     }
 
     @Bean
@@ -244,12 +228,56 @@ public class TrustStoreAutoConfiguration {
         return new TrustStoreScheduler(trustStoreService, trustStoreConfig);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
+    // Configurações lite importadas, sem @Configuration: o scan do standalone não
+    // deve registrá-las antes das condições de back-off da auto-configuração.
+    @ConditionalOnClass(S3Client.class)
+    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
+    @Import(S3ClientFactory.class)
+    static class S3Configuration {
+
+        @Bean
+        @ConfigurationProperties(prefix = "icpbrasil-truststore.s3")
+        @Validated
+        @ConditionalOnMissingBean
+        S3Properties s3Properties() {
+            return new S3Properties();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean(TrustStoreRepository.class)
+        S3Repository s3Repository(S3Client s3Client, TrustStoreConfig config, S3Properties properties) {
+            return new S3Repository(s3Client, config, properties);
+        }
+
+        @Bean
+        @ConditionalOnMissingClass("software.amazon.awssdk.http.apache.ApacheHttpClient")
+        @ConditionalOnMissingBean(S3Client.class)
+        S3Client missingS3HttpClient() {
+            throw new IllegalStateException("icpbrasil-truststore.storage.type=s3 requer "
+                    + "software.amazon.awssdk:apache-client ou um bean S3Client customizado");
+        }
+    }
+
+    @ConditionalOnMissingClass("software.amazon.awssdk.services.s3.S3Client")
+    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
+    static class MissingS3Configuration {
+
+        @Bean
+        @ConditionalOnMissingBean(TrustStoreRepository.class)
+        TrustStoreRepository missingS3Repository() {
+            throw new IllegalStateException("icpbrasil-truststore.storage.type=s3 requer "
+                    + "software.amazon.awssdk:s3 e software.amazon.awssdk:apache-client no classpath");
+        }
+    }
+
     @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
-    public TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
-                                                                         TrustStoreConfig config,
-                                                                         Cache trustStoreCache) {
-        return new TrustStoreCacheHealthIndicator(repository, config, trustStoreCache);
+    static class HealthConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
+                                                                      TrustStoreConfig config, Cache cache) {
+            return new TrustStoreCacheHealthIndicator(repository, config, cache);
+        }
     }
 }

@@ -35,7 +35,7 @@ public class S3Properties {
      * Caminho para o certificado PEM da CA usada pelo servidor S3 (classpath: ou file:).
      * Necessário apenas para endpoints S3 privados (MinIO, etc.) com CA não reconhecida pela JVM.
      * Quando não definido, o AWS SDK usa o JVM default truststore automaticamente.
-     * Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/minha-ca.crt
+     * Exemplo: icpbrasil-truststore.s3.ca-cert-path=file:/etc/ssl/certs/minha-ca.crt
      */
     private String caCertPath;
 }

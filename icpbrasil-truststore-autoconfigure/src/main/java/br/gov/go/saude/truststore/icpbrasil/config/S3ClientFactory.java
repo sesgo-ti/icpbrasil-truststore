@@ -1,9 +1,10 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.util.StringUtils;
@@ -27,9 +28,9 @@ import java.util.Arrays;
 /**
  * Fábrica do {@link S3Client}, ativada apenas quando {@code icpbrasil-truststore.storage.type=s3}.
  *
- * <p>Separada de {@link S3Properties} para manter o core livre de dependências do AWS SDK:
- * {@code S3Properties} é um POJO puro; este módulo ({@code autoconfigure}) detém a dependência
- * do SDK e toda a lógica de construção do cliente.</p>
+ * <p>Importada pela auto-configuração, sem component scan. Este módulo
+ * ({@code autoconfigure}) detém a dependência do SDK e a construção do cliente;
+ * o consumidor pode fornecer seu próprio bean {@code S3Client}.</p>
  *
  * <p>Quando {@code icpbrasil-truststore.s3.ca-cert-path} é definido, o cliente usa um
  * {@code TrustManager} exclusivo para aquele certificado CA, isolando a confiança do S3
@@ -37,7 +38,7 @@ import java.util.Arrays;
  * adequado para AWS S3 e endpoints com CA pública reconhecida.</p>
  */
 @Slf4j
-@Configuration
+@ConditionalOnClass({S3Client.class, ApacheHttpClient.class})
 @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
 public class S3ClientFactory {
 
@@ -47,6 +48,7 @@ public class S3ClientFactory {
      * corretamente durante o shutdown do contexto Spring.
      */
     @Bean(destroyMethod = "close")
+    @ConditionalOnMissingBean(S3Client.class)
     public S3Client s3Client(S3Properties props) {
         var httpClientBuilder = ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(10))
