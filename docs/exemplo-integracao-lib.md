@@ -4,11 +4,15 @@ Uso embutido em uma aplicação Spring Boot que precisa consultar em memória os
 
 ## 1. Dependência
 
+> A `0.0.1` ainda não foi publicada. Estas coordenadas antecipam a primeira
+> release; para experimentação local, instale parent e bibliotecas com
+> `./mvnw -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am install`.
+
 ```xml
 <dependency>
     <groupId>br.gov.go.saude</groupId>
     <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
 </dependency>
 ```
 

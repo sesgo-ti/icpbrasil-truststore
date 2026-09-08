@@ -6,47 +6,95 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
-    name: Publicar no Maven Central e criar GitHub Release
+  verify:
+    name: Verificar candidata sem secrets
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout do commit exato do evento
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Configurar JDK 21, credenciais do Central e chave GPG
-        uses: actions/setup-java@v4
+      - name: Validar tag e ancestralidade na main
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          commit=$(git rev-parse --verify "${RELEASE_SHA}^{commit}")
+          [[ "$(git rev-parse --verify HEAD)" == "$commit" ]]
+          [[ "$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")" == "$commit" ]]
+          git merge-base --is-ancestor "$commit" refs/remotes/origin/main
+
+      - name: Configurar JDK 21 sem credenciais de publicacao
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven
-          # Gera o <server id="central"> no settings.xml do runner, com as
-          # credenciais lidas das env vars declaradas abaixo no passo de deploy.
-          # O id deve ser igual ao <publishingServerId> do pom.xml.
+
+      - name: Compilar, testar e gerar fontes e Javadoc de todos os modulos
+        run: ./mvnw -B -ntp clean verify -Prelease -Dgpg.skip=true
+
+      - name: Comparar tag com todos os POMs efetivos e inspecionar artefatos
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: bash scripts/verify-release.sh "$RELEASE_TAG"
+
+  publish:
+    name: Assinar e publicar bibliotecas no Maven Central
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Requer aprovadores e regras de tags configurados manualmente no GitHub.
+    environment: release
+    steps:
+      - name: Checkout do mesmo commit verificado
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar JDK 21, credenciais do Central e chave GPG
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_TOKEN
-          # Importa a chave privada no chaveiro GPG do runner e configura
-          # o gpg-agent para uso não interativo.
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
-      - name: Build, assinar e publicar no Maven Central
+      - name: Publicar parent, core e autoconfigure (REST fora do reactor)
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: ./mvnw -B -Prelease deploy --no-transfer-progress
+        run: ./mvnw -B -ntp -Prelease -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am clean deploy
 
+  github-release:
+    name: Registrar GitHub Release apos publicacao
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
       - name: Criar GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-from-tag \
-            --verify-tag
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-from-tag --verify-tag

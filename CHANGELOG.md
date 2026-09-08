@@ -5,9 +5,12 @@ Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-> A versão 0.0.1 ainda **não foi lançada**. Todo o conteúdo abaixo reflete o estado atual em desenvolvimento.
+> A versão 0.0.1 ainda **não foi lançada**. A data abaixo registra o fechamento
+> da candidata local, não uma publicação no Maven Central ou uma tag existente.
 
 ## [Unreleased]
+
+## 0.0.1 - 2026-09-08 (candidata, não publicada)
 
 ### Adicionado
 
@@ -22,5 +25,9 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Auto-configuração Spring Boot, endpoint REST opcional de consulta por SKI e health indicator.
 - `SSLContext` e `X509TrustManager` dedicados com trust exclusivo nas ACs da ICP-Brasil.
 - Proteção contra SSRF e limites de tamanho para downloads derivados de extensões de certificados (AIA, OCSP, CRL).
+- Evidências OCSP/CRL vinculadas ao certificado, cobertura e janela temporal; cache revalidado nas consultas.
+- Snapshot atômico do acervo com validade limitada e readiness coerente com as consultas.
+- Integrações AWS/Actuator opcionais e configuração filesystem mínima.
+- Preparação de parent, core e autoconfigure para o Central, com fontes, Javadoc e verificação sem credenciais; REST fora da publicação.
 
 [Unreleased]: https://github.com/sesgo-ti/icpbrasil-truststore/commits/main

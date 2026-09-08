@@ -6,9 +6,12 @@
 
 Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de certificados das Autoridades Certificadoras (ACs) vigentes da ICP-Brasil. Realiza download do repositório oficial publicado pelo ITI, verificação de integridade por hash SHA-512, cache em memória e sincronização automática.
 
+> A `0.0.1` é uma candidata preparada localmente, ainda não publicada. As coordenadas
+> abaixo antecipam a primeira release; não indicam disponibilidade no Maven Central.
+
 ## Módulos
 
-| Módulo | Papel | Publicado no Maven Central |
+| Módulo | Papel | Previsto no Maven Central |
 |---|---|---|
 | `icpbrasil-truststore-core` | Domínio e lógica (parsers X.509, cache, revogação OCSP/CRL, download) — **Java puro, zero Spring/AWS** | ✅ |
 | `icpbrasil-truststore-autoconfigure` | Auto-configuração Spring Boot: beans, binding de properties, scheduler, bootstrap, health, S3 | ✅ |
@@ -50,7 +53,7 @@ Adicione a dependência:
 <dependency>
     <groupId>br.gov.go.saude</groupId>
     <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
 </dependency>
 ```
 

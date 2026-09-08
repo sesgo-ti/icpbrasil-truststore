@@ -1,10 +1,10 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" child.project.url.inherit.append.path="false"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>br.gov.go.saude</groupId>
   <artifactId>icpbrasil-truststore</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1</version>
   <packaging>pom</packaging>
 
   <modules>
@@ -36,11 +36,13 @@
     </developer>
   </developers>
 
-  <scm>
+  <scm child.scm.connection.inherit.append.path="false"
+       child.scm.developerConnection.inherit.append.path="false"
+       child.scm.url.inherit.append.path="false">
     <connection>scm:git:https://github.com/sesgo-ti/icpbrasil-truststore.git</connection>
     <developerConnection>scm:git:git@github.com:sesgo-ti/icpbrasil-truststore.git</developerConnection>
     <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
-    <tag>HEAD</tag>
+    <tag>v0.0.1</tag>
   </scm>
 
   <properties>
@@ -96,6 +98,16 @@
   </dependencyManagement>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>${maven.multiModuleProjectDirectory}</directory>
+        <targetPath>META-INF</targetPath>
+        <includes><include>LICENSE</include></includes>
+      </resource>
+    </resources>
     <pluginManagement>
       <plugins>
         <!-- Sem o parent do Spring Boot, as versões de plugins precisam ser explícitas -->
@@ -296,12 +308,17 @@
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>0.7.0</version>
+            <version>0.11.0</version>
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
               <waitUntil>published</waitUntil>
+              <waitMaxTime>1800</waitMaxTime>
+              <!-- A selecao do reactor exclui o REST; esta lista protege builds completos. -->
+              <excludeArtifacts>
+                <excludeArtifact>icpbrasil-truststore-rest</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
         </plugins>

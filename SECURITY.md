@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.0.1-SNAPSHOT (development) | :white_check_mark: |
+| 0.0.1 (upcoming, not yet published) | Reports accepted; no released version yet |
 
 ## Reporting a Vulnerability
 
