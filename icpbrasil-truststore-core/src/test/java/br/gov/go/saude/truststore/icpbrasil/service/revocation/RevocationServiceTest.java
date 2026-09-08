@@ -14,13 +14,15 @@ import javax.security.auth.x500.X500Principal;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @Slf4j
@@ -70,6 +72,68 @@ class RevocationServiceTest {
         assertInstanceOf(RevocationStatus.Good.class, status);
         RevocationStatus.Good good = (RevocationStatus.Good) status;
         assertEquals("CRL", good.source());
+    }
+
+    @Test
+    void testCheckMalformedNaoViraIndisponibilidade() {
+        List<String> urls = CertificateParser.getCrlUrls(leafCert);
+        when(crlClient.check(leafCert, issuerCert, urls.get(0)))
+                .thenReturn(new RevocationStatus.Malformed("CRL"));
+        when(crlClient.check(leafCert, issuerCert, urls.get(1)))
+                .thenReturn(new RevocationStatus.CrlUnavailable());
+
+        assertEquals(new RevocationStatus.Malformed("CRL"), revocationService.check(leafCert, issuerCert));
+    }
+
+    @Test
+    void testCheckMalformedPermiteProximaEvidenciaConclusiva() {
+        List<String> urls = CertificateParser.getCrlUrls(leafCert);
+        when(crlClient.check(leafCert, issuerCert, urls.get(0)))
+                .thenReturn(new RevocationStatus.Malformed("CRL"));
+        when(crlClient.check(leafCert, issuerCert, urls.get(1)))
+                .thenReturn(new RevocationStatus.Revoked("CRL"));
+
+        assertEquals(new RevocationStatus.Revoked("CRL"), revocationService.check(leafCert, issuerCert));
+    }
+
+    @Test
+    void testCheckPreservaNoConnectivitySemFlagDeInterrupcao() {
+        List<String> urls = CertificateParser.getCrlUrls(leafCert);
+        when(crlClient.check(leafCert, issuerCert, urls.get(0)))
+                .thenReturn(new RevocationStatus.NoConnectivity());
+        when(crlClient.check(leafCert, issuerCert, urls.get(1)))
+                .thenReturn(new RevocationStatus.Malformed("CRL"));
+
+        assertInstanceOf(RevocationStatus.NoConnectivity.class, revocationService.check(leafCert, issuerCert));
+        verify(crlClient).check(leafCert, issuerCert, urls.get(1));
+    }
+
+    @Test
+    void testCheckInterrupcaoEncerraLoopCrl() {
+        List<String> urls = CertificateParser.getCrlUrls(leafCert);
+        when(crlClient.check(leafCert, issuerCert, urls.get(0))).thenAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            return new RevocationStatus.NoConnectivity();
+        });
+        try {
+            assertInstanceOf(RevocationStatus.NoConnectivity.class, revocationService.check(leafCert, issuerCert));
+            assertTrue(Thread.currentThread().isInterrupted());
+            verify(crlClient, never()).check(leafCert, issuerCert, urls.get(1));
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void testCheckThreadJaInterrompidaNaoConsultaClientes() {
+        Thread.currentThread().interrupt();
+        try {
+            assertInstanceOf(RevocationStatus.NoConnectivity.class, revocationService.check(leafCert, issuerCert));
+            assertTrue(Thread.currentThread().isInterrupted());
+            verifyNoInteractions(ocspClient, crlClient);
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test

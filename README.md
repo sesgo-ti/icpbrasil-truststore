@@ -194,7 +194,7 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 | `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
 | `CrlUnavailable` | CRL inacessível após todas as tentativas |
 | `NoConnectivity` | Verificação interrompida (thread interrupted) |
-| `Malformed` | Evidência inválida; em OCSP inclui identidade, assinatura, autorização ou datas rejeitadas |
+| `Malformed` | Evidência inválida ou não suportada; inclui identidade, assinatura, autorização, datas ou cobertura rejeitadas |
 
 Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
 
@@ -214,7 +214,23 @@ podem ser arquivados, mas exigem validação histórica separada para esse uso.
 - Cada hit no cache revalida identidade, assinatura, autorização e datas. A chave contém SHA-256 do DER do alvo e do emissor, compartilhada entre URLs. Um hit inválido retorna `Malformed`, sem nova requisição até a remoção por TTL/eviction; a facade preserva seu fallback CRL.
 - Não há nonce: replay permanece possível dentro da janela temporal aceita. O construtor com `Clock` permite controlar o presente em testes; os construtores existentes usam `Clock.systemUTC()`.
 
-Essas garantias são do caminho OCSP; não ampliam as garantias do fallback CRL.
+#### Contrato CRL
+
+O `CrlClient.check` também consulta somente o **presente**. O chamador estabelece
+a confiança no emissor e valida separadamente a cadeia PKIX e a validade do alvo/emissor;
+`Good` não comprova validade histórica/LTV. Somente CRLs completas e diretas são aceitas.
+
+- O DN do emissor do alvo deve corresponder ao subject do emissor informado, e a assinatura do alvo deve conferir com sua chave. O emissor deve ser CA (`basicConstraints`) e, se KeyUsage existir, permitir `cRLSign`. O DN e a assinatura da CRL também devem conferir com esse emissor.
+- `thisUpdate` e `nextUpdate` são obrigatórios. `thisUpdate` não pode estar no futuro além de **5 minutos**; a CRL expira em `nextUpdate` mais 5 minutos, e `nextUpdate` não pode preceder `thisUpdate`, sem tolerância. Diferentemente de OCSP, não há aceitação sem `nextUpdate`.
+- São rejeitados `deltaCRLIndicator` e qualquer `issuingDistributionPoint` (IDP), mesmo não críticos, inclusive IDP de motivos parciais, restrição de tipo ou CRL indireta. Não há composição de delta/base nem combinação de motivos. Qualquer DP do certificado com `reasons` ou `cRLIssuer` torna a consulta CRL inconclusiva, mesmo se outro DP não tiver restrições.
+- Todas as extensões críticas de CRL ou de qualquer entrada são rejeitadas antes de `Good`/`Revoked`, inclusive as conhecidas mas não processadas. Entradas com `certificateIssuer` (mesmo não crítico) ou motivo `removeFromCRL` também são rejeitadas. A ausência do serial só produz `Good` após essas verificações de cobertura.
+- Cada hit no cache por URL revalida a evidência inteira para o alvo, emissor e instante atuais. O TTL não prolonga a validade assinada; hit inválido retorna `Malformed`, sem novo download até remoção por TTL/eviction. O construtor com `Clock` controla o presente; os existentes usam `Clock.systemUTC()`.
+- Evidência inválida ou formato não suportado retorna `Malformed`, um resultado **inconclusivo**, nunca confirmação de não revogação. Replay permanece possível dentro da janela temporal aceita.
+
+O serviço tenta outros endpoints/mecanismos após resultado inconclusivo e só retorna
+`Good`/`Revoked` mediante outra evidência aceita. Sem conclusão, preserva
+`NoConnectivity` com prioridade sobre `Malformed`, em vez de ocultá-los como
+indisponibilidade. Uma thread interrompida encerra os loops sem novas tentativas.
 
 ### Montagem de cadeia (AIA CA Issuers)
 

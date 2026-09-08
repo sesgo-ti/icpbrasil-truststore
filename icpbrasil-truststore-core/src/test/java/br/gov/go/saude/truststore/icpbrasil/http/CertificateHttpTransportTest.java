@@ -397,7 +397,7 @@ class CertificateHttpTransportTest {
     @SneakyThrows
     void testCrlSucessoHttpLocal() {
         X509v2CRLBuilder builder = new X509v2CRLBuilder(
-                new X500Name(issuer.getSubjectX500Principal().getName()), new Date());
+                new JcaX509CertificateHolder(issuer).getSubject(), new Date());
         builder.setNextUpdate(Date.from(Instant.now().plusSeconds(3600)));
         byte[] body = builder.build(new JcaContentSignerBuilder("SHA256WithRSA")
                 .build(issuerKey.getPrivate())).getEncoded();
