@@ -1,13 +1,16 @@
 package br.gov.go.saude.truststore.icpbrasil.model;
 
+import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.x509.AccessDescription;
 import org.bouncycastle.asn1.x509.DistributionPoint;
 import org.bouncycastle.asn1.x509.GeneralNames;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.List;
@@ -15,25 +18,36 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CertificateParserTest {
-    X509Certificate certificate;
+    static X509Certificate certificate;
+    static X509Certificate testCa;
 
     X509Certificate authorityCertificate;
 
     @SneakyThrows
+    @BeforeAll
+    static void generateSyntheticPair() {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        var caKeyPair = kpg.generateKeyPair();
+        var leafKeyPair = kpg.generateKeyPair();
+        testCa = TestCertificateFactory.generateIcpBrasilTestCa(caKeyPair);
+        certificate = TestCertificateFactory.generateIcpBrasilPersonCert(leafKeyPair, caKeyPair, testCa);
+    }
+
+    @SneakyThrows
     @BeforeEach
     void setUp() {
-        this.certificate = CertificateParser.parse(TestResourceLoader.getResource("DANIEL_NOGUEIRA_DA_COSTA-02057377148.cer"));
         this.authorityCertificate = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }
 
     @Test
     void testGetSubjectCommonName() {
-        assertEquals("DANIEL NOGUEIRA DA COSTA:02057377148", CertificateParser.getSubjectCommonName(certificate));
+        assertEquals(TestCertificateFactory.CN_TITULAR_TESTE, CertificateParser.getSubjectCommonName(certificate));
     }
 
     @Test
     void testGetIssuerCommonName() {
-        assertEquals("AC SOLUTI Multipla v5 G2", CertificateParser.getIssuerCommonName(certificate));
+        assertEquals(TestCertificateFactory.CN_AC_TESTE, CertificateParser.getIssuerCommonName(certificate));
     }
 
     @Test
@@ -58,20 +72,15 @@ class CertificateParserTest {
 
     @Test
     void testGetSubjectKeyIdentifier() {
-        assertEquals("6cc3193238e71499dfa2e40708a68f9c7ed09647", CertificateParser.getSubjectKeyIdentifier(certificate));
+        assertNotNull(CertificateParser.getSubjectKeyIdentifier(certificate));
+        assertEquals(40, CertificateParser.getSubjectKeyIdentifier(certificate).length()); // SHA-1 em hex
     }
-
-    @Test
-    void testGetAuthorityKeyIdentifier() {
-        assertEquals("962738fb529fa23d34d35dc82bf741ad825eb08f", CertificateParser.getAuthorityKeyIdentifier(certificate));
-    }
-
 
     @Test
     void testAuthorityKeyIdentifierCorrespondeAoSkiDoEmissor() {
         assertEquals(
-                CertificateParser.getAuthorityKeyIdentifier(certificate),
-                CertificateParser.getSubjectKeyIdentifier(authorityCertificate)
+                CertificateParser.getSubjectKeyIdentifier(testCa),
+                CertificateParser.getAuthorityKeyIdentifier(certificate)
         );
     }
 
@@ -141,8 +150,8 @@ class CertificateParserTest {
 
         assertNotNull(crlUrls);
         assertEquals(2, crlUrls.size());
-        assertTrue(crlUrls.get(0).contains("http://ccd.acsoluti.com.br/lcr/ac-soluti-multipla-v5-g2.crl"));
-        assertTrue(crlUrls.get(1).contains("http://ccd2.acsoluti.com.br/lcr/ac-soluti-multipla-v5-g2.crl"));
+        assertTrue(crlUrls.get(0).contains("http://crl.teste.example/ac-teste-1.crl"));
+        assertTrue(crlUrls.get(1).contains("http://crl2.teste.example/ac-teste-2.crl"));
     }
 
     @Test
@@ -157,7 +166,7 @@ class CertificateParserTest {
 
     @Test
     void testGetOcspUrlsCertificadoSemOcsp() {
-        // Certificados ICP-Brasil Soluti não possuem OCSP na AIA
+        // Reproduz certificados ICP-Brasil (ex.: Soluti) que não possuem OCSP na AIA
         List<String> ocspUrls = CertificateParser.getOcspUrls(certificate);
 
         assertNotNull(ocspUrls);

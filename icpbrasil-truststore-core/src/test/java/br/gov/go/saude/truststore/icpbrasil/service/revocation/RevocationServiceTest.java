@@ -3,7 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
-import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
+import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import javax.security.auth.x500.X500Principal;
 import java.math.BigInteger;
 import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.Date;
@@ -39,8 +40,13 @@ class RevocationServiceTest {
         crlClient = mock(CrlClient.class);
         revocationService = new RevocationService(ocspClient, crlClient);
 
-        leafCert = CertificateParser.parse(TestResourceLoader.getResource("DANIEL_NOGUEIRA_DA_COSTA-02057377148.cer"));
-        issuerCert = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
+        // O par precisa de CRL DPs e AIA sem OCSP: o fluxo testado consulta essas extensões
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        var caKeyPair = kpg.generateKeyPair();
+        var leafKeyPair = kpg.generateKeyPair();
+        issuerCert = TestCertificateFactory.generateIcpBrasilTestCa(caKeyPair);
+        leafCert = TestCertificateFactory.generateIcpBrasilPersonCert(leafKeyPair, caKeyPair, issuerCert);
     }
 
     @Test

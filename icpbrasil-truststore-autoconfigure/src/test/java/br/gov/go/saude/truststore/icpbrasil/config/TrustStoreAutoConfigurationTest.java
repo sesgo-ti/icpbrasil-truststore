@@ -4,6 +4,7 @@ import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepos
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
+import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -128,7 +129,7 @@ class TrustStoreAutoConfigurationTest {
     static class ProviderCustomizado {
         // Provider real com um certificado do classpath: o TrustStoreManager
         // rejeita providers sem certificados, então um stub vazio não serve.
-        CertificateProvider provider = new br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider(
+        CertificateProvider provider = new TrustedCertsProvider(
                 List.of(lerRecurso("registries/certificates/isrgrootx1.json")));
 
         @Bean

@@ -1,33 +1,36 @@
 package br.gov.go.saude.truststore.icpbrasil.model;
 
-import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
+import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class IcpBrasilCertificateParserTest {
-    X509Certificate certificate;
-
-    X509Certificate authorityCertificate;
+    static X509Certificate certificate;
 
     @SneakyThrows
-    @BeforeEach
-    void setUp() {
-        this.certificate = CertificateParser.parse(TestResourceLoader.getResource("DANIEL_NOGUEIRA_DA_COSTA-02057377148.cer"));
-        this.authorityCertificate = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
+    @BeforeAll
+    static void generateSyntheticCert() {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        var caKeyPair = kpg.generateKeyPair();
+        var leafKeyPair = kpg.generateKeyPair();
+        X509Certificate testCa = TestCertificateFactory.generateIcpBrasilTestCa(caKeyPair);
+        certificate = TestCertificateFactory.generateIcpBrasilPersonCert(leafKeyPair, caKeyPair, testCa);
     }
 
     @Test
     void testGetCpf() {
-        assertEquals("02057377148", IcpBrasilCertificateParser.getCpf(certificate));
+        assertEquals(TestCertificateFactory.CPF_TESTE, IcpBrasilCertificateParser.getCpf(certificate));
     }
 
     @Test
     void testGetDataNascimento() {
-        assertEquals("2002-12-24", IcpBrasilCertificateParser.getDataNascimento(certificate).toString());
+        assertEquals("1990-01-01", IcpBrasilCertificateParser.getDataNascimento(certificate).toString());
     }
 }
