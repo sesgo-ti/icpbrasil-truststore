@@ -118,8 +118,8 @@ git commit -am "chore: release X.Y.Z"
 # 4. Valide localmente ANTES da tag (build completo + assinatura)
 ./mvnw clean verify -Prelease
 
-# 5. Tag e push — a tag dispara o workflow de publicação
-git tag vX.Y.Z
+# 5. Tag ANOTADA e push — a tag dispara o workflow de publicação
+git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main vX.Y.Z
 
 # 6. Acompanhe o workflow em Actions; ao final ele cria o GitHub Release
