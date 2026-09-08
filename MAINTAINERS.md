@@ -1,7 +1,6 @@
 # Guia do mantenedor
 
 Local **único** para informações operacionais de manutenção do projeto.
-Documentos voltados a contribuidores e consumidores apenas apontam para cá.
 
 ## Chave GPG de release
 
@@ -15,7 +14,7 @@ Documentos voltados a contribuidores e consumidores apenas apontam para cá.
 
 ### Onde a chave pública está publicada
 
-A chave foi publicada em **dois** keyservers (verificado):
+A chave foi publicada em **dois** keyservers:
 
 1. **keyserver.ubuntu.com** — HKP tradicional
 2. **keys.openpgp.org** — keyserver moderno (VKS)
@@ -25,7 +24,7 @@ A chave foi publicada em **dois** keyservers (verificado):
 > `keys.openpgp.org` e `pgp.mit.edu`). Qualquer operação na chave (renovação,
 > revogação) deve ser propagada aos **dois** servidores acima.
 
-### Renovar a expiração (fazer antes de 2028-08-30 — lembrete sugerido: 2028-08-01)
+### Renovar a expiração (fazer antes de 2028-08-30)
 
 ```bash
 gpg --edit-key 566A199A481E3355
@@ -53,7 +52,7 @@ e deve estar guardado no cofre da equipe. Ele funciona **mesmo sem a chave priva
 
 ```bash
 # 1. Preparar o certificado: o arquivo vem com um ':' de segurança no início
-#    da linha BEGIN — remova o ':' conforme instrui o comentário do próprio arquivo
+#    da linha BEGIN — remova o ':'
 
 # 2. Importar a revogação sobre a chave no chaveiro local
 gpg --import 8EF66D445A976C0A2C3B4FB5566A199A481E3355.rev
@@ -94,8 +93,7 @@ Visibilidade restrita ao repositório `icpbrasil-truststore`.
 
 A publicação no Maven Central é **automatizada por tag**: o workflow
 [release.yml](.github/workflows/release.yml) compila, assina com GPG e publica os
-módulos `core` e `autoconfigure` (o módulo `rest` é artefato de deploy e não é
-publicado — `skipPublishing=true`).
+módulos `core` e `autoconfigure`.
 
 ### Pré-requisitos (uma única vez, já configurados)
 
