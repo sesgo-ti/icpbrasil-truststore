@@ -28,7 +28,39 @@ icpbrasil-truststore:
     base-dir: .data/icpbrasil-truststore
 ```
 
-Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. Se não, baixa do ITI. O cache em memória é populado **antes** de o Spring declarar o contexto "Started", eliminando qualquer janela em que requisições cheguem com cache vazio.
+Na inicialização, o runner revalida o acervo local e tenta atualização pelo ITI.
+Ele termina antes do `ApplicationReadyEvent` e do retorno de `SpringApplication.run()`,
+mas o servidor HTTP pode aceitar requisições antes. Outros beans e seus inicializadores
+também podem consultar cache vazio; a biblioteca não instala uma barreira global de consumo.
+Se o cache continuar inválido, `bootstrap.fail-fast=true` encerra o contexto.
+Um acervo local válido pode sustentar a operação até seu prazo original mesmo com falha remota.
+
+Para aplicações web, adicione `spring-boot-starter-actuator` (opcional na lib) e
+configure explicitamente os grupos no YAML do consumidor:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,trustStoreCache
+        liveness:
+          include: livenessState
+```
+
+O balanceador/orquestrador deve respeitar `/actuator/health/readiness` (503 enquanto
+a aplicação não aceita tráfego ou o cache está indisponível). Liveness não depende
+do acervo nem de ITI/S3. Health não faz I/O; reflete o snapshot e o relógio do cache.
+Detalhes operacionais e proteção da porta de gerenciamento estão no
+[manual de monitoramento](manual-monitoramento.md).
 
 ## 3. Consultar certificados
 
@@ -52,11 +84,11 @@ public class ValidacaoAssinaturaService {
     }
 
     public boolean caConhecida(String ski) {
-        return cache.isCacheValid() && cache.getCertificateBySki(ski) != null;
+        return cache.getCertificateBySki(ski) != null;
     }
 
     public X509Certificate buscarCA(String ski) {
-        return cache.getCertificateBySki(ski);                    // null se não encontrado
+        return cache.getCertificateBySki(ski); // null se ausente ou acervo indisponível
     }
 
     public Map<String, X509Certificate> raizes() {
@@ -64,6 +96,11 @@ public class ValidacaoAssinaturaService {
     }
 }
 ```
+
+Se for necessário distinguir acervo indisponível de SKI ausente, use
+`cache.lookupCertificate(ski)`: `available()` e `certificate()` são capturados no
+mesmo snapshot e instante. Não combine `isCacheValid()` com uma leitura posterior
+para decidir entre 503 e 404. A validade não revoga cópias já entregues.
 
 ## 4. Variáveis de configuração relevantes
 

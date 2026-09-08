@@ -275,9 +275,8 @@ public class TrustStoreAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
-                                                                      TrustStoreConfig config, Cache cache) {
-            return new TrustStoreCacheHealthIndicator(repository, config, cache);
+        TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreConfig config, Cache cache) {
+            return new TrustStoreCacheHealthIndicator(config, cache);
         }
     }
 }

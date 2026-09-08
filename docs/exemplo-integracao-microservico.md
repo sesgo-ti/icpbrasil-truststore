@@ -19,13 +19,28 @@ java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
 
 O endpoint `/certificate` está sempre ativo — servir REST é a função deste módulo.
 
-Na primeira subida, a aplicação baixa o acervo ICP-Brasil do ITI e popula o cache antes de aceitar requisições. Se o download falhar, o processo encerra com erro (fail-fast). Nas subidas seguintes, se o `base-dir` contém um acervo válido, o startup é imediato.
+O runner tenta carregar o cache antes do `ApplicationReadyEvent`, não antes de abrir
+HTTP. O servidor pode responder durante o bootstrap; `/certificate` retorna 503
+enquanto não há snapshot válido. Se o cache continuar inválido após o refresh,
+o processo encerra com erro (fail-fast). Nas subidas seguintes, o acervo local é
+revalidado e o refresh ainda tenta confirmação remota, portanto o startup não é
+necessariamente imediato. Falha remota conserva somente o prazo original do cache.
+
+Configure o roteamento para respeitar `/actuator/health/readiness`: o grupo inclui
+`readinessState,trustStoreCache`, recusando tráfego até o fim dos runners mesmo se
+o cache local já estiver válido. `/actuator/health/liveness` inclui somente
+`livenessState`, sem reiniciar a instância por indisponibilidade de ITI/S3.
+Não há filtro global bloqueando HTTP; acesso direto pode contornar o roteamento.
 
 ## 3. Endpoints
 
 ### `GET /certificate`
 
 Retorna um certificado indexado por SKI.
+
+Disponibilidade e certificado são capturados em uma única consulta ao snapshot.
+As respostas produzidas pelo controller usam `Cache-Control: no-store` para evitar
+reutilização HTTP de um resultado após expiração ou recuperação do acervo.
 
 **Query params:**
 
@@ -57,7 +72,10 @@ curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado
 
 ### `GET /actuator/health`
 
-Saúde da aplicação, inclui o estado do cache (`VALID`, `CRITICAL`, `EXPIRED`). Detalhes em [manual-monitoramento.md](manual-monitoramento.md).
+Saúde agregada da aplicação, incluindo o cache, sem I/O em probes. Por padrão não
+expõe componentes nem detalhes (`show-details: never`). Readiness retorna 200 para
+cache `VALID`/`CRITICAL` após startup, e 503 para `UNAVAILABLE`/`EXPIRED`.
+Diagnóstico restrito em [manual-monitoramento.md](manual-monitoramento.md).
 
 ```bash
 curl http://localhost:8080/actuator/health
@@ -74,5 +92,6 @@ curl http://localhost:8080/actuator/health
 | `icpbrasil-truststore.scheduling.enabled` | `true` | Manter `true` (sincronização automática em background) |
 | `icpbrasil-truststore.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 | `server.port` | `8080` | Padrão Spring Boot |
+| `management.server.port` | mesma porta HTTP | Separar gerenciamento em porta protegida por rede/proxy |
 
 Credenciais para `storage.type=s3` são definidas via variáveis de ambiente (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`). Veja o [README](../README.md#armazenamento-s3-compatível).

@@ -78,8 +78,21 @@ public class Cache {
 
     /** Retorna null se o SKI nao existe ou o acervo esta indisponivel/expirado. */
     public X509Certificate getCertificateBySki(String ski) {
-        return currentIndex().get(ski);
+        return lookupCertificate(ski).certificate();
     }
+
+    /**
+     * Consulta um unico snapshot e instante, distinguindo acervo indisponivel de SKI ausente.
+     * A validade vale para esta chamada; nao revoga o certificado ja entregue.
+     */
+    public CertificateLookup lookupCertificate(String ski) {
+        Snapshot current = snapshot;
+        boolean available = current != null && usable(current.confirmedAt(), current.expiresAt(), now());
+        return new CertificateLookup(available, available ? current.index().get(ski) : null);
+    }
+
+    /** Certificado null significa SKI ausente se available, ou acervo indisponivel caso contrario. */
+    public record CertificateLookup(boolean available, X509Certificate certificate) {}
 
     /** Retorna copia defensiva do indice valido, ou mapa vazio se indisponivel/expirado. */
     public Map<String, X509Certificate> getAllCertificates() {
@@ -105,13 +118,15 @@ public class Cache {
     /** Metadados atomicos para observabilidade sem I/O; preservados mesmo apos expiracao. */
     public Optional<State> getState() {
         Snapshot current = snapshot;
+        Instant observedAt = now();
         return current == null ? Optional.empty() : Optional.of(new State(current.hash(),
                 current.confirmedAt(), current.expiresAt(), current.index().size(),
-                usable(current.confirmedAt(), current.expiresAt(), now())));
+                usable(current.confirmedAt(), current.expiresAt(), observedAt), observedAt));
     }
 
     /** Estado observado em uma chamada; nao e uma autorizacao para leituras futuras. */
-    public record State(String hash, Instant confirmedAt, Instant expiresAt, int certificateCount, boolean valid) {}
+    public record State(String hash, Instant confirmedAt, Instant expiresAt, int certificateCount,
+                        boolean valid, Instant observedAt) {}
 
     private record Snapshot(Map<String, X509Certificate> index, String hash,
                             Instant confirmedAt, Instant expiresAt) {}

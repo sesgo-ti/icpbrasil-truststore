@@ -229,7 +229,7 @@ public class TrustStoreConfig {
         }
         bundle.validate();
 
-        log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
+        log.info("Validação das propriedades de configuração concluída com sucesso");
     }
 
     /**
@@ -616,21 +616,21 @@ public class TrustStoreConfig {
     /**
      * Configurações do bootstrap síncrono.
      * Controla a carga inicial do cache durante o startup do Spring Boot,
-     * antes de o contexto ser declarado "Started".
+     * antes do ApplicationReadyEvent, mas nao necessariamente da abertura HTTP.
      */
     @Data
     public static class BootstrapConfig {
 
         /**
          * Se true, o bootstrap síncrono é executado no startup (padrão).
-         * Quando desabilitado, o cache só é populado pela primeira execução do scheduler.
+         * Quando desabilitado, a carga depende do scheduler ou de refresh explicito pelo consumidor.
          * Útil em testes que sobem o contexto sem rede disponível.
          */
         private boolean enabled = true;
 
         /**
-         * Se true (padrão), uma falha no bootstrap aborta o startup (lança IllegalStateException).
-         * Se false, loga erro e deixa a aplicação subir com cache vazio — útil apenas em
+         * Se true (padrão), cache ainda invalido apos bootstrap aborta o startup (IllegalStateException).
+         * Se false, loga erro e deixa a aplicação subir com cache indisponivel — útil apenas em
          * cenários de desenvolvimento onde a indisponibilidade do repositório ITI é aceitável.
          */
         private boolean failFast = true;

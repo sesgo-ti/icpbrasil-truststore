@@ -89,6 +89,40 @@ class TrustStoreServiceTest {
     }
 
     @Test
+    void testLookupCertificate_UmInstantePorConsulta_DistingueAusenteDeExpirado() {
+        String ski = CertificateParser.getSubjectKeyIdentifier(caA);
+        assertFalse(cache.lookupCertificate(ski).available());
+        service.refresh();
+        var missing = cache.lookupCertificate("missing");
+        assertTrue(missing.available());
+        assertNull(missing.certificate());
+        Instant expiry = NOW.plusSeconds(3600);
+        when(clock.instant()).thenReturn(expiry.minusNanos(1), expiry);
+        clearInvocations(clock);
+        var found = cache.lookupCertificate(ski);
+        assertTrue(found.available());
+        assertEquals(caA, found.certificate());
+        verify(clock).instant();
+        var expired = cache.lookupCertificate(ski);
+        assertFalse(expired.available());
+        assertNull(expired.certificate());
+        assertNull(cache.getCertificateBySki(ski));
+    }
+
+    @Test
+    void testGetState_ValidadeEObservacaoUsamMesmoInstante() {
+        service.refresh();
+        Instant expiry = NOW.plusSeconds(3600);
+        when(clock.instant()).thenReturn(expiry.minusNanos(1), expiry);
+        clearInvocations(clock);
+        var state = cache.getState().orElseThrow();
+        assertTrue(state.valid());
+        assertEquals(expiry.minusNanos(1), state.observedAt());
+        verify(clock).instant();
+        assertFalse(cache.getState().orElseThrow().valid());
+    }
+
+    @Test
     void testRefresh_PublicaGeracaoCompletaA_B_ReconfirmaSemBaixarZip() {
         service.refresh();
         assertGeneration(caA, zipA, NOW);
@@ -450,7 +484,7 @@ class TrustStoreServiceTest {
     private void assertGeneration(X509Certificate certificate, byte[] zip, Instant confirmation) {
         assertTrue(cache.isCacheValid());
         assertEquals(Map.of(CertificateParser.getSubjectKeyIdentifier(certificate), certificate), cache.getAllCertificates());
-        assertEquals(new Cache.State(hash(zip), confirmation, confirmation.plusSeconds(3600), 1, true),
+        assertEquals(new Cache.State(hash(zip), confirmation, confirmation.plusSeconds(3600), 1, true, clock.instant()),
                 cache.getState().orElseThrow());
     }
 

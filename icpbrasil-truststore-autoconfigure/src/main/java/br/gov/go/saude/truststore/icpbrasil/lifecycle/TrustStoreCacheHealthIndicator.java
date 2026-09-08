@@ -1,71 +1,37 @@
 package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
-import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 
-import java.time.Instant;
-import java.util.Optional;
+import java.time.Duration;
 
-@Slf4j
+/** Saude temporal do snapshot servido, sem I/O de storage ou rede em probes. */
 public class TrustStoreCacheHealthIndicator implements HealthIndicator {
 
-    private final TrustStoreRepository repository;
     private final TrustStoreConfig config;
     private final Cache cache;
 
-    public TrustStoreCacheHealthIndicator(TrustStoreRepository repository, TrustStoreConfig config, Cache cache) {
-        this.repository = repository;
+    /** O limiar critico apenas alerta; a disponibilidade e decidida pelo proprio snapshot. */
+    public TrustStoreCacheHealthIndicator(TrustStoreConfig config, Cache cache) {
         this.config = config;
         this.cache = cache;
     }
 
     @Override
     public Health health() {
-        if (!cache.isCacheValid()) {
-            return Health.down()
-                .withDetail("status", "EXPIRED")
-                .withDetail("message", "Cache expirado — certificados não disponíveis")
-                .build();
-        }
-        try {
-            Optional<Instant> ultimaConfirmacaoOpt = repository.recuperarUltimaConfirmacao();
-            if (ultimaConfirmacaoOpt.isEmpty()) {
-                return Health.down()
-                    .withDetail("status", "EXPIRED")
-                    .withDetail("message", "Última confirmação indisponível")
-                    .build();
+        return cache.getState().map(state -> {
+            String status = "EXPIRED";
+            if (state.valid()) {
+                status = Duration.between(state.confirmedAt(), state.observedAt())
+                        .compareTo(Duration.ofMillis(config.getCacheTtlCriticalMillis())) > 0
+                        ? "CRITICAL" : "VALID";
             }
-            Instant ultimaConfirmacao = ultimaConfirmacaoOpt.get();
-            long idadeMillis = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
-            if (idadeMillis <= config.getCacheTtlCriticalMillis()) {
-                return Health.up()
-                    .withDetail("status", "VALID")
-                    .withDetail("ultimaConfirmacao", ultimaConfirmacao.toString())
+            return (state.valid() ? Health.up() : Health.down())
+                    .withDetail("status", status)
+                    .withDetail("ultimaConfirmacao", state.confirmedAt().toString())
                     .build();
-            }
-            if (idadeMillis <= config.getCacheTtlMaxMillis()) {
-                return Health.up()
-                    .withDetail("status", "CRITICAL")
-                    .withDetail("message", "Cache sem atualização há mais de "
-                        + config.getCacheTtlCriticalHours() + " horas")
-                    .withDetail("ultimaConfirmacao", ultimaConfirmacao.toString())
-                    .build();
-            }
-            return Health.down()
-                .withDetail("status", "EXPIRED")
-                .withDetail("message", "Cache expirado — TTL máximo ultrapassado")
-                .withDetail("ultimaConfirmacao", ultimaConfirmacao.toString())
-                .build();
-        } catch (Exception e) {
-            log.error("Erro ao verificar saúde do cache", e);
-            return Health.unknown()
-                .withDetail("status", "UNKNOWN")
-                .withDetail("error", e.getMessage())
-                .build();
-        }
+        }).orElseGet(() -> Health.down().withDetail("status", "UNAVAILABLE").build());
     }
 }

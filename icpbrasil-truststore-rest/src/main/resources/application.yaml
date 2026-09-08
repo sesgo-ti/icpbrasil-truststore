@@ -14,9 +14,14 @@ management:
         include: health
   endpoint:
     health:
-      show-details: always
+      show-details: never
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,trustStoreCache
+        liveness:
+          include: livenessState
 
 # Configurações do TrustStore ICP-Brasil
 icpbrasil-truststore:
@@ -40,13 +45,13 @@ icpbrasil-truststore:
 
   # Ativação de Componentes Opcionais
   scheduling:
-    enabled: true                 # Ativa a rotina automática (Cron) de atualização em background
+    enabled: true                 # Executor dedicado, primeira execução após um intervalo completo
 
   # Bootstrap Síncrono
-  # [Resultado]: Carga inicial do cache antes de o Spring declarar "Started" — elimina race condition
+  # Runner anterior ao ApplicationReadyEvent, não à abertura HTTP; roteamento deve respeitar readiness
   bootstrap:
     enabled: true                 # Executa ApplicationRunner síncrono no startup
-    fail-fast: true               # Aborta startup se a carga inicial falhar (recomendado em produção)
+    fail-fast: true               # Aborta startup se o cache continuar inválido após refresh
 
   # Estratégia de Armazenamento
   # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível)

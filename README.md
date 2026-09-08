@@ -56,9 +56,9 @@ Adicione a dependência:
 
 A biblioteca se auto-configura via mecanismo de auto-configuração do Spring Boot — nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
-Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs da ICP-Brasil já está disponível localmente. Se não, baixa do repositório oficial do ITI e popula o cache em memória (indexado por SKI) **antes** de o Spring declarar o contexto "Started". Requisições só chegam à aplicação após o cache estar pronto — eliminando a race condition entre startup e scheduler.
+Na inicialização, um `ApplicationRunner` síncrono revalida o acervo local, quando disponível, e tenta atualização pelo ITI antes do `ApplicationReadyEvent` e do retorno de `SpringApplication.run()`. O servidor HTTP pode aceitar requisições antes de o runner terminar. O roteamento deve respeitar readiness, que no standalone combina `readinessState` e `trustStoreCache`; `/certificate` retorna 503 se não houver snapshot válido.
 
-Se a carga inicial falhar (rede indisponível, hash inválido, timeout), o startup é abortado por padrão (`bootstrap.fail-fast=true`). Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap) para ajustar esse comportamento em testes ou cenários de desenvolvimento sem conectividade.
+Se o cache continuar inválido após a carga inicial, o startup é abortado por padrão (`bootstrap.fail-fast=true`). Uma falha remota pode ser tolerada enquanto o snapshot local revalidado ainda estiver no prazo original. Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap).
 
 Para um exemplo completo de integração (incluindo o comportamento do bootstrap síncrono e testes), veja [docs/exemplo-integracao-lib.md](docs/exemplo-integracao-lib.md).
 
@@ -404,25 +404,44 @@ nao substitui validacao PKIX nem a validade individual dos certificados.
 icpbrasil-truststore:
   bootstrap:
     enabled: true           # default — carga síncrona no startup
-    fail-fast: true         # default — aborta startup se a carga falhar
+    fail-fast: true         # default: aborta startup se o cache continuar inválido
 ```
 
-A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBootstrap`) de forma **síncrona**, antes de o Spring Boot declarar o contexto "Started". Isso garante que nenhuma requisição seja atendida enquanto o cache estiver vazio — eliminando a race condition em que a aplicação aceitava assinaturas antes de o scheduler completar o primeiro download.
+A carga inicial é executada pelo `ApplicationRunner` (`TrustStoreBootstrap`) de forma **síncrona**, antes do `ApplicationReadyEvent` e do retorno de `SpringApplication.run()`. Isso **não é uma barreira HTTP**: o contexto e o servidor podem estar ativos durante o runner. Outros beans, seus inicializadores e listeners anteriores também podem consumir o cache antes da carga; devem tratar indisponibilidade. A biblioteca não bloqueia globalmente endpoints de aplicações consumidoras.
+
+No standalone, `/actuator/health/readiness` inclui `readinessState,trustStoreCache`:
+somente retorna 200 quando a aplicação aceita tráfego e o snapshot está válido.
+Configure o balanceador/orquestrador para retirar instâncias com readiness 503.
+`/actuator/health/liveness` inclui somente `livenessState`, sem depender de ITI/S3.
+Consumidores da biblioteca precisam adicionar Actuator e configurar esses grupos
+explicitamente, conforme o [exemplo da lib](docs/exemplo-integracao-lib.md).
+
+Health consulta apenas `Cache.getState()`, com validade e idade no mesmo instante do
+relógio do cache, sem I/O de storage/rede. `VALID` e `CRITICAL` permanecem `UP`;
+ausência de snapshot (`UNAVAILABLE`), expiração ou relógio anterior à confirmação
+(`EXPIRED`) produzem `DOWN`. A janela é `[confirmedAt, expiresAt)`.
+Uma probe é uma observação, não autorização para consultas futuras. `/certificate`
+captura disponibilidade e certificado em uma única leitura (`Cache.lookupCertificate`),
+distinguindo 503 de SKI ausente (404), e suas respostas usam `Cache-Control: no-store`.
+
+Detalhes de health ficam ocultos por padrão (`show-details: never`). Para diagnóstico
+restrito, configure a porta de gerenciamento e controle de acesso conforme o
+[manual de monitoramento](docs/manual-monitoramento.md); o serviço não inclui autenticação.
 
 **Comportamento conforme as flags:**
 
 | `enabled` | `fail-fast` | Efeito no startup |
 |---|---|---|
-| `true` (padrão) | `true` (padrão) | Baixa e carrega o cache; se falhar, lança `IllegalStateException` e a aplicação **não sobe** |
-| `true` | `false` | Baixa e carrega o cache; se falhar, loga erro e a aplicação sobe com cache vazio (não recomendado em produção) |
-| `false` | — | Bootstrap desativado; cache só será populado na primeira execução do scheduler (útil em testes sem rede) |
+| `true` (padrão) | `true` (padrão) | Tenta carga/refresh; se o cache continuar inválido, lança `IllegalStateException` e encerra o contexto, sem desfazer HTTP já atendido |
+| `true` | `false` | Se o cache continuar inválido, loga erro e conclui startup degradado, com readiness 503 |
+| `false` | — | Sem carga pelo runner; depende do scheduler ou de chamada explícita a `refresh()` (útil em testes sem rede) |
 
 **Quando desabilitar (`enabled: false`):**
 
 - Testes que sobem o `ApplicationContext` sem acesso à internet e mockam `IcpBrasilCertificateProvider` ou o `Downloader`.
 - Desenvolvimento local onde o consumidor deseja iterar rapidamente sem esperar o download.
 
-**Relação com o scheduler:** com o bootstrap habilitado, a primeira execução do `TrustStoreScheduler` ocorre apenas após um intervalo completo (`refresh-interval-hours`) — o `initialDelay` do `@Scheduled` foi ajustado para não competir com a carga do bootstrap.
+**Relação com o scheduler:** `TrustStoreScheduler` usa um `ScheduledExecutorService` dedicado, sem ativar scheduling global do Spring. A primeira execução ocorre após um intervalo completo (`refresh-interval-hours`) desde a criação do bean, com ou sem bootstrap. Esse atraso não garante ausência de sobreposição com runner lento; `TrustStoreService.refresh()` sincronizado serializa as atualizações.
 
 ---
 

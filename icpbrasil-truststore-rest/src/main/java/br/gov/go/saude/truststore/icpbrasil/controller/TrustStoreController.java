@@ -45,23 +45,26 @@ public class TrustStoreController {
 
             // Cache inválido = acervo não confiável no momento: 503 (indisponível),
             // distinto de 404 (SKI não existe no acervo vigente)
-            if (!cache.isCacheValid()) {
+            var lookup = cache.lookupCertificate(ski);
+            if (!lookup.available()) {
                 log.warn("Cache do trust store inválido/expirado — consulta indisponível");
                 return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .cacheControl(CacheControl.noStore())
                     .body("Acervo ICP-Brasil temporariamente indisponível");
             }
 
-            X509Certificate cert = cache.getCertificateBySki(ski);
+            X509Certificate cert = lookup.certificate();
 
             if (cert == null) {
                 log.warn("Certificado não encontrado para SKI: {}", ski);
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.notFound().cacheControl(CacheControl.noStore()).build();
             }
 
             // Validar tipo de formato
             if (!TYPE_PEM.equalsIgnoreCase(type) && !TYPE_DER.equalsIgnoreCase(type)) {
                 log.warn("Tipo de formato inválido: {}. Tipos válidos: pem, der", type);
                 return ResponseEntity.badRequest()
+                    .cacheControl(CacheControl.noStore())
                     .body("Tipo de formato inválido. Use 'pem' ou 'der'");
             }
 
@@ -73,7 +76,7 @@ public class TrustStoreController {
 
         } catch (Exception e) {
             log.error("Erro ao obter certificado: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            return ResponseEntity.internalServerError().cacheControl(CacheControl.noStore()).build();
         }
     }
 
@@ -101,6 +104,7 @@ public class TrustStoreController {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.TEXT_PLAIN);
+            headers.setCacheControl(CacheControl.noStore());
             
             return new ResponseEntity<>(pemBuilder.toString(), headers, HttpStatus.OK);
 
@@ -125,6 +129,7 @@ public class TrustStoreController {
             // Cria cabeçalhos para forçar o download do arquivo
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/x-x509-ca-cert"));
+            headers.setCacheControl(CacheControl.noStore());
             headers.setContentDisposition(
                     ContentDisposition.attachment()
                             .filename(ski + ".der")

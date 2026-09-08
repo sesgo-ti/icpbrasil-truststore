@@ -9,19 +9,19 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
 /**
- * Garante que o cache ICP-Brasil esteja carregado antes de o Spring Boot
- * declarar o contexto "Started" — eliminando a race condition entre o startup
- * e a primeira execução do scheduler.
+ * Tenta carregar o cache antes do ApplicationReadyEvent e do retorno de SpringApplication.run().
+ * O servidor HTTP e outros beans podem operar antes deste runner: consumidores devem
+ * respeitar readiness e tratar acervo indisponivel, inclusive em inicializadores de beans.
  *
  * <p>Implementa {@link ApplicationRunner}, que é executado de forma síncrona
- * imediatamente antes de {@code SpringApplication.run()} retornar. Qualquer
- * exceção propagada daqui aborta o startup.</p>
+ * durante o startup, sem barreira global de requisicoes. Qualquer exceção propagada
+ * daqui aborta o startup, mas nao desfaz requisicoes ja atendidas.</p>
  *
  * <p>Comportamento controlado por {@code icpbrasil-truststore.bootstrap.*}:</p>
  * <ul>
  *   <li>{@code enabled} (padrão {@code true}): quando {@code false}, desabilita o bootstrap por completo —
- *       o bean não é registrado e o cache só será populado na primeira execução do scheduler.</li>
- *   <li>{@code fail-fast} (padrão {@code true}): se a carga falhar, aborta o startup.</li>
+ *       o bean não é registrado; a carga depende do scheduler ou de refresh explicito.</li>
+ *   <li>{@code fail-fast} (padrão {@code true}): se o cache continuar invalido, aborta o startup.</li>
  * </ul>
  */
 @Slf4j
@@ -41,7 +41,7 @@ public class TrustStoreBootstrap implements ApplicationRunner {
         TrustStoreConfig.BootstrapConfig bootstrap = trustStoreConfig.getBootstrap();
 
         if (bootstrap != null && !bootstrap.isEnabled()) {
-            log.info("Bootstrap síncrono desabilitado — cache será populado apenas pelo scheduler");
+            log.info("Bootstrap síncrono desabilitado; carga depende de refresh agendado ou explicito");
             return;
         }
 

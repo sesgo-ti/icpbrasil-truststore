@@ -16,8 +16,9 @@ import java.util.concurrent.TimeUnit;
  * infraestrutura global de scheduling do Spring, pois isso ligaria inadvertidamente os
  * {@code @Scheduled} da aplicação consumidora.</p>
  *
- * <p>A primeira execução é adiada em um intervalo completo — o {@link TrustStoreBootstrap}
- * já realiza a carga inicial no startup, evitando trabalho duplicado.</p>
+ * <p>A primeira execução é adiada em um intervalo completo desde a criação do bean,
+ * inclusive sem bootstrap. Um bootstrap lento pode coincidir com o scheduler;
+ * {@link TrustStoreService#refresh()} serializa as atualizações.</p>
  *
  * <p>Ciclo de vida gerenciado pela auto-configuração via {@code initMethod}/{@code destroyMethod}.</p>
  */
