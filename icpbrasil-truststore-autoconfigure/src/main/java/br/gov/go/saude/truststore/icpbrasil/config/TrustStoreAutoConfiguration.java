@@ -29,7 +29,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.validation.annotation.Validated;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -51,7 +50,6 @@ import java.util.List;
  * sem anotações Spring, o que as torna testáveis de forma isolada.</p>
  */
 @AutoConfiguration
-@EnableScheduling
 public class TrustStoreAutoConfiguration {
 
     /**
@@ -237,12 +235,13 @@ public class TrustStoreAutoConfiguration {
         return new TrustStoreBootstrap(trustStoreService, trustStoreConfig);
     }
 
-    @Bean
+    @Bean(initMethod = "start", destroyMethod = "stop")
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "icpbrasil-truststore.scheduling", name = "enabled",
             havingValue = "true", matchIfMissing = true)
-    public TrustStoreScheduler trustStoreScheduler(TrustStoreService trustStoreService) {
-        return new TrustStoreScheduler(trustStoreService);
+    public TrustStoreScheduler trustStoreScheduler(TrustStoreService trustStoreService,
+                                                   TrustStoreConfig trustStoreConfig) {
+        return new TrustStoreScheduler(trustStoreService, trustStoreConfig);
     }
 
     @Bean

@@ -1,33 +1,69 @@
 package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 
+import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Componente responsável pelo agendamento da atualização do TrustStore.
- * Pode ser desativado via configuração icpbrasil-truststore.scheduling.enabled=false.
+ * Agendador da atualização periódica do trust store.
+ *
+ * <p>Usa um {@link ScheduledExecutorService} próprio (thread daemon dedicada) em vez de
+ * {@code @Scheduled}/{@code @EnableScheduling}: uma auto-configuração não deve ativar a
+ * infraestrutura global de scheduling do Spring, pois isso ligaria inadvertidamente os
+ * {@code @Scheduled} da aplicação consumidora.</p>
+ *
+ * <p>A primeira execução é adiada em um intervalo completo — o {@link TrustStoreBootstrap}
+ * já realiza a carga inicial no startup, evitando trabalho duplicado.</p>
+ *
+ * <p>Ciclo de vida gerenciado pela auto-configuração via {@code initMethod}/{@code destroyMethod}.</p>
  */
 @Slf4j
 public class TrustStoreScheduler {
-    private final TrustStoreService trustStoreService;
 
-    public TrustStoreScheduler(TrustStoreService trustStoreService) {
+    private final TrustStoreService trustStoreService;
+    private final long intervalMillis;
+    private ScheduledExecutorService executor;
+
+    public TrustStoreScheduler(TrustStoreService trustStoreService, TrustStoreConfig trustStoreConfig) {
         this.trustStoreService = trustStoreService;
+        this.intervalMillis = trustStoreConfig.getRefreshIntervalMillis();
     }
 
     /**
-     * Executa a verificação automática periódica de sincronização do repositório local.
-     * <p>
-     * O {@code initialDelayString} é igual ao {@code fixedRateString} para adiar a
-     * primeira execução em um intervalo completo — o {@link TrustStoreBootstrap}
-     * já realiza a carga inicial no startup, evitando competir com o scheduler.
+     * Inicia o agendamento periódico (chamado pelo container como {@code initMethod}).
      */
-    @Scheduled(
-            fixedRateString = "#{${icpbrasil-truststore.refresh-interval-hours:2} * 60 * 60 * 1000}",
-            initialDelayString = "#{${icpbrasil-truststore.refresh-interval-hours:2} * 60 * 60 * 1000}")
-    public void scheduleRefresh() {
-        log.info("Executando atualização agendada do TrustStore");
-        trustStoreService.refresh();
+    public void start() {
+        executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "icpbrasil-truststore-scheduler");
+            thread.setDaemon(true);
+            return thread;
+        });
+        executor.scheduleAtFixedRate(this::scheduleRefresh, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
+        log.info("Agendador do trust store iniciado (intervalo: {} ms)", intervalMillis);
+    }
+
+    /**
+     * Encerra o agendamento (chamado pelo container como {@code destroyMethod}).
+     */
+    public void stop() {
+        if (executor != null) {
+            executor.shutdownNow();
+            log.info("Agendador do trust store encerrado");
+        }
+    }
+
+    void scheduleRefresh() {
+        try {
+            log.info("Executando atualização agendada do TrustStore");
+            trustStoreService.refresh();
+        } catch (Exception e) {
+            // scheduleAtFixedRate cancela execuções futuras se a tarefa lançar exceção;
+            // capturamos aqui para garantir que uma falha pontual não mate o agendamento
+            log.error("Falha na atualização agendada do trust store", e);
+        }
     }
 }
