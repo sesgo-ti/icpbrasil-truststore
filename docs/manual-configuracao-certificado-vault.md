@@ -83,7 +83,7 @@ Exemplo:
 java \
   -Djavax.net.ssl.trustStore=mytruststore.jks \
   -Djavax.net.ssl.trustStorePassword=changeit \
-  -jar target/icpbrasil-truststore-0.0.1-standalone.jar
+  -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar
 ```
 
 ## Segurança
