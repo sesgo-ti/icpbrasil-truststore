@@ -100,6 +100,30 @@ public class TrustStoreConfig {
      */
     private BootstrapConfig bootstrap;
 
+    /** Limites do acervo administrativo, independentes da politica de URLs X.509. */
+    private BundleConfig bundle = new BundleConfig();
+
+    /** Orcamentos em bytes incluem entradas ignoradas e diretorios do ZIP. */
+    @Data
+    public static class BundleConfig {
+        private int maxCompressedBytes = 20 * 1024 * 1024;
+        private int maxEntryBytes = 1024 * 1024;
+        private long maxExpandedBytes = 100L * 1024 * 1024;
+        private int maxEntries = 10_000;
+        private int maxHashBytes = 4096;
+
+        /** Rejeita limites nulos, negativos ou superiores aos tetos de memoria suportados. */
+        public void validate() {
+            if (maxCompressedBytes < 1 || maxCompressedBytes > 100 * 1024 * 1024
+                    || maxEntryBytes < 1 || maxEntryBytes > 10 * 1024 * 1024
+                    || maxExpandedBytes < 1 || maxExpandedBytes > 500L * 1024 * 1024
+                    || maxEntries < 1 || maxEntries > 100_000
+                    || maxHashBytes < 1 || maxHashBytes > 64 * 1024) {
+                throw new IllegalStateException("Limites invalidos em icpbrasil-truststore.bundle");
+            }
+        }
+    }
+
     /**
      * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
      */
@@ -200,6 +224,10 @@ public class TrustStoreConfig {
         validateChainConfig();
         validateDownloadPolicyConfig();
         validateBootstrapConfig();
+        if (bundle == null) {
+            throw new IllegalStateException("icpbrasil-truststore.bundle nao pode ser nulo");
+        }
+        bundle.validate();
 
         log.info("Validação das propriedades de configuração concluída com sucesso - Sistema pronto para operação");
     }

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,7 +49,8 @@ class CacheTest {
         );
         // Instância isolada por teste — escrita acessível por estar no mesmo pacote do pipeline
         cache = new Cache();
-        cache.load(icpBrasilCertificateProvider.getCertificates());
+        cache.publish(icpBrasilCertificateProvider.parseSnapshot(zipBytes, hashContent.strip().split("\\s+")[0]),
+                Instant.now(), 3600000, cache.version(), () -> {});
 
         testCertificate = CertificateParser.parse(TestResourceLoader.getResource("AC_SOLUTI_Multipla_v5_G2.crt"));
     }

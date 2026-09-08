@@ -53,12 +53,18 @@ public final class CertificateHttpTransport {
      * @throws InterruptedException se o chamador for interrompido; cancela a transferencia
      */
     public byte[] send(HttpRequest request, long maxBytes) throws IOException, InterruptedException {
+        policy.validateUrl(request.uri().toString());
+        return sendBounded(client, request, maxBytes);
+    }
+
+    // O acervo administrativo usa TLS dedicado, sem a politica DNS das extensoes X.509.
+    static byte[] sendBounded(HttpClient client, HttpRequest request, long maxBytes)
+            throws IOException, InterruptedException {
         Duration timeout = request.timeout().orElseThrow(
                 () -> new IllegalArgumentException("Timeout obrigatorio para download de certificados"));
         if (maxBytes < 0 || maxBytes > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Limite de resposta fora do intervalo suportado");
         }
-        policy.validateUrl(request.uri().toString());
         BoundedBodySubscriber subscriber = new BoundedBodySubscriber(maxBytes);
         long started = System.nanoTime();
         CompletableFuture<HttpResponse<byte[]>> pending = client.sendAsync(request, info -> subscriber);

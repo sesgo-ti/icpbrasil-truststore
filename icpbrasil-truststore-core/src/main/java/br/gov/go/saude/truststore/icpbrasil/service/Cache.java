@@ -1,120 +1,118 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
-import lombok.extern.slf4j.Slf4j;
+import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider.ParsedSnapshot;
 
 import java.security.cert.X509Certificate;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Índice em memória do acervo ICP-Brasil (SKI → certificado), servido aos consumidores.
- *
- * <p><strong>Modelo de segurança:</strong> a leitura é pública; a <em>escrita</em> é
- * restrita ao pipeline legítimo de carga ({@link TrustStoreService}, mesmo pacote),
- * preservando a cadeia de custódia: download com TLS dedicado → validação SHA-512 →
- * armazenamento → indexação. Código fora do pipeline não consegue substituir nem
- * revalidar o acervo.</p>
- *
- * <p><strong>Concorrência:</strong> o índice é reconstruído em um mapa local e publicado
- * por troca atômica de referência {@code volatile} — leitores nunca observam estado
- * parcial durante uma atualização.</p>
- *
- * <p>Uma instância por aplicação: a auto-configuração expõe o bean compartilhado.</p>
+ * Acervo publicado atomicamente com identidade e validade. Leituras expiram sem depender de refresh.
+ * A escrita pertence ao pipeline no mesmo pacote; consumidores recebem apenas leituras.
+ * A validade e verificada no instante de cada chamada, nao revoga copias ja entregues.
  */
-@Slf4j
 public class Cache {
+    private final Clock clock;
+    private volatile Snapshot snapshot;
+    private long invalidationVersion;
 
-    private volatile boolean cacheValid = false;
-    private volatile Map<String, X509Certificate> skiIndex = Map.of();
-
-    /**
-     * Carrega os certificados no cache e o marca como válido.
-     * A validade só é sinalizada após o índice estar completamente populado.
-     */
-    void load(List<X509Certificate> certificates) {
-        log.info("Carregando cache de certificados...");
-        skiIndex = indexarPorSki(certificates);
-        cacheValid = true;
-        log.info("Cache de certificados carregado com {} entradas.", skiIndex.size());
+    /** Usa o relogio UTC do sistema. */
+    public Cache() {
+        this(Clock.systemUTC());
     }
 
-    /**
-     * Atualiza o índice se o cache estiver válido; caso contrário, não faz nada.
-     */
-    void refreshCache(List<X509Certificate> certificates) {
-        if (cacheValid) {
-            log.info("Atualizando cache de certificados...");
-            skiIndex = indexarPorSki(certificates);
-            log.info("Cache de certificados atualizado com {} entradas.", skiIndex.size());
-            return;
+    /** O relogio tambem governa as confirmacoes produzidas pelo servico deste cache. */
+    public Cache(Clock clock) {
+        this.clock = Objects.requireNonNull(clock);
+    }
+
+    Instant now() {
+        return clock.instant();
+    }
+
+    synchronized long version() {
+        return invalidationVersion;
+    }
+
+    // Invalidar durante download/parsing impede que aquele refresh ressuscite o acervo.
+    synchronized void invalidate() {
+        invalidationVersion++;
+        snapshot = null;
+    }
+
+    // A carga local pode ser repetida, mas nunca substituir uma publicacao ou desfazer invalidacao.
+    synchronized void publishInitial(ParsedSnapshot parsed, Instant confirmedAt, long ttlMillis) {
+        if (snapshot == null) {
+            publish(parsed, confirmedAt, ttlMillis, 0, () -> {});
         }
-
-        log.warn("Cache inválido, não foi possível atualizar.");
     }
 
-    /**
-     * Constrói o índice em um mapa local — a publicação acontece por atribuição
-     * atômica da referência, nunca por mutação do mapa visível aos leitores.
-     */
-    private static Map<String, X509Certificate> indexarPorSki(List<X509Certificate> certificates) {
-        Map<String, X509Certificate> novoIndice = new HashMap<>();
-
-        for (X509Certificate certificate : certificates) {
-            try {
-                String ski = CertificateParser.getSubjectKeyIdentifier(certificate);
-                novoIndice.put(ski, certificate);
-            } catch (RuntimeException e) {
-                log.error("Erro ao extrair Subject Key Identifier do certificado: {}", e.getMessage(), e);
-            }
+    synchronized boolean publish(ParsedSnapshot parsed, Instant confirmedAt, long ttlMillis,
+                                 long expectedVersion, Runnable persist) {
+        Instant expiresAt = confirmedAt.plusMillis(ttlMillis);
+        if (ttlMillis <= 0 || expectedVersion != invalidationVersion
+                || !usable(confirmedAt, expiresAt, now())) {
+            return false;
         }
-
-        return novoIndice;
+        Snapshot candidate = new Snapshot(parsed.index(), parsed.hash(), confirmedAt, expiresAt);
+        // A invalidacao lineariza antes ou depois de persistir/publicar, nunca entre ambos.
+        persist.run();
+        snapshot = candidate;
+        return true;
     }
 
+    private static boolean usable(Instant confirmedAt, Instant expiresAt, Instant now) {
+        return !now.isBefore(confirmedAt) && now.isBefore(expiresAt);
+    }
+
+    private Map<String, X509Certificate> currentIndex() {
+        Snapshot current = snapshot;
+        return current != null && usable(current.confirmedAt(), current.expiresAt(), now())
+                ? current.index() : Map.of();
+    }
+
+    /** Retorna null se o SKI nao existe ou o acervo esta indisponivel/expirado. */
     public X509Certificate getCertificateBySki(String ski) {
-        return skiIndex.get(ski);
+        return currentIndex().get(ski);
     }
 
-    /**
-     * Retorna uma cópia do mapa de certificados indexados por SKI.
-     *
-     * @return Mapa SKI → X509Certificate (cópia defensiva)
-     */
+    /** Retorna copia defensiva do indice valido, ou mapa vazio se indisponivel/expirado. */
     public Map<String, X509Certificate> getAllCertificates() {
-        return new HashMap<>(skiIndex);
+        return new HashMap<>(currentIndex());
     }
 
-    /**
-     * Retorna os certificados raiz (auto-assinados) indexados por SKI.
-     * Um certificado é considerado raiz quando subject e issuer são iguais
-     * e a assinatura é verificável com a própria chave pública.
-     *
-     * @return Mapa SKI → X509Certificate contendo apenas certificados raiz
-     */
+    /** Retorna apenas certificados auto-assinados do snapshot valido capturado nesta chamada. */
     public Map<String, X509Certificate> getRootCertificates() {
         Map<String, X509Certificate> roots = new HashMap<>();
-        for (Map.Entry<String, X509Certificate> entry : skiIndex.entrySet()) {
-            X509Certificate cert = entry.getValue();
-            if (CertificateParser.isSelfSigned(cert)) {
-                roots.put(entry.getKey(), cert);
+        currentIndex().forEach((ski, certificate) -> {
+            if (CertificateParser.isSelfSigned(certificate)) {
+                roots.put(ski, certificate);
             }
-        }
+        });
         return roots;
     }
 
-    /**
-     * Marca a validade do cache; ao invalidar, o índice é descartado (fail-closed).
-     */
-    void setCacheValid(boolean cacheValid) {
-        this.cacheValid = cacheValid;
-        if (!cacheValid) {
-            skiIndex = Map.of();
-        }
+    /** A janela e [confirmedAt, expiresAt); relogio anterior a confirmacao falha fechado. */
+    public boolean isCacheValid() {
+        return getState().map(State::valid).orElse(false);
     }
 
-    public boolean isCacheValid() {
-        return cacheValid;
+    /** Metadados atomicos para observabilidade sem I/O; preservados mesmo apos expiracao. */
+    public Optional<State> getState() {
+        Snapshot current = snapshot;
+        return current == null ? Optional.empty() : Optional.of(new State(current.hash(),
+                current.confirmedAt(), current.expiresAt(), current.index().size(),
+                usable(current.confirmedAt(), current.expiresAt(), now())));
     }
+
+    /** Estado observado em uma chamada; nao e uma autorizacao para leituras futuras. */
+    public record State(String hash, Instant confirmedAt, Instant expiresAt, int certificateCount, boolean valid) {}
+
+    private record Snapshot(Map<String, X509Certificate> index, String hash,
+                            Instant confirmedAt, Instant expiresAt) {}
 }

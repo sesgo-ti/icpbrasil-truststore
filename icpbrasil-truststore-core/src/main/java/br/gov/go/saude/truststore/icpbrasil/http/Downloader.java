@@ -1,121 +1,77 @@
 package br.gov.go.saude.truststore.icpbrasil.http;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
-import lombok.extern.slf4j.Slf4j;
 
-import javax.net.ssl.HttpsURLConnection;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
-/**
- * Serviço responsável por downloads HTTP/HTTPS seguros do bundle ICP-Brasil.
- * Utiliza SSLContext customizado via {@link TrustStoreManager} e retry via {@link RetryPolicy}.
- */
-@Slf4j
+/** Downloads HTTPS do acervo com TLS dedicado, sem redirects e com orcamentos por tentativa. */
 public class Downloader {
-
-    private final TrustStoreManager trustStoreManager;
+    private final HttpClient client;
     private final RetryPolicy retryPolicy;
-    private final TrustStoreConfig.NetworkConfig networkConfig;
+    private final int attempts;
+    private final long retryMillis;
+    private final Duration timeout;
+    private final int maxZipBytes;
+    private final int maxHashBytes;
 
-    public Downloader(TrustStoreManager trustStoreManager, RetryPolicy retryPolicy,
-                      TrustStoreConfig trustStoreConfig) {
-        this.trustStoreManager = trustStoreManager;
-        this.retryPolicy = retryPolicy;
-        this.networkConfig = trustStoreConfig.getNetwork();
+    /** O SSLContext da JVM nao e alterado; somente o cliente do acervo recebe a confianca dedicada. */
+    public Downloader(TrustStoreManager trustStoreManager, RetryPolicy retryPolicy, TrustStoreConfig config) {
+        this(HttpClient.newBuilder().sslContext(trustStoreManager.getSslContext())
+                .followRedirects(HttpClient.Redirect.NEVER).build(), retryPolicy, config);
     }
 
-    /**
-     * Faz download de dados binários com retry automático.
-     *
-     * @param url URL para download (deve ser HTTPS)
-     * @return Array de bytes com os dados baixados
-     * @throws IOException se o download falhar após todas as tentativas
-     */
-    public byte[] downloadBytes(String url) throws IOException {
-        log.debug("Iniciando download: {}", url);
+    Downloader(HttpClient client, RetryPolicy retryPolicy, TrustStoreConfig config) {
+        if (client.followRedirects() != HttpClient.Redirect.NEVER) {
+            throw new IllegalArgumentException("Downloads do acervo exigem Redirect.NEVER");
+        }
+        config.getBundle().validate();
+        TrustStoreConfig.NetworkConfig network = config.getNetwork();
+        if (network.getDownloadTimeoutSeconds() < 1 || network.getDownloadTimeoutSeconds() > 300
+                || network.getMaxRetries() < 1 || network.getMaxRetries() > 10
+                || network.getRetryIntervalSeconds() < 0 || network.getRetryIntervalSeconds() > 300) {
+            throw new IllegalArgumentException("Configuracao de rede invalida para download do acervo");
+        }
+        this.client = client;
+        this.retryPolicy = retryPolicy;
+        this.attempts = network.getMaxRetries();
+        this.retryMillis = network.getRetryIntervalMillis();
+        this.timeout = Duration.ofSeconds(network.getDownloadTimeoutSeconds());
+        this.maxZipBytes = config.getBundle().getMaxCompressedBytes();
+        this.maxHashBytes = config.getBundle().getMaxHashBytes();
+    }
 
+    /** Recebe o ZIP dentro do limite compressed; o prazo inclui o corpo completo em cada tentativa. */
+    public byte[] downloadBytes(String url) throws IOException {
+        return download(url, maxZipBytes);
+    }
+
+    /** Recebe texto UTF-8 dentro do limite de hash, independente do limite do ZIP. */
+    public String downloadText(String url) throws IOException {
+        return new String(download(url, maxHashBytes), StandardCharsets.UTF_8);
+    }
+
+    private byte[] download(String url, int maxBytes) throws IOException {
+        URI uri = URI.create(url);
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null) {
+            throw new IOException("URL do acervo deve usar HTTPS com host e sem credenciais");
+        }
+        HttpRequest request = HttpRequest.newBuilder(uri).timeout(timeout)
+                .header("User-Agent", "TrustStore-Downloader/1.0").GET().build();
         try {
-            return retryPolicy.executeWithRetry(
-                    url,
-                    networkConfig.getMaxRetries() - 1,
-                    networkConfig.getRetryIntervalMillis(),
-                    () -> performDownload(url));
-        } catch (IOException e) {
+            return retryPolicy.executeWithRetry(url, attempts - 1, retryMillis,
+                    () -> CertificateHttpTransport.sendBounded(client, request, maxBytes));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Download interrompido", e);
+        } catch (IOException | DownloadPolicyException e) {
             throw e;
         } catch (Exception e) {
-            throw new IOException("Download falhou após " + networkConfig.getMaxRetries()
-                    + " tentativas: " + url, e);
+            throw new IOException("Falha no download do acervo", e);
         }
-    }
-
-    /**
-     * Faz download de texto.
-     *
-     * @param url URL para download
-     * @return String com o conteúdo baixado
-     * @throws IOException se o download falhar
-     */
-    public String downloadText(String url) throws IOException {
-        byte[] data = downloadBytes(url);
-        return new String(data, StandardCharsets.UTF_8);
-    }
-
-    private byte[] performDownload(String url) throws IOException {
-        HttpURLConnection connection = null;
-        try {
-            connection = createConnection(url);
-
-            int responseCode = connection.getResponseCode();
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Falha no download: HTTP " + responseCode
-                        + " para URL: " + url);
-            }
-
-            try (InputStream inputStream = connection.getInputStream();
-                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
-
-                log.debug("Download concluído com sucesso: {} bytes baixados de {}",
-                        outputStream.size(), url);
-                return outputStream.toByteArray();
-            }
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
-    }
-
-    private HttpURLConnection createConnection(String url) throws IOException {
-        // URI.create + toURL substitui o construtor new URL(String), deprecado desde o Java 20
-        URL targetUrl = URI.create(url).toURL();
-        HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
-
-        connection.setConnectTimeout(networkConfig.getDownloadTimeoutMillis());
-        connection.setReadTimeout(networkConfig.getDownloadTimeoutMillis());
-        connection.setRequestMethod("GET");
-        connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "TrustStore-Downloader/1.0");
-        connection.setRequestProperty("Accept", "*/*");
-        connection.setRequestProperty("Connection", "close");
-
-        if (connection instanceof HttpsURLConnection httpsConnection) {
-            httpsConnection.setSSLSocketFactory(trustStoreManager.getSslContext().getSocketFactory());
-        } else {
-            throw new IOException("URL deve usar HTTPS: " + url);
-        }
-
-        return connection;
     }
 }

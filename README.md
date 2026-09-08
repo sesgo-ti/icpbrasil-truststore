@@ -292,6 +292,61 @@ icpbrasil-truststore:
 
 Se a seção `download-policy` não for definida no YAML, valores padrão são aplicados automaticamente.
 
+### Snapshot e limites do acervo
+
+O `Cache` publica indice SKI, identidade SHA-512 do ZIP, `confirmedAt` e `expiresAt`
+como uma unica geracao. Cada leitura verifica a janela `[confirmedAt, expiresAt)`;
+na expiracao, consultas retornam `null` ou mapas vazios mesmo sem executar refresh.
+`Cache()` usa UTC e `Cache(Clock)` permite controlar o relogio, usado tambem pelo
+servico para confirmar geracoes. `getState()` fornece metadados e validade observada
+sem I/O, inclusive metadados do snapshot expirado. Copias ja entregues ao consumidor
+nao sao revogadas automaticamente.
+
+`TrustStoreService.refresh()` serializa atualizacoes. Hash, parsing integral e indice
+CA+SKI precisam ser validos antes de persistir ou publicar. Reconfirmar o hash remoto
+exige validar os bytes correspondentes, nao apenas comparar o arquivo de hash local.
+Uma falha conserva o snapshot anterior somente ate seu vencimento original. O pipeline
+nao expoe metodos publicos para gravar artefatos ou alterar validade isoladamente.
+
+No startup offline, o formato persistido permanece ZIP + hash SHA-512 + timestamp
+`Instant` ISO-8601. A geracao local e revalidada e usa sua confirmacao original;
+timestamps futuros ou expirados sao rejeitados, sem tolerancia de clock. A leitura
+tambem falha fechada se o relogio retroceder para antes de `confirmedAt`.
+Somente confirmacao remota valida pode renovar o prazo.
+
+```yaml
+icpbrasil-truststore:
+  bundle:
+    max-compressed-bytes: 20971520   # 20 MiB; intervalo 1..104857600
+    max-entry-bytes: 1048576        # 1 MiB; intervalo 1..10485760
+    max-expanded-bytes: 104857600   # 100 MiB; intervalo 1..524288000
+    max-entries: 10000              # intervalo 1..100000
+    max-hash-bytes: 4096            # intervalo 1..65536
+```
+
+Os defaults e a validacao dos limites existem no core, sem depender de Spring.
+Entradas ignoradas e diretorios tambem consomem os orcamentos de expansao e contagem.
+ZIP vazio, truncado, CRC invalido ou qualquer entrada de certificado invalida rejeita
+a geracao inteira. O diretorio e limitado antes de materializar suas entradas;
+ZIP64 e arquivos multipart nao sao aceitos. Entradas de certificado aceitam DER
+individual ou PEM concatenado, sem conteudo residual. Certificados precisam ser CAs com SKI; nao se exige quantidade
+minima de raizes nem validade X.509 atual. Para SKIs repetidos, permanece a selecao
+da ultima ocorrencia na ordem fisica do ZIP; alternativas cross-signed nao sao
+resolvidas por este indice.
+
+O downloader ITI reutiliza o transporte bounded, mas preserva seu `SSLContext`
+dedicado e nao aplica a politica DNS de extensoes X.509 ao host configurado pelo
+administrador. Exige HTTPS, rejeita redirects e limita ZIP e hash durante o stream,
+inclusive em erros HTTP. `network.download-timeout-seconds` cobre toda a troca de
+cada tentativa, incluindo corpo parado ou lento; retries iniciam novo prazo.
+
+**Limite da persistencia:** filesystem/S3 continuam com tres gravacoes independentes,
+confirmacao por ultimo, sem transacao ou coordenacao entre processos. Falhas parciais
+podem deixar artefatos inconsistentes ou bytes novos com timestamp anterior; a carga
+seguinte revalida o conjunto, mas recuperacao transacional de geracoes fica fora deste
+contrato. Cada cache/repositorio deve ter um unico servico escritor. O TTL do snapshot
+nao substitui validacao PKIX nem a validade individual dos certificados.
+
 ### Inicialização síncrona (bootstrap)
 
 ```yaml
