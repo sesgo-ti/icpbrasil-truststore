@@ -1,0 +1,101 @@
+spring:
+  application:
+    name: icpbrasil-truststore
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+# Configurações do TrustStore ICP-Brasil
+icpbrasil-truststore:
+  # URLs Oficiais da ICP-Brasil para download dos certificados e hash
+  # [Resultado]: Define de onde o sistema baixa as atualizações
+  certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
+  hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+
+  # Configurações de Rede e Resiliência
+  # [Resultado]: Controla o comportamento em caso de falha na conexão
+  network:
+    download-timeout-seconds: 60  # Tempo máximo de espera pelo download (30-300s)
+    max-retries: 3                # Número de tentativas em caso de erro (1-10)
+    retry-interval-seconds: 30    # Tempo entre tentativas (10-300s)
+
+  # Ciclo de Vida do Cache e Alertas
+  # [Resultado]: Controla quando o cache é considerado inválido ou crítico
+  refresh-interval-hours: 2       # Frequência de verificação de novas atualizações (Horas)
+  cache-ttl-critical-hours: 72    # Tempo sem atualização para entrar em estado CRÍTICO (Horas)
+  cache-ttl-max-hours: 168        # Tempo máximo de vida do cache antes de expirar (Horas)
+
+  # Ativação de Componentes Opcionais
+  scheduling:
+    enabled: true                 # Ativa a rotina automática (Cron) de atualização em background
+
+  # Bootstrap Síncrono
+  # [Resultado]: Carga inicial do cache antes de o Spring declarar "Started" — elimina race condition
+  bootstrap:
+    enabled: true                 # Executa ApplicationRunner síncrono no startup
+    fail-fast: true               # Aborta startup se a carga inicial falhar (recomendado em produção)
+
+  # Estratégia de Armazenamento
+  # [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível)
+  storage:
+    type: "filesystem"  # Opções: filesystem | s3
+    truststore-archive-path: "ACcompactado.zip"
+    hash-file-path: "hash.txt"
+    confirmation-file-path: "ultima_confirmacao.txt"
+
+  # Configurações para armazenamento no Filesystem Local
+  # [Resultado]: Local onde os artefatos são mantidos em disco
+  filesystem:
+    base-dir: "${STORAGE_FILESYSTEM_DIR:.data/icpbrasil-truststore}"
+
+  # Configurações para S3-compatible Storage (AWS S3, MinIO, etc.)
+  # [Resultado]: Conexão com serviço de objetos S3
+  s3:
+    endpoint: "${S3_ENDPOINT:https://s3.amazonaws.com}"
+    region: "${S3_REGION:us-east-1}"
+    access-key: "${S3_ACCESS_KEY:}"
+    secret-key: "${S3_SECRET_KEY:}"
+    bucket: "${S3_BUCKET:}"
+    # PEM da CA que assinou o cert do servidor S3 (classpath: ou file:).
+    # Quando não definido, usa o trustManager global.
+    # Exemplo: S3_CA_CERT_PATH=file:/etc/ssl/certs/minha-ca.crt
+    ca-cert-path: "${S3_CA_CERT_PATH:}"
+
+  # Configurações de Montagem de Cadeia de Certificados via AIA CA Issuers
+  # [Resultado]: Controla o download de certificados emissores para construção da cadeia
+  chain:
+    download-timeout-seconds: 10    # Timeout do download AIA (1-60s)
+    max-retries: 1                  # Tentativas adicionais por URL (0-5)
+    retry-interval-seconds: 2       # Intervalo entre tentativas (1-30s)
+
+  # Configurações de Verificação de Revogação (OCSP e CRL)
+  # [Resultado]: Controla timeouts, retries e cache para checagem de revogação
+  # Nota: O HttpClient de revogação usa o trust store padrão da JVM intencionalmente,
+  # pois os endpoints OCSP/CRL são acessados via CAs públicas (não ICP-Brasil).
+  revocation:
+    ocsp-timeout-seconds: 10        # Timeout da requisição OCSP (1-60s)
+    crl-timeout-seconds: 10         # Timeout da requisição CRL (1-60s)
+    max-retries: 2                  # Tentativas em caso de falha (0-10)
+    retry-interval-seconds: 3       # Intervalo entre tentativas (1-60s)
+    ocsp-cache-ttl-seconds: 3600    # TTL do cache OCSP (60-86400s)
+    crl-cache-ttl-seconds: 3600     # TTL do cache CRL (60-86400s)
+    ocsp-cache-max-size: 10000      # Máximo de entradas no cache OCSP (100-1000000)
+    crl-cache-max-size: 1000        # Máximo de entradas no cache CRL (100-100000)
+
+  # Diretório de Certificados Confiáveis Fixos
+  # [Resultado]: Local onde o sistema busca certificados adicionais (JSON) no classpath ou disco
+  trusted-certs:
+    dir: "${TRUSTED_CERTS_DIR:classpath:registries/certificates}"

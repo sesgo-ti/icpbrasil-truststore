@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: icpbrasil-truststore
+
+icpbrasil-truststore:
+  certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
+  hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+  network:
+    download-timeout-seconds: 30
+    max-retries: 3
+    retry-interval-seconds: 30
+  cache-ttl-critical-hours: 72
+  cache-ttl-max-hours: 168
+  refresh-interval-hours: 2
+  scheduling:
+    enabled: false
+  bootstrap:
+    enabled: false
+    fail-fast: true
+  storage:
+    type: filesystem
+    truststore-archive-path: "ACcompactado.zip"
+    hash-file-path: "hash.txt"
+    confirmation-file-path: "ultima_confirmacao.txt"
+
+  filesystem:
+    base-dir: "target/test-icpbrasil-truststore"
+
+  s3:
+    endpoint: "${S3_ENDPOINT:minio.clusterb.saude-go.net}"
+    access-key: "${S3_ACCESS_KEY:admin}"
+    secret-key: "${S3_SECRET_KEY:password}"
+    bucket: "${S3_BUCKET:staging}"
+
+  chain:
+    download-timeout-seconds: 10
+    max-retries: 1
+    retry-interval-seconds: 1
+
+  revocation:
+    ocsp-timeout-seconds: 10
+    crl-timeout-seconds: 10
+    max-retries: 2
+    retry-interval-seconds: 3
+    ocsp-cache-ttl-seconds: 3600
+    crl-cache-ttl-seconds: 3600
+    ocsp-cache-max-size: 10000
+    crl-cache-max-size: 1000
+
+  trusted-certs:
+    dir: "classpath:registries/certificates"

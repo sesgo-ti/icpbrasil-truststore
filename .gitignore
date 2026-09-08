@@ -78,3 +78,7 @@ desktop.ini
 # Claude Code
 CLAUDE.local.md
 .claude/
+.superpowers/
+
+# Notas internas (não publicar no remoto)
+BACKLOG.md

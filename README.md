@@ -1,6 +1,22 @@
 # Trust Store ICP-Brasil
 
+[![Build](https://github.com/sesgo-ti/icpbrasil-truststore/actions/workflows/ci.yml/badge.svg)](https://github.com/sesgo-ti/icpbrasil-truststore/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/br.gov.go.saude/icpbrasil-truststore)](https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore)
+
 Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de certificados das Autoridades Certificadoras (ACs) vigentes da ICP-Brasil. Realiza download do repositório oficial publicado pelo ITI, verificação de integridade por hash SHA-512, cache em memória e sincronização automática.
+
+## Módulos
+
+| Módulo | Papel | Publicado no Maven Central |
+|---|---|---|
+| `icpbrasil-truststore-core` | Domínio e lógica (parsers X.509, cache, revogação OCSP/CRL, download) — **Java puro, zero Spring/AWS** | ✅ |
+| `icpbrasil-truststore-autoconfigure` | Auto-configuração Spring Boot: beans, binding de properties, scheduler, bootstrap, health, S3 | ✅ |
+| `icpbrasil-truststore-rest` | Microserviço standalone (endpoint REST + fat jar) | ❌ (artefato de deploy) |
+
+Para consumir como **biblioteca**, dependa de `icpbrasil-truststore-autoconfigure`. Para rodar como **serviço**, use o fat jar do módulo `rest`.
+
+Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets estão centralizados em [MAINTAINERS.md](MAINTAINERS.md).
 
 ---
 
@@ -32,8 +48,8 @@ Adicione a dependência:
 
 ```xml
 <dependency>
-    <groupId>br.gov.go.saude.fhir</groupId>
-    <artifactId>trust-store-icpbrasil</artifactId>
+    <groupId>br.gov.go.saude</groupId>
+    <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
@@ -49,11 +65,11 @@ Para um exemplo completo de integração (incluindo o comportamento do bootstrap
 **Configuração mínima:**
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: filesystem
   filesystem:
-    base-dir: .data/truststore-icpbrasil
+    base-dir: .data/icpbrasil-truststore
 ```
 
 ---
@@ -63,17 +79,16 @@ truststore-icpbrasil:
 ### Build
 
 ```bash
-./mvnw clean package -P standalone -DskipTests
+./mvnw clean package -DskipTests
 ```
 
-Gera `target/trust-store-icpbrasil-*-standalone.jar` (fat JAR executável).
+Gera `icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar` (fat JAR executável — módulo `rest`).
 
 ### Execução
 
 ```bash
-java -jar target/trust-store-icpbrasil-*-standalone.jar \
-  --truststore-icpbrasil.rest.enabled=true \
-  --truststore-icpbrasil.storage.filesystem.base-dir=/data/truststore
+java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
+  --icpbrasil-truststore.filesystem.base-dir=/data/truststore
 ```
 
 ### Verificação
@@ -106,7 +121,6 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 | `cache-ttl-critical-hours` | `72` | Horas sem atualização para estado CRITICAL (24–168) |
 | `cache-ttl-max-hours` | `168` | Horas até o cache expirar (72–720, deve ser > critical) |
 | `storage.type` | `filesystem` | `filesystem` ou `s3` |
-| `rest.enabled` | `false` | Ativa o endpoint `/certificate` |
 | `scheduling.enabled` | `true` | Ativa a rotina de atualização em background |
 | `bootstrap.enabled` | `true` | Executa carga síncrona do cache no startup |
 | `bootstrap.fail-fast` | `true` | Falha no bootstrap aborta o startup |
@@ -115,17 +129,17 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 ### Armazenamento: filesystem
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: filesystem
   filesystem:
-    base-dir: .data/truststore-icpbrasil
+    base-dir: .data/icpbrasil-truststore
 ```
 
 ### Armazenamento: S3-compatível
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   storage:
     type: s3
 ```
@@ -144,7 +158,7 @@ Credenciais via variáveis de ambiente:
 ### Rede
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   network:
     download-timeout-seconds: 60  # 30–300
     max-retries: 3                 # 1–10
@@ -154,7 +168,7 @@ truststore-icpbrasil:
 ### Revogação (OCSP e CRL)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   revocation:
     ocsp-timeout-seconds: 10
     crl-timeout-seconds: 10
@@ -187,7 +201,7 @@ Se a seção `revocation` não for definida no YAML, valores padrão são aplica
 ### Montagem de cadeia (AIA CA Issuers)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   chain:
     download-timeout-seconds: 10  # 1–60
     max-retries: 1                # 0–5
@@ -209,7 +223,7 @@ Se a seção `chain` não for definida no YAML, valores padrão são aplicados a
 ### Política de download (SSRF e limites de tamanho)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   download-policy:
     max-ocsp-response-bytes: 1048576   # 1 MB — padrão; intervalo válido: 1024–10485760
     max-crl-response-bytes: 52428800   # 50 MB — padrão; intervalo válido: 1024–524288000
@@ -232,7 +246,7 @@ O `DownloadPolicy` protege contra SSRF (Server-Side Request Forgery) e exaustão
 **`allowed-domains`:** lista de sufixos de domínio. Quando vazia (padrão), qualquer domínio público é aceito. A correspondência é por sufixo do hostname: `icpbrasil.gov.br` cobre `ocsp.icpbrasil.gov.br`, `crl.icpbrasil.gov.br`, etc. Exemplo para restringir apenas a domínios governamentais:
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   download-policy:
     allowed-domains:
       - icpbrasil.gov.br
@@ -245,7 +259,7 @@ Se a seção `download-policy` não for definida no YAML, valores padrão são a
 ### Inicialização síncrona (bootstrap)
 
 ```yaml
-truststore-icpbrasil:
+icpbrasil-truststore:
   bootstrap:
     enabled: true           # default — carga síncrona no startup
     fail-fast: true         # default — aborta startup se a carga falhar
@@ -306,7 +320,7 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 ```
 
 ```bash
-./mvnw clean package -P standalone -DskipTests
+./mvnw clean package -DskipTests
 ```
 
 ---
