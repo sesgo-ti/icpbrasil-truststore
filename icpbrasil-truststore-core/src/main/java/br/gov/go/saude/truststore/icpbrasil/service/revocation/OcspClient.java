@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -18,11 +19,9 @@ import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
 
 import javax.security.auth.x500.X500Principal;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -44,27 +43,28 @@ public class OcspClient {
     private final RevocationCache cache;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
-    private final HttpClient httpClient;
+    private final CertificateHttpTransport transport;
     private final DownloadPolicy downloadPolicy;
 
+    /** Cria um cliente OCSP com transporte sem redirects e limites durante o download. */
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
                       TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        this.cache = cache;
-        this.retryPolicy = retryPolicy;
-        this.config = trustStoreConfig.getRevocation();
-        this.downloadPolicy = downloadPolicy;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(config.getOcspTimeoutSeconds()))
-                .build();
+        this(cache, retryPolicy, trustStoreConfig.getRevocation(), HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(trustStoreConfig.getRevocation().getOcspTimeoutSeconds()))
+                .build(), downloadPolicy);
     }
 
+    /**
+     * Usa um cliente pertencente ao chamador, sem alterar a política de download.
+     * @throws IllegalArgumentException se o cliente não usar {@link HttpClient.Redirect#NEVER}
+     */
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
                       HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
-        this.httpClient = httpClient;
+        this.transport = new CertificateHttpTransport(httpClient, downloadPolicy);
         this.downloadPolicy = downloadPolicy;
     }
 
@@ -135,11 +135,7 @@ public class OcspClient {
                 .header("Accept", "application/ocsp-response")
                 .POST(HttpRequest.BodyPublishers.ofByteArray(requestBytes))
                 .build();
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IOException("OCSP HTTP status: " + response.statusCode());
-        }
-        return response.body();
+        return transport.send(request, downloadPolicy.getMaxOcspResponseBytes());
     }
 
     private byte[] buildRequest(X509Certificate cert, X509Certificate issuer) throws Exception {

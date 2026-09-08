@@ -16,6 +16,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,6 +50,7 @@ class CrlClientTest {
         leafCert = generateLeafCert(leafKeyPair, rootKeyPair, rootCert);
 
         mockHttpClient = mock(HttpClient.class);
+        when(mockHttpClient.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
         downloadPolicy = mock(DownloadPolicy.class);
         cache = mock(RevocationCache.class);
         when(cache.getCrl(any())).thenReturn(Optional.empty());
@@ -70,6 +72,7 @@ class CrlClientTest {
     }
 
     @Test
+    @SneakyThrows
     void testCheckUrlBloqueadaRetornaCrlUnavailable() {
         doThrow(new DownloadPolicyException("URL bloqueada: " + CRL_URL))
                 .when(downloadPolicy).validateUrl(CRL_URL);
@@ -77,7 +80,7 @@ class CrlClientTest {
         RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
 
         assertInstanceOf(RevocationStatus.CrlUnavailable.class, status);
-        verifyNoInteractions(mockHttpClient);
+        verify(mockHttpClient, never()).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
@@ -103,7 +106,7 @@ class CrlClientTest {
 
         client.check(leafCert, rootCert, CRL_URL);
 
-        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     // --- Helpers: HTTP mock ---
@@ -115,7 +118,7 @@ class CrlClientTest {
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.body()).thenReturn(body);
 
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(mockResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(CompletableFuture.completedFuture(mockResponse));
     }
 }

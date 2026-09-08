@@ -572,8 +572,9 @@ public class TrustStoreConfig {
         private long maxAiaResponseBytes = 10_485_760L;
 
         /**
-         * Se true, resolve o hostname DNS e bloqueia se o endereço resolvido for privado.
-         * Proteção adicional contra SSRF via DNS; note que não elimina DNS rebinding.
+         * Se true, bloqueia falha DNS e qualquer endereço resolvido não público.
+         * Desabilitar remove a proteção para hostnames, mas não para IPs literais.
+         * Não elimina DNS rebinding; a rede de execução deve restringir egress privado.
          */
         private boolean blockPrivateHostnames = true;
 

@@ -239,9 +239,11 @@ O `DownloadPolicy` protege contra SSRF (Server-Side Request Forgery) e exaustão
 - Apenas esquemas `http` e `https` são permitidos
 - Endereços localhost e reservados são bloqueados (127.x.x.x, ::1, etc.)
 - IPs privados literais são bloqueados (10.x.x.x, 172.16–31.x.x, 192.168.x.x)
-- O tamanho da resposta é verificado antes de carregar o conteúdo em memória
+- O corpo é acumulado de forma compacta, com limite aplicado durante o recebimento e cancelamento ao excedê-lo, inclusive em respostas chunked e erros HTTP
+- Redirects HTTP são rejeitados, sem acessar o destino de `Location`. Endpoints AIA, OCSP e CRL devem responder diretamente; clientes `HttpClient` injetados devem usar `Redirect.NEVER`
+- O timeout de cada tentativa abrange toda a troca HTTP, incluindo o corpo, mesmo quando o servidor continua enviando bytes
 
-**`block-private-hostnames`:** quando `true` (padrão), o hostname é resolvido via DNS antes do download — a conexão é bloqueada se o IP resultante for privado. Desabilite em ambientes de desenvolvimento onde os servidores OCSP/CRL estão em rede interna.
+**`block-private-hostnames`:** quando `true` (padrão), o hostname é resolvido via DNS antes do download; falhas de resolução ou qualquer endereço não público bloqueiam a conexão, incluindo ULA IPv6 e CGNAT. Desabilitar remove essa proteção para hostnames, mas não para IPs literais. A resolução da política depende do resolvedor da JVM e não está incluída no timeout HTTP. Como o IP validado não é fixado à conexão, DNS rebinding permanece um risco residual: restrinja também o egress na rede de execução.
 
 **`allowed-domains`:** lista de sufixos de domínio. Quando vazia (padrão), qualquer domínio público é aceito. A correspondência é por sufixo do hostname: `icpbrasil.gov.br` cobre `ocsp.icpbrasil.gov.br`, `crl.icpbrasil.gov.br`, etc. Exemplo para restringir apenas a domínios governamentais:
 

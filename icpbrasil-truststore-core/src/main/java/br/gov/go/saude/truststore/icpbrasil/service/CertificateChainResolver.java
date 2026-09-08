@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -11,7 +12,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -39,27 +39,29 @@ import java.util.Set;
 public class CertificateChainResolver {
     private static final int MAX_CHAIN_DEPTH = 10;
 
-    private final HttpClient httpClient;
+    private final CertificateHttpTransport transport;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.ChainConfig chainConfig;
     private final DownloadPolicy downloadPolicy;
 
+    /** Cria um resolvedor com transporte sem redirects e limites durante o download. */
     public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig trustStoreConfig,
                                     DownloadPolicy downloadPolicy) {
-        this.retryPolicy = retryPolicy;
-        this.chainConfig = trustStoreConfig.getChain();
-        this.downloadPolicy = downloadPolicy;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()))
-                .build();
+        this(retryPolicy, trustStoreConfig.getChain(), HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(trustStoreConfig.getChain().getDownloadTimeoutSeconds()))
+                .build(), downloadPolicy);
     }
 
+    /**
+     * Usa um cliente pertencente ao chamador, sem alterar a política de download.
+     * @throws IllegalArgumentException se o cliente não usar {@link HttpClient.Redirect#NEVER}
+     */
     public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
                                     HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.retryPolicy = retryPolicy;
         this.chainConfig = chainConfig;
-        this.httpClient = httpClient;
+        this.transport = new CertificateHttpTransport(httpClient, downloadPolicy);
         this.downloadPolicy = downloadPolicy;
     }
 
@@ -192,11 +194,7 @@ public class CertificateChainResolver {
                 .GET()
                 .build();
 
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IOException("HTTP " + response.statusCode() + " para " + url);
-        }
-        return response.body();
+        return transport.send(request, downloadPolicy.getMaxAiaResponseBytes());
     }
 
     /**

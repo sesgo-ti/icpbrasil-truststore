@@ -28,6 +28,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,6 +68,7 @@ class CertificateChainResolverTest {
                 leafKeyPair, intermediateKeyPair, intermediateCert, INTERMEDIATE_AIA_URL);
 
         mockHttpClient = mock(HttpClient.class);
+        when(mockHttpClient.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
 
         TrustStoreConfig.ChainConfig chainConfig = new TrustStoreConfig.ChainConfig();
         chainConfig.setDownloadTimeoutSeconds(10);
@@ -139,8 +141,8 @@ class CertificateChainResolverTest {
     @Test
     @SneakyThrows
     void testResolveChainDownloadFalhaLancaExcecao() {
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenThrow(new IOException("Conexão recusada"));
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(CompletableFuture.failedFuture(new IOException("Conexão recusada")));
 
         IncompleteChainException ex = assertThrows(IncompleteChainException.class,
                 () -> resolver.resolveChain(leafCert));
@@ -186,7 +188,7 @@ class CertificateChainResolverTest {
 
         resolver.resolveChain(leafCert);
 
-        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
@@ -198,7 +200,7 @@ class CertificateChainResolverTest {
         List<X509Certificate> chain = resolver.resolveChain(leafCert);
 
         assertEquals(3, chain.size());
-        verify(mockHttpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, times(2)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
 
@@ -214,7 +216,7 @@ class CertificateChainResolverTest {
 
         assertEquals(1, ex.getPartialChain().size());
         assertEquals(leafCert, ex.getPartialChain().getFirst());
-        verify(mockHttpClient, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, never()).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
@@ -243,9 +245,7 @@ class CertificateChainResolverTest {
         assertThrows(IncompleteChainException.class,
                 () -> resolver.resolveChain(leafCert));
 
-        // Deve ter feito apenas 1 request HTTP — a validação de tamanho é após o retry,
-        // portanto não há retentativa
-        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     // --- Helpers: HTTP mock ---
@@ -257,10 +257,10 @@ class CertificateChainResolverTest {
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.body()).thenReturn(body);
 
-        when(mockHttpClient.send(
+        when(mockHttpClient.sendAsync(
                 argThat(req -> req != null && req.uri().toString().equals(url)),
                 any(HttpResponse.BodyHandler.class)))
-                .thenReturn(mockResponse);
+                .thenReturn(CompletableFuture.completedFuture(mockResponse));
     }
 
     // --- Helpers: geração de certificados ---

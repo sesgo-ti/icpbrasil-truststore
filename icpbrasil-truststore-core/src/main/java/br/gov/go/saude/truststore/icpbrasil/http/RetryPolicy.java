@@ -54,6 +54,7 @@ public class RetryPolicy {
     /**
      * Executa uma operação com retry usando parâmetros explícitos.
      * Propaga a exceção original caso todas as tentativas falhem.
+     * Interrupções e bloqueios de {@link DownloadPolicyException} não são repetidos.
      *
      * @param operation      descrição da operação (para logging)
      * @param maxRetries     número máximo de retries após a primeira tentativa (0 = sem retry)
@@ -73,6 +74,8 @@ public class RetryPolicy {
                 return task.call();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                throw e;
+            } catch (DownloadPolicyException e) {
                 throw e;
             } catch (Exception e) {
                 lastException = e;

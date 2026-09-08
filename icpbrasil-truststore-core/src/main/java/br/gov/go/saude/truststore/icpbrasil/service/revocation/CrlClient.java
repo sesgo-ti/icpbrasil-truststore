@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -8,11 +9,9 @@ import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
@@ -29,27 +28,28 @@ public class CrlClient {
     private final RevocationCache cache;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
-    private final HttpClient httpClient;
+    private final CertificateHttpTransport transport;
     private final DownloadPolicy downloadPolicy;
 
+    /** Cria um cliente CRL com transporte sem redirects e limites durante o download. */
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy,
                      TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        this.cache = cache;
-        this.retryPolicy = retryPolicy;
-        this.config = trustStoreConfig.getRevocation();
-        this.downloadPolicy = downloadPolicy;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
-                .build();
+        this(cache, retryPolicy, trustStoreConfig.getRevocation(), HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(trustStoreConfig.getRevocation().getCrlTimeoutSeconds()))
+                .build(), downloadPolicy);
     }
 
+    /**
+     * Usa um cliente pertencente ao chamador, sem alterar a política de download.
+     * @throws IllegalArgumentException se o cliente não usar {@link HttpClient.Redirect#NEVER}
+     */
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
                      HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
-        this.httpClient = httpClient;
+        this.transport = new CertificateHttpTransport(httpClient, downloadPolicy);
         this.downloadPolicy = downloadPolicy;
     }
 
@@ -109,11 +109,7 @@ public class CrlClient {
                 .timeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
                 .GET()
                 .build();
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IOException("CRL HTTP status: " + response.statusCode());
-        }
-        return response.body();
+        return transport.send(request, downloadPolicy.getMaxCrlResponseBytes());
     }
 
     /**
