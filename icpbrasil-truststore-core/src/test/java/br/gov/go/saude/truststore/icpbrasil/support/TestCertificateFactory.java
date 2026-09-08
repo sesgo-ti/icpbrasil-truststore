@@ -58,10 +58,17 @@ public final class TestCertificateFactory {
     public static X509v3CertificateBuilder createBuilder(X500Name issuer, X500Name subject,
                                                           long serial, KeyPair subjectKeyPair) {
         Instant now = Instant.now();
+        return createBuilder(issuer, subject, serial, subjectKeyPair,
+                now.minus(1, ChronoUnit.DAYS), now.plus(365, ChronoUnit.DAYS));
+    }
+
+    /** Permite fixar a validade para testar evidências de revogação com relógio controlado. */
+    public static X509v3CertificateBuilder createBuilder(X500Name issuer, X500Name subject,
+                                                          long serial, KeyPair subjectKeyPair,
+                                                          Instant notBefore, Instant notAfter) {
         return new JcaX509v3CertificateBuilder(
                 issuer, BigInteger.valueOf(serial),
-                Date.from(now.minus(1, ChronoUnit.DAYS)),
-                Date.from(now.plus(365, ChronoUnit.DAYS)),
+                Date.from(notBefore), Date.from(notAfter),
                 subject, subjectKeyPair.getPublic());
     }
 

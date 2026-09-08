@@ -418,7 +418,7 @@ class CertificateHttpTransportTest {
         CountDownLatch disconnected = new CountDownLatch(1);
         serveOversized(500, disconnected, hits);
         RetryPolicy retry = new RetryPolicy(config);
-        RevocationCache cache = new RevocationCache(config);
+        RevocationCache cache = spy(new RevocationCache(config));
         X509Certificate leaf = leafWithAia();
         assertTimeoutPreemptively(Duration.ofSeconds(3), () -> {
             switch (artifact) {
@@ -430,8 +430,7 @@ class CertificateHttpTransportTest {
                 case "OCSP" -> {
                     OcspClient client = new OcspClient(cache, retry, config.getRevocation(), httpClient, policy);
                     assertInstanceOf(RevocationStatus.OcspUnavailable.class, client.check(leaf, issuer, url));
-                    assertTrue(cache.getOcsp(leaf.getSerialNumber().toString(16) + "|"
-                            + leaf.getIssuerX500Principal().getName()).isEmpty());
+                    verify(cache, never()).putOcsp(any(), any());
                 }
                 case "CRL" -> {
                     CrlClient client = new CrlClient(cache, retry, config.getRevocation(), httpClient, policy);
@@ -487,7 +486,7 @@ class CertificateHttpTransportTest {
     @SneakyThrows
     private X509Certificate leafWithAia() {
         X509v3CertificateBuilder builder = createBuilder(
-                new X500Name(issuer.getSubjectX500Principal().getName()),
+                new JcaX509CertificateHolder(issuer).getSubject(),
                 new X500Name("CN=Local HTTP Leaf"), 42, leafKey);
         addSki(builder, leafKey);
         addAki(builder, issuerKey);

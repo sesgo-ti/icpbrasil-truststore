@@ -188,15 +188,33 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 
 | Status | Significado |
 |---|---|
-| `Good` | Certificado não revogado (inclui bytes da resposta para LTV) |
+| `Good` | Evidência aceita de não revogação no presente (inclui bytes; não comprova validade histórica/LTV) |
 | `Revoked` | Certificado revogado |
 | `NoDistributionPoints` | Certificado não possui extensões OCSP nem CRL |
 | `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
 | `CrlUnavailable` | CRL inacessível após todas as tentativas |
 | `NoConnectivity` | Verificação interrompida (thread interrupted) |
-| `Malformed` | Resposta OCSP ou CRL corrompida ou com status inesperado |
+| `Malformed` | Evidência inválida; em OCSP inclui identidade, assinatura, autorização ou datas rejeitadas |
 
 Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
+
+#### Contrato OCSP
+
+O `OcspClient.check` consulta o **presente**, não o instante de uma assinatura histórica.
+O chamador deve estabelecer a confiança no emissor; `Good` não substitui validação
+de cadeia PKIX, validade do certificado alvo ou validação LTV. Os bytes retornados
+podem ser arquivados, mas exigem validação histórica separada para esse uso.
+
+- Exige serial e hashes do nome/chave do emissor no `CertID`, calculados com o algoritmo indicado na resposta via Bouncy Castle. São permitidos SHA-1 (identificação, não assinatura), SHA-224, SHA-256, SHA-384 e SHA-512. A assinatura do certificado alvo também deve conferir com o emissor informado.
+- Respostas múltiplas são aceitas somente com um resultado correspondente ao alvo. Ausência ou duplicação desse resultado, inclusive com algoritmos distintos, é inconclusiva (`Malformed`).
+- `thisUpdate` e `producedAt` não podem estar no futuro além de 5 minutos. `producedAt` deve estar entre `thisUpdate` e `nextUpdate` (quando presente), com a mesma tolerância. `nextUpdate` não pode preceder `thisUpdate`; a evidência expira em `nextUpdate` mais 5 minutos.
+- Sem `nextUpdate`, a idade máxima de `thisUpdate` é **24 horas mais 5 minutos de tolerância**, independente de `ocsp-cache-ttl-seconds`. Esse TTL limita armazenamento, nunca prolonga a validade assinada.
+- O ResponderID (nome ou hash da chave) deve corresponder ao assinante. São aceitos o emissor ou um delegado diretamente emitido por ele, não CA, com EKU `id-kp-OCSPSigning` e `digitalSignature` se KeyUsage estiver presente. O delegado deve estar válido no presente e em `producedAt`, sem tolerância nas datas do certificado.
+- Extensões críticas de resposta/SingleResp são rejeitadas. No delegado, apenas basicConstraints, EKU e KeyUsage são processadas quando críticas; demais extensões críticas são rejeitadas conservadoramente. Não são consultadas a revogação do delegado ou cadeias alternativas de autorização.
+- Cada hit no cache revalida identidade, assinatura, autorização e datas. A chave contém SHA-256 do DER do alvo e do emissor, compartilhada entre URLs. Um hit inválido retorna `Malformed`, sem nova requisição até a remoção por TTL/eviction; a facade preserva seu fallback CRL.
+- Não há nonce: replay permanece possível dentro da janela temporal aceita. O construtor com `Clock` permite controlar o presente em testes; os construtores existentes usam `Clock.systemUTC()`.
+
+Essas garantias são do caminho OCSP; não ampliam as garantias do fallback CRL.
 
 ### Montagem de cadeia (AIA CA Issuers)
 

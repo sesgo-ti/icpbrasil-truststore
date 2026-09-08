@@ -32,6 +32,8 @@ public class RevocationService {
 
     /**
      * Verifica se um certificado foi revogado, tentando OCSP primeiro e CRL como fallback.
+     * A consulta OCSP é do presente, conforme {@link OcspClient}; não estabelece
+     * confiança na cadeia nem valida uma assinatura histórica/LTV.
      *
      * @param cert   certificado a verificar
      * @param issuer certificado do emissor (necessário para construir a requisição OCSP)
