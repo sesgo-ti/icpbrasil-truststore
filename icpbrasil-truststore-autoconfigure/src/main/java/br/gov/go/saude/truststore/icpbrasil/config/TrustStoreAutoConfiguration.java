@@ -12,6 +12,9 @@ import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.CacheTrustMaterialSource;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
@@ -239,6 +242,24 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnMissingBean
     public RevocationService revocationService(OcspClient ocspClient, CrlClient crlClient) {
         return new RevocationService(ocspClient, crlClient);
+    }
+
+    /**
+     * Âncoras e intermediárias PKIX derivadas do acervo em memória. Um bean próprio de
+     * {@link TrustMaterialSource} substitui a derivação padrão.
+     */
+    @Bean
+    @ConditionalOnMissingBean(TrustMaterialSource.class)
+    public CacheTrustMaterialSource trustMaterialSource(Cache trustStoreCache) {
+        return new CacheTrustMaterialSource(trustStoreCache);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public PkixCertificateValidator pkixCertificateValidator(TrustMaterialSource trustMaterialSource,
+                                                             CertificateChainResolver certificateChainResolver,
+                                                             RevocationService revocationService) {
+        return new PkixCertificateValidator(trustMaterialSource, certificateChainResolver, revocationService);
     }
 
     @Bean

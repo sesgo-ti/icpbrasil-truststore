@@ -6,6 +6,9 @@ import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepos
 import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.CacheTrustMaterialSource;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
 import org.junit.jupiter.api.Test;
@@ -97,6 +100,8 @@ class TrustStoreAutoConfigurationTest {
             assertInstanceOf(FilesystemTrustStoreRepository.class, context.getBean(TrustStoreRepository.class));
             assertEquals(1, context.getBeansOfType(CertificateHttpTransport.class).size(),
                     "AIA, OCSP e CRL compartilham um único transporte HTTP");
+            assertNotNull(context.getBean(PkixCertificateValidator.class));
+            assertInstanceOf(CacheTrustMaterialSource.class, context.getBean(TrustMaterialSource.class));
         });
     }
 
