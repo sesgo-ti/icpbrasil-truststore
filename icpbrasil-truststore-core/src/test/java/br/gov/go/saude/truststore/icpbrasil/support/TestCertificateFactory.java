@@ -179,7 +179,8 @@ public final class TestCertificateFactory {
         return new GeneralName(GeneralName.otherName, new DERSequence(vector));
     }
 
-    private static DistributionPoint crlDistributionPoint(String url) {
+    /** DP com fullName de uma única URI, sem reasons nem cRLIssuer. */
+    public static DistributionPoint crlDistributionPoint(String url) {
         GeneralName gn = new GeneralName(GeneralName.uniformResourceIdentifier, url);
         DistributionPointName dpn = new DistributionPointName(new GeneralNames(gn));
         return new DistributionPoint(dpn, null, null);

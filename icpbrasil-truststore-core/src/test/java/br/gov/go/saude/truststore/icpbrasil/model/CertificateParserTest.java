@@ -14,6 +14,7 @@ import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -162,6 +163,31 @@ class CertificateParserTest {
         assertEquals(2, crlUrls.size());
         assertTrue(crlUrls.get(0).contains("http://ccd.acsoluti.com.br/lcr/ac-soluti-v5-g2.crl"));
         assertTrue(crlUrls.get(1).contains("http://ccd2.acsoluti.com.br/lcr/ac-soluti-v5-g2.crl"));
+    }
+
+    @Test
+    void testGetCrlDistributionPointDaUrlDoSegundoDp() {
+        Optional<DistributionPoint> dp = CertificateParser.getCrlDistributionPoint(
+                certificate, "http://crl2.teste.example/ac-teste-2.crl");
+
+        assertTrue(dp.isPresent());
+        assertEquals(CertificateParser.getCrlDistributionPoints(certificate)[1], dp.get());
+    }
+
+    @Test
+    void testGetCrlDistributionPointUrlAusenteRetornaVazio() {
+        Optional<DistributionPoint> dp = CertificateParser.getCrlDistributionPoint(
+                certificate, "http://crl3.teste.example/ac-teste-3.crl");
+
+        assertTrue(dp.isEmpty());
+    }
+
+    @Test
+    void testGetCrlDistributionPointCertificadoSemExtensaoRetornaVazio() {
+        Optional<DistributionPoint> dp = CertificateParser.getCrlDistributionPoint(
+                testCa, "http://crl.teste.example/ac-teste-1.crl");
+
+        assertTrue(dp.isEmpty());
     }
 
     @Test

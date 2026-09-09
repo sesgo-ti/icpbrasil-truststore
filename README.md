@@ -192,7 +192,7 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 | `Revoked` | Certificado revogado |
 | `NoDistributionPoints` | Certificado não possui extensões OCSP nem CRL |
 | `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
-| `CrlUnavailable` | CRL inacessível após todas as tentativas |
+| `CrlUnavailable` | CRL inacessível ou sem evidência utilizável após todas as tentativas |
 | `NoConnectivity` | Verificação interrompida (thread interrupted) |
 | `Malformed` | Resposta OCSP ou CRL corrompida, com status inesperado ou evidência inválida, vencida ou não correspondente ao certificado consultado |
 

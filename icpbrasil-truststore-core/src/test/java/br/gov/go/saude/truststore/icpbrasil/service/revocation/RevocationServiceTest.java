@@ -6,6 +6,15 @@ import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.AccessDescription;
+import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.CRLDistPoint;
+import org.bouncycastle.asn1.x509.DistributionPoint;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,15 +30,22 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Slf4j
 class RevocationServiceTest {
 
+    private static final String OCSP_URL = "http://ocsp.teste.example/status";
+    private static final String CRL_URL = "http://crl.teste.example/ac-teste.crl";
+
     private OcspClient ocspClient;
     private CrlClient crlClient;
     private RevocationService revocationService;
 
+    private KeyPair caKeyPair;
+    private KeyPair leafKeyPair;
     private X509Certificate leafCert;
     private X509Certificate issuerCert;
 
@@ -43,8 +59,8 @@ class RevocationServiceTest {
         // O par precisa de CRL DPs e AIA sem OCSP: o fluxo testado consulta essas extensões
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
         kpg.initialize(2048);
-        var caKeyPair = kpg.generateKeyPair();
-        var leafKeyPair = kpg.generateKeyPair();
+        caKeyPair = kpg.generateKeyPair();
+        leafKeyPair = kpg.generateKeyPair();
         issuerCert = TestCertificateFactory.generateIcpBrasilTestCa(caKeyPair);
         leafCert = TestCertificateFactory.generateIcpBrasilPersonCert(leafKeyPair, caKeyPair, issuerCert);
     }
@@ -70,6 +86,49 @@ class RevocationServiceTest {
         assertInstanceOf(RevocationStatus.Good.class, status);
         RevocationStatus.Good good = (RevocationStatus.Good) status;
         assertEquals("CRL", good.source());
+    }
+
+    @Test
+    void testCheck_OcspMalformedECrlGood_DeveRetornarGood() {
+        X509Certificate cert = generateCertComOcspECrl();
+        when(ocspClient.check(cert, issuerCert, OCSP_URL)).thenReturn(new RevocationStatus.Malformed("OCSP"));
+        when(crlClient.check(cert, issuerCert, CRL_URL)).thenReturn(new RevocationStatus.Good("CRL", null));
+
+        RevocationStatus status = revocationService.check(cert, issuerCert);
+
+        RevocationStatus.Good good = assertInstanceOf(RevocationStatus.Good.class, status);
+        assertEquals("CRL", good.source());
+    }
+
+    @Test
+    void testCheck_TudoInconclusivoComNoConnectivity_DeveRetornarNoConnectivity() {
+        X509Certificate cert = generateCertComOcspECrl();
+        when(ocspClient.check(cert, issuerCert, OCSP_URL)).thenReturn(new RevocationStatus.NoConnectivity());
+        when(crlClient.check(cert, issuerCert, CRL_URL)).thenReturn(new RevocationStatus.Malformed("CRL"));
+
+        RevocationStatus status = revocationService.check(cert, issuerCert);
+
+        assertInstanceOf(RevocationStatus.NoConnectivity.class, status);
+    }
+
+    @Test
+    void testCheck_ThreadInterrompida_DeveEncerrarTentativas() {
+        List<String> crlUrls = CertificateParser.getCrlUrls(leafCert);
+        assertEquals(2, crlUrls.size());
+        when(crlClient.check(leafCert, issuerCert, crlUrls.get(0))).thenAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            return new RevocationStatus.NoConnectivity();
+        });
+
+        try {
+            RevocationStatus status = revocationService.check(leafCert, issuerCert);
+
+            assertInstanceOf(RevocationStatus.NoConnectivity.class, status);
+            verify(crlClient, never()).check(leafCert, issuerCert, crlUrls.get(1));
+        } finally {
+            // O serviço deve preservar a flag; limpá-la aqui evita contaminar os testes seguintes
+            assertTrue(Thread.interrupted());
+        }
     }
 
     @Test
@@ -121,5 +180,21 @@ class RevocationServiceTest {
         assertEquals(3, config.getRetryIntervalSeconds());
         assertEquals(3600, config.getOcspCacheTtlSeconds());
         assertEquals(3600, config.getCrlCacheTtlSeconds());
+    }
+
+    /** Folha emitida pela AC de teste com um responder OCSP na AIA e um único CRL DP. */
+    @SneakyThrows
+    private X509Certificate generateCertComOcspECrl() {
+        X500Name issuerName = X500Name.getInstance(issuerCert.getSubjectX500Principal().getEncoded());
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(
+                issuerName, new X500Name("CN=Test Leaf, O=Test, C=BR"), 12, leafKeyPair);
+        builder.addExtension(Extension.basicConstraints, false, new BasicConstraints(false));
+        TestCertificateFactory.addSki(builder, leafKeyPair);
+        TestCertificateFactory.addAki(builder, caKeyPair);
+        builder.addExtension(Extension.authorityInfoAccess, false, new AuthorityInformationAccess(
+                AccessDescription.id_ad_ocsp, new GeneralName(GeneralName.uniformResourceIdentifier, OCSP_URL)));
+        builder.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(
+                new DistributionPoint[]{TestCertificateFactory.crlDistributionPoint(CRL_URL)}));
+        return TestCertificateFactory.sign(builder, caKeyPair);
     }
 }

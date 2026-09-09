@@ -67,12 +67,8 @@ public class OcspClient {
     private static final String OCSP_RESPONSE_CONTENT_TYPE = "application/ocsp-response";
     private static final String CACHE_KEY_DIGEST = "SHA-256";
 
-    /**
-     * Tolerância para diferença de relógio entre este host e o responder. Mesmo valor do padrão
-     * do OpenJDK ({@code com.sun.security.ocsp.clockSkew}), para que uma resposta aceita pelo
-     * validador da JVM não seja rejeitada aqui apenas por desvio de relógio.
-     */
-    private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(15);
+    /** Tolerância para diferença de relógio entre este host e o responder; ver {@link ClockSkew}. */
+    private static final Duration MAX_CLOCK_SKEW = ClockSkew.MAX_CLOCK_SKEW;
 
     /**
      * Algoritmos aceitos no hashAlgorithm do CertID. Eles só servem para reconhecer o emissor
