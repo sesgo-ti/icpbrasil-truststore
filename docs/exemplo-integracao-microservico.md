@@ -19,7 +19,7 @@ java -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar \
 
 O endpoint `/certificate` está sempre ativo — servir REST é a função deste módulo.
 
-Na primeira subida, a aplicação baixa o acervo ICP-Brasil do ITI e popula o cache antes de aceitar requisições. Se o download falhar, o processo encerra com erro (fail-fast). Nas subidas seguintes, se o `base-dir` contém um acervo válido, o startup é imediato.
+Na primeira subida, a aplicação baixa o acervo ICP-Brasil do ITI e popula o cache antes do `ApplicationReadyEvent`; o servidor HTTP pode aceitar conexões antes disso, mas a readiness (`readinessState` + `trustStoreCache`) fica `DOWN` e `/certificate` responde 503 até o cache carregar. Se o download falhar, o processo encerra com erro (fail-fast). Nas subidas seguintes, se o `base-dir` contém um acervo válido, o startup é imediato.
 
 ## 3. Endpoints
 
@@ -57,7 +57,7 @@ curl "http://localhost:8080/certificate?ski=<SKI>&type=der" --output certificado
 
 ### `GET /actuator/health`
 
-Saúde da aplicação, inclui o estado do cache (`VALID`, `CRITICAL`, `EXPIRED`). Detalhes em [manual-monitoramento.md](manual-monitoramento.md).
+Saúde da aplicação, inclui o estado do cache (`VALID`, `CRITICAL`, `EXPIRED`, `UNAVAILABLE`). Detalhes em [manual-monitoramento.md](manual-monitoramento.md).
 
 ```bash
 curl http://localhost:8080/actuator/health

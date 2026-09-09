@@ -1,7 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
-import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -19,9 +18,7 @@ class HealthConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
-                                                                  TrustStoreConfig config,
-                                                                  Cache trustStoreCache) {
-        return new TrustStoreCacheHealthIndicator(repository, config, trustStoreCache);
+    TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreConfig config, Cache trustStoreCache) {
+        return new TrustStoreCacheHealthIndicator(config, trustStoreCache);
     }
 }

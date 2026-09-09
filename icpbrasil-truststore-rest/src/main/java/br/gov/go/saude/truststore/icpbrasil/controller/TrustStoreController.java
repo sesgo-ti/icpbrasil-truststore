@@ -43,25 +43,27 @@ public class TrustStoreController {
         try {
             log.info("Buscando certificado para SKI: {}", ski);
 
-            // Cache inválido = acervo não confiável no momento: 503 (indisponível),
-            // distinto de 404 (SKI não existe no acervo vigente)
-            if (!cache.isCacheValid()) {
+            // Uma única leitura do snapshot decide 503 e 404: acervo indisponível (não confiável
+            // no momento) é distinto de SKI ausente no acervo vigente, e duas leituras poderiam
+            // observar gerações diferentes ou a expiração ocorrida entre elas.
+            Cache.Lookup lookup = cache.lookupCertificate(ski);
+            if (!lookup.available()) {
                 log.warn("Cache do trust store inválido/expirado — consulta indisponível");
-                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                return resposta(HttpStatus.SERVICE_UNAVAILABLE)
                     .body("Acervo ICP-Brasil temporariamente indisponível");
             }
 
-            X509Certificate cert = cache.getCertificateBySki(ski);
+            X509Certificate cert = lookup.certificate();
 
             if (cert == null) {
                 log.warn("Certificado não encontrado para SKI: {}", ski);
-                return ResponseEntity.notFound().build();
+                return resposta(HttpStatus.NOT_FOUND).build();
             }
 
             // Validar tipo de formato
             if (!TYPE_PEM.equalsIgnoreCase(type) && !TYPE_DER.equalsIgnoreCase(type)) {
                 log.warn("Tipo de formato inválido: {}. Tipos válidos: pem, der", type);
-                return ResponseEntity.badRequest()
+                return resposta(HttpStatus.BAD_REQUEST)
                     .body("Tipo de formato inválido. Use 'pem' ou 'der'");
             }
 
@@ -73,8 +75,16 @@ public class TrustStoreController {
 
         } catch (Exception e) {
             log.error("Erro ao obter certificado: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            return resposta(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    /**
+     * Toda resposta sai com {@code Cache-Control: no-store}: 503 e 404 descrevem o acervo neste
+     * instante, e um certificado servido hoje pode não constar da próxima geração.
+     */
+    private static ResponseEntity.BodyBuilder resposta(HttpStatus status) {
+        return ResponseEntity.status(status).cacheControl(CacheControl.noStore());
     }
 
     /**
@@ -99,10 +109,9 @@ public class TrustStoreController {
             
             pemBuilder.append("-----END CERTIFICATE-----");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.TEXT_PLAIN);
-            
-            return new ResponseEntity<>(pemBuilder.toString(), headers, HttpStatus.OK);
+            return resposta(HttpStatus.OK)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(pemBuilder.toString());
 
         } catch (Exception e) {
             log.error("Erro ao converter certificado para PEM: {}", e.getMessage(), e);
@@ -131,7 +140,7 @@ public class TrustStoreController {
                             .build()
             );
 
-            return new ResponseEntity<>(derBytes, headers, HttpStatus.OK);
+            return resposta(HttpStatus.OK).headers(headers).body(derBytes);
 
         } catch (Exception e) {
             log.error("Erro ao converter certificado para DER: {}", e.getMessage(), e);

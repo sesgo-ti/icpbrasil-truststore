@@ -46,6 +46,16 @@ public class Cache {
     public record State(String hash, Instant confirmedAt, Instant expiresAt, boolean valid) {
     }
 
+    /**
+     * Resposta de {@link #lookupCertificate} obtida de um único snapshot.
+     *
+     * @param available   {@code true} se havia acervo vigente no instante da consulta
+     * @param certificate certificado com o SKI consultado; {@code null} se ele não está no
+     *                    acervo vigente ou se não há acervo vigente ({@code available == false})
+     */
+    public record Lookup(boolean available, X509Certificate certificate) {
+    }
+
     private record Snapshot(Map<String, X509Certificate> index, String hash,
                             Instant confirmedAt, Instant expiresAt) {
     }
@@ -147,6 +157,19 @@ public class Cache {
     public X509Certificate getCertificateBySki(String ski) {
         Snapshot atual = vigente();
         return atual == null ? null : atual.index().get(ski);
+    }
+
+    /**
+     * Consulta um SKI informando, na mesma leitura, se havia acervo vigente. Permite distinguir
+     * "acervo indisponível" de "SKI inexistente" sem uma segunda leitura, que poderia observar
+     * outro snapshot ou a expiração ocorrida entre as duas chamadas.
+     */
+    public Lookup lookupCertificate(String ski) {
+        Snapshot atual = vigente();
+        if (atual == null) {
+            return new Lookup(false, null);
+        }
+        return new Lookup(true, atual.index().get(ski));
     }
 
     /**

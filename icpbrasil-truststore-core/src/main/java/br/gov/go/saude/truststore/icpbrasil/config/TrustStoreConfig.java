@@ -595,7 +595,7 @@ public class TrustStoreConfig {
     /**
      * Configurações do bootstrap síncrono.
      * Controla a carga inicial do cache durante o startup do Spring Boot,
-     * antes de o contexto ser declarado "Started".
+     * executada antes do {@code ApplicationReadyEvent}.
      */
     @Data
     public static class BootstrapConfig {

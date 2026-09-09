@@ -28,7 +28,7 @@ icpbrasil-truststore:
     base-dir: .data/icpbrasil-truststore
 ```
 
-Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. Se não, baixa do ITI. O cache em memória é populado **antes** de o Spring declarar o contexto "Started", eliminando qualquer janela em que requisições cheguem com cache vazio.
+Na inicialização, a lib verifica se o acervo de ACs já existe no `base-dir`. Se não, baixa do ITI. O cache em memória é populado por um `ApplicationRunner` antes do `ApplicationReadyEvent`; como o servidor HTTP pode aceitar conexões antes disso, inclua `trustStoreCache` no grupo de readiness (`management.endpoint.health.group.readiness.include=readinessState,trustStoreCache`) para que a instância fique `DOWN` até o cache carregar.
 
 ## 3. Consultar certificados
 

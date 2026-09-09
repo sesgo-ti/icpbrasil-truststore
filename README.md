@@ -31,7 +31,7 @@ Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets
 - Verificação de revogação de certificados via OCSP e CRL com cache e fallback automático
 - Proteção contra SSRF e limites de tamanho configuráveis para downloads iniciados por extensões de certificados (AIA, OCSP, CRL)
 - `SSLContext` e `X509TrustManager` com trust exclusivo nas CAs embutidas
-- Health indicator (`/actuator/health`) com estados VALID / CRITICAL / EXPIRED
+- Health indicator (`/actuator/health`) com estados VALID / CRITICAL / EXPIRED / UNAVAILABLE
 
 ---
 
@@ -56,7 +56,7 @@ Adicione a dependência:
 
 A biblioteca se auto-configura via mecanismo de auto-configuração do Spring Boot — nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
-Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs da ICP-Brasil já está disponível localmente. Se não, baixa do repositório oficial do ITI e popula o cache em memória (indexado por SKI) **antes** de o Spring declarar o contexto "Started". Requisições só chegam à aplicação após o cache estar pronto — eliminando a race condition entre startup e scheduler.
+Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs da ICP-Brasil já está disponível localmente. Se não, baixa do repositório oficial do ITI e popula o cache em memória (indexado por SKI). O runner executa antes do `ApplicationReadyEvent`, mas o servidor HTTP pode aceitar conexões antes de o cache estar pronto: o health indicator `trustStoreCache` fica `DOWN` até a carga concluir — inclua-o no grupo de readiness (`management.endpoint.health.group.readiness.include=readinessState,trustStoreCache`) para que a instância só receba tráfego com acervo vigente.
 
 Se a carga inicial falhar (rede indisponível, hash inválido, timeout), o startup é abortado por padrão (`bootstrap.fail-fast=true`). Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap) para ajustar esse comportamento em testes ou cenários de desenvolvimento sem conectividade.
 
@@ -266,7 +266,7 @@ icpbrasil-truststore:
     fail-fast: true         # default — aborta startup se a carga falhar
 ```
 
-A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBootstrap`) de forma **síncrona**, antes de o Spring Boot declarar o contexto "Started". Isso garante que nenhuma requisição seja atendida enquanto o cache estiver vazio — eliminando a race condition em que a aplicação aceitava assinaturas antes de o scheduler completar o primeiro download.
+A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBootstrap`) de forma **síncrona**, antes do `ApplicationReadyEvent`. O servidor HTTP pode aceitar conexões antes disso: quem impede tráfego até o cache carregar é a readiness (`readinessState` + `trustStoreCache`, configurada no serviço standalone), e o endpoint REST responde 503 enquanto não há acervo vigente.
 
 **Comportamento conforme as flags:**
 
@@ -281,7 +281,7 @@ A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBoo
 - Testes que sobem o `ApplicationContext` sem acesso à internet e mockam `IcpBrasilCertificateProvider` ou o `Downloader`.
 - Desenvolvimento local onde o consumidor deseja iterar rapidamente sem esperar o download.
 
-**Relação com o scheduler:** com o bootstrap habilitado, a primeira execução do `TrustStoreScheduler` ocorre apenas após um intervalo completo (`refresh-interval-hours`) — o `initialDelay` do `@Scheduled` foi ajustado para não competir com a carga do bootstrap.
+**Relação com o scheduler:** o `TrustStoreScheduler` usa um executor dedicado (não `@Scheduled`) e sua primeira execução ocorre apenas após um intervalo completo (`refresh-interval-hours`), para não competir com a carga do bootstrap.
 
 ---
 

@@ -229,6 +229,38 @@ class CacheTest {
         assertTrue(state.isEmpty());
     }
 
+    @Test
+    void testLookupCertificate_SemSnapshot_Indisponivel() {
+        Cache.Lookup lookup = cache.lookupCertificate(ski(root));
+
+        assertFalse(lookup.available());
+        assertNull(lookup.certificate());
+    }
+
+    @Test
+    void testLookupCertificate_SnapshotVigente_DistingueSkiAusenteDeIndisponivel() {
+        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+
+        Cache.Lookup existente = cache.lookupCertificate(ski(root));
+        Cache.Lookup ausente = cache.lookupCertificate(ski(otherRoot));
+
+        assertTrue(existente.available());
+        assertEquals(root, existente.certificate());
+        assertTrue(ausente.available());
+        assertNull(ausente.certificate());
+    }
+
+    @Test
+    void testLookupCertificate_SnapshotExpirado_Indisponivel() {
+        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        clock.advance(TTL);
+
+        Cache.Lookup lookup = cache.lookupCertificate(ski(root));
+
+        assertFalse(lookup.available());
+        assertNull(lookup.certificate());
+    }
+
     private static String ski(X509Certificate certificate) {
         return CertificateParser.getSubjectKeyIdentifier(certificate);
     }

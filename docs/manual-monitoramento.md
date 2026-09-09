@@ -13,7 +13,7 @@ curl -s http://localhost:8080/actuator/health | jq '.components.trustStoreCache'
 | `VALID` | UP | Sincronizado com ITI | Nenhuma |
 | `CRITICAL` | UP | Sem atualização além do limiar crítico | Verificar conectividade com repositório ITI |
 | `EXPIRED` | DOWN | Sem atualização além do limiar máximo — cache invalidado | **Ação imediata** — certificados indisponíveis |
-| `UNKNOWN` | UNKNOWN | Erro ao verificar saúde | Investigar logs |
+| `UNAVAILABLE` | DOWN | Nenhum acervo publicado (carga inicial não concluída ou cache invalidado) | Verificar logs do bootstrap e conectividade com o ITI |
 
 Limiares configuráveis via `cache-ttl-critical-hours` (padrão: 72) e `cache-ttl-max-hours` (padrão: 168).
 
