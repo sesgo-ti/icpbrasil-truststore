@@ -29,13 +29,17 @@ import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Instant;
@@ -161,7 +165,7 @@ class CrlClientTest {
 
         RevocationStatus.Good good = assertInstanceOf(RevocationStatus.Good.class, status);
         assertArrayEquals(crl, good.responseDer());
-        verify(cache).putCrl(CRL_URL, crl);
+        assertArrayEquals(crl, cachedCrl().getEncoded());
     }
 
     @Test
@@ -174,7 +178,7 @@ class CrlClientTest {
         RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
 
         assertInstanceOf(RevocationStatus.Revoked.class, status);
-        verify(cache).putCrl(CRL_URL, crl);
+        assertArrayEquals(crl, cachedCrl().getEncoded());
     }
 
     // --- Emissor ---
@@ -469,6 +473,26 @@ class CrlClientTest {
         assertInstanceOf(RevocationStatus.Malformed.class, status);
     }
 
+    /**
+     * A entrada com certificateIssuer precede a do alvo: pela regra de herança da RFC 5280 5.3.3 a
+     * JVM atribui a revogação do alvo ao outro emissor e não a encontraria. A lista inteira deixa
+     * de servir como evidência — nem Good nem Revoked.
+     */
+    @Test
+    @SneakyThrows
+    void testCheckEntradaComCertificateIssuerAntesDoAlvoRetornaMalformed() {
+        Extension certificateIssuer = new Extension(Extension.certificateIssuer, true,
+                new GeneralNames(new GeneralName(OTHER_CA_NAME)).getEncoded());
+        mockHttpResponse(rootSigned(crlBuilder()
+                .addCRLEntry(BigInteger.valueOf(999), yesterday(), new Extensions(certificateIssuer))
+                .addCRLEntry(leafCert.getSerialNumber(), yesterday(), CRLReason.keyCompromise)));
+
+        RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
+
+        assertInstanceOf(RevocationStatus.Malformed.class, status);
+        verify(cache, never()).putCrl(anyString(), any());
+    }
+
     @Test
     @SneakyThrows
     void testCheckEntradaRemoveFromCrlRetornaMalformed() {
@@ -497,7 +521,7 @@ class CrlClientTest {
     @Test
     @SneakyThrows
     void testCheckHitDeCacheValidoRetornaGoodSemHttp() {
-        when(cache.getCrl(CRL_URL)).thenReturn(Optional.of(rootSigned(crlBuilder())));
+        when(cache.getCrl(CRL_URL)).thenReturn(Optional.of(decode(rootSigned(crlBuilder()))));
 
         RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
 
@@ -509,7 +533,7 @@ class CrlClientTest {
     @SneakyThrows
     void testCheckHitDeCacheVencidoRefazDownloadERefleteNovaCrl() {
         byte[] vencida = rootSigned(crlBuilder(rootName, now.minus(2, ChronoUnit.DAYS), now.minus(1, ChronoUnit.HOURS)));
-        when(cache.getCrl(CRL_URL)).thenReturn(Optional.of(vencida));
+        when(cache.getCrl(CRL_URL)).thenReturn(Optional.of(decode(vencida)));
         byte[] atual = rootSigned(crlBuilder()
                 .addCRLEntry(leafCert.getSerialNumber(), yesterday(), CRLReason.keyCompromise));
         mockHttpResponse(atual);
@@ -518,7 +542,21 @@ class CrlClientTest {
 
         assertInstanceOf(RevocationStatus.Revoked.class, status);
         verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
-        verify(cache).putCrl(CRL_URL, atual);
+        assertArrayEquals(atual, cachedCrl().getEncoded());
+    }
+
+    // --- Helpers: cache ---
+
+    /** A CRL que o cliente guardou no cache após um resultado conclusivo. */
+    private X509CRL cachedCrl() {
+        ArgumentCaptor<X509CRL> captor = ArgumentCaptor.forClass(X509CRL.class);
+        verify(cache).putCrl(eq(CRL_URL), captor.capture());
+        return captor.getValue();
+    }
+
+    @SneakyThrows
+    private static X509CRL decode(byte[] crlBytes) {
+        return (X509CRL) CertificateFactory.getInstance("X.509").generateCRL(new ByteArrayInputStream(crlBytes));
     }
 
     // --- Helpers: certificados ---

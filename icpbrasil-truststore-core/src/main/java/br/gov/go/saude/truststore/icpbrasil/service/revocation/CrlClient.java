@@ -9,21 +9,23 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.DistributionPoint;
 import org.bouncycastle.asn1.x509.DistributionPointName;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.IssuingDistributionPoint;
-import org.bouncycastle.cert.X509CRLEntryHolder;
-import org.bouncycastle.cert.X509CRLHolder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 
 import javax.security.auth.x500.X500Principal;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.security.GeneralSecurityException;
+import java.security.cert.CRLReason;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509CRL;
+import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Duration;
@@ -51,18 +53,18 @@ import java.util.Set;
  *       indireta, parcial por motivos ou restrita a outra classe de certificado, e o nome do IDP,
  *       quando presente, inclui a URL consultada ou um nome do DP do certificado; o DP do
  *       certificado não restringe motivos nem delega a emissão (cRLIssuer);</li>
- *   <li>não há extensão crítica não processada na CRL nem na entrada do certificado, e a entrada
- *       não tem certificateIssuer nem reasonCode removeFromCRL.</li>
+ *   <li>não há extensão crítica não processada na CRL nem na entrada do certificado, nenhuma
+ *       entrada tem certificateIssuer e a entrada do certificado não tem reasonCode removeFromCRL.</li>
  * </ul>
  *
  * <p>Qualquer violação resulta em {@code Malformed}: a CRL existe, mas não serve como evidência
- * para este certificado neste instante. CRLs em cache passam pelas mesmas verificações a cada
- * uso; a que deixa de passar é tratada como miss e substituída pelo próximo download válido.</p>
+ * para este certificado neste instante. O cache guarda a CRL já decodificada ({@link X509CRL}),
+ * cuja consulta por serial é indexada e cuja assinatura se verifica sobre os bytes originais sem
+ * recodificação; cada uso repete as verificações acima, e a CRL que deixa de passar é tratada
+ * como miss e substituída pelo próximo download válido.</p>
  */
 @Slf4j
 public class CrlClient {
-
-    private static final String BC_PROVIDER = "BC";
 
     /** Posição do bit cRLSign no array de {@link X509Certificate#getKeyUsage()}. */
     private static final int KEY_USAGE_CRL_SIGN = 6;
@@ -127,9 +129,9 @@ public class CrlClient {
             return new RevocationStatus.Malformed("CRL");
         }
 
-        Optional<byte[]> cached = cache.getCrl(url);
+        Optional<X509CRL> cached = cache.getCrl(url);
         if (cached.isPresent()) {
-            RevocationStatus status = parse(cached.get(), cert, issuer, url, point);
+            RevocationStatus status = evaluate(cached.get(), null, cert, issuer, url, point);
             if (status.isConclusive()) {
                 log.debug("CRL encontrada no cache para {}", url);
                 return status;
@@ -153,9 +155,18 @@ public class CrlClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> download(url));
 
-            RevocationStatus result = parse(crlBytes, cert, issuer, url, point);
+            X509CRL crl = decode(crlBytes);
+            if (crl == null) {
+                log.warn("Conteúdo de {} não é uma CRL X.509 decodificável", url);
+                return new RevocationStatus.Malformed("CRL");
+            }
+            if (hasCertificateIssuerEntries(crl)) {
+                log.warn("CRL de {} tem entrada com certificateIssuer; lista direta ambígua, descartada", url);
+                return new RevocationStatus.Malformed("CRL");
+            }
+            RevocationStatus result = evaluate(crl, crlBytes, cert, issuer, url, point);
             if (result.isConclusive()) {
-                cache.putCrl(url, crlBytes);
+                cache.putCrl(url, crl);
             }
             return result;
         } catch (DownloadPolicyException e) {
@@ -177,16 +188,50 @@ public class CrlClient {
     }
 
     /**
+     * RFC 5280 5.3.3: certificateIssuer atribui a entrada — e as seguintes sem a extensão — a outro
+     * emissor, o que só faz sentido em CRL indireta. Numa lista direta isso torna ambíguo a quem
+     * cada entrada se refere (a JVM, por exemplo, deixa de encontrar o serial sob o emissor da
+     * CRL), então a lista inteira é descartada. A varredura ocorre uma vez, no download; CRLs em
+     * cache já passaram por ela.
+     */
+    private static boolean hasCertificateIssuerEntries(X509CRL crl) {
+        Set<? extends X509CRLEntry> entries = crl.getRevokedCertificates();
+        if (entries == null) {
+            return false;
+        }
+        String certificateIssuerOid = Extension.certificateIssuer.getId();
+        for (X509CRLEntry entry : entries) {
+            if (entry.hasExtensions() && entry.getExtensionValue(certificateIssuerOid) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return a CRL decodificada, ou {@code null} se os bytes não formam uma CRL X.509
+     */
+    private static X509CRL decode(byte[] crlBytes) {
+        try {
+            return (X509CRL) CertificateFactory.getInstance("X.509").generateCRL(new ByteArrayInputStream(crlBytes));
+        } catch (GeneralSecurityException | ClassCastException e) {
+            log.debug("Falha ao decodificar CRL: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Interpreta a CRL como evidência para o certificado: emissor, prazo e escopo são verificados
      * antes de consultar o serial, porque a ausência do serial só significa "não revogado" numa
      * lista completa, vigente e do emissor certo.
+     *
+     * @param encoded bytes recebidos do download, ou {@code null} para uma CRL vinda do cache, cuja
+     *                codificação DER é obtida da própria CRL apenas se ela virar evidência
      */
-    private RevocationStatus parse(byte[] crlBytes, X509Certificate cert, X509Certificate issuer,
-                                   String url, DistributionPoint point) {
+    private RevocationStatus evaluate(X509CRL crl, byte[] encoded, X509Certificate cert, X509Certificate issuer,
+                                      String url, DistributionPoint point) {
         String serialHex = cert.getSerialNumber().toString(16);
         try {
-            X509CRLHolder crl = new X509CRLHolder(crlBytes);
-
             if (!isIssuedBy(crl, cert, issuer)) {
                 log.warn("CRL de {} não foi emitida pelo emissor do certificado serial {}", url, serialHex);
                 return new RevocationStatus.Malformed("CRL");
@@ -203,9 +248,9 @@ public class CrlClient {
                 return new RevocationStatus.Malformed("CRL");
             }
 
-            X509CRLEntryHolder entry = crl.getRevokedCertificate(cert.getSerialNumber());
+            X509CRLEntry entry = crl.getRevokedCertificate(cert);
             if (entry == null) {
-                return new RevocationStatus.Good("CRL", crlBytes);
+                return new RevocationStatus.Good("CRL", encoded != null ? encoded : crl.getEncoded());
             }
             if (!isUsableEntry(entry)) {
                 log.warn("Entrada da CRL de {} para o certificado serial {} tem extensão não processável",
@@ -225,12 +270,12 @@ public class CrlClient {
      * a assinou. A comparação de nomes usa a forma canônica de {@link X500Principal}, a mesma do
      * validador da JVM.
      */
-    private boolean isIssuedBy(X509CRLHolder crl, X509Certificate cert, X509Certificate issuer) throws Exception {
+    private boolean isIssuedBy(X509CRL crl, X509Certificate cert, X509Certificate issuer) {
         X500Principal issuerName = issuer.getSubjectX500Principal();
         if (!cert.getIssuerX500Principal().equals(issuerName)) {
             return false;
         }
-        if (!new X500Principal(crl.getIssuer().getEncoded()).equals(issuerName)) {
+        if (!crl.getIssuerX500Principal().equals(issuerName)) {
             return false;
         }
         if (issuer.getBasicConstraints() == -1) {
@@ -240,9 +285,13 @@ public class CrlClient {
         if (keyUsage != null && (keyUsage.length <= KEY_USAGE_CRL_SIGN || !keyUsage[KEY_USAGE_CRL_SIGN])) {
             return false;
         }
-        return crl.isSignatureValid(new JcaContentVerifierProviderBuilder()
-                .setProvider(BC_PROVIDER)
-                .build(new JcaX509CertificateHolder(issuer)));
+        try {
+            crl.verify(issuer.getPublicKey());
+            return true;
+        } catch (GeneralSecurityException e) {
+            log.debug("Assinatura da CRL não confere com o emissor {}: {}", issuerName, e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -251,7 +300,7 @@ public class CrlClient {
      * nextUpdate é opcional no ASN.1, mas sem ele o emissor não declarou até quando a lista vale,
      * e a JVM também não a aceita como evidência.
      */
-    private boolean isWithinValidityWindow(X509CRLHolder crl, Instant now) {
+    private boolean isWithinValidityWindow(X509CRL crl, Instant now) {
         Date nextUpdate = crl.getNextUpdate();
         if (nextUpdate == null) {
             return false;
@@ -268,19 +317,21 @@ public class CrlClient {
      * não faz; onlySomeReasons deixaria revogações fora da lista consultada. Uma extensão crítica
      * desconhecida pode alterar o escopo de formas que não sabemos interpretar.
      */
-    private boolean coversCertificate(X509CRLHolder crl, X509Certificate cert, String url, DistributionPoint point) {
-        if (crl.getExtension(Extension.deltaCRLIndicator) != null) {
+    private boolean coversCertificate(X509CRL crl, X509Certificate cert, String url, DistributionPoint point)
+            throws IOException {
+        if (crl.getExtensionValue(Extension.deltaCRLIndicator.getId()) != null) {
             return false;
         }
         if (!hasOnlyProcessedCriticalExtensions(crl.getCriticalExtensionOIDs(), Extension.issuingDistributionPoint)) {
             return false;
         }
 
-        Extension idpExtension = crl.getExtension(Extension.issuingDistributionPoint);
-        if (idpExtension == null) {
+        byte[] idpValue = crl.getExtensionValue(Extension.issuingDistributionPoint.getId());
+        if (idpValue == null) {
             return true;
         }
-        IssuingDistributionPoint idp = IssuingDistributionPoint.getInstance(idpExtension.getParsedValue());
+        IssuingDistributionPoint idp = IssuingDistributionPoint.getInstance(
+                JcaX509ExtensionUtils.parseExtensionValue(idpValue));
         if (idp.isIndirectCRL() || idp.getOnlySomeReasons() != null || idp.onlyContainsAttributeCerts()) {
             return false;
         }
@@ -319,28 +370,31 @@ public class CrlClient {
     }
 
     /**
-     * RFC 5280 5.3: certificateIssuer atribui a entrada a outro emissor (só faz sentido em CRL
-     * indireta), removeFromCRL só existe em delta CRL, e uma extensão crítica desconhecida pode
+     * RFC 5280 5.3: removeFromCRL só existe em delta CRL, e uma extensão crítica desconhecida pode
      * mudar o significado da entrada; em qualquer desses casos não se sabe o que ela afirma.
+     * Entradas com certificateIssuer já foram excluídas com a CRL inteira no download.
      */
-    private boolean isUsableEntry(X509CRLEntryHolder entry) {
+    private boolean isUsableEntry(X509CRLEntry entry) {
         if (!entry.hasExtensions()) {
             return true;
-        }
-        if (entry.getExtension(Extension.certificateIssuer) != null) {
-            return false;
         }
         if (!hasOnlyProcessedCriticalExtensions(entry.getCriticalExtensionOIDs(), Extension.reasonCode)) {
             return false;
         }
-        Extension reasonCode = entry.getExtension(Extension.reasonCode);
-        return reasonCode == null
-                || CRLReason.getInstance(reasonCode.getParsedValue()).getValue().intValue() != CRLReason.removeFromCRL;
+        return entry.getRevocationReason() != CRLReason.REMOVE_FROM_CRL;
     }
 
-    private boolean hasOnlyProcessedCriticalExtensions(Set<?> criticalOids, ASN1ObjectIdentifier... processed) {
-        Set<Object> unresolved = new HashSet<>(criticalOids);
-        unresolved.removeAll(Arrays.asList(processed));
+    /**
+     * @param criticalOids OIDs críticos reportados pela JVM; {@code null} quando não há extensões
+     */
+    private boolean hasOnlyProcessedCriticalExtensions(Set<String> criticalOids, ASN1ObjectIdentifier... processed) {
+        if (criticalOids == null) {
+            return true;
+        }
+        Set<String> unresolved = new HashSet<>(criticalOids);
+        for (ASN1ObjectIdentifier oid : processed) {
+            unresolved.remove(oid.getId());
+        }
         return unresolved.isEmpty();
     }
 }
