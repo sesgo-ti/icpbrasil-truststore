@@ -86,19 +86,16 @@ public class OcspClient {
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
     private final CertificateHttpTransport transport;
-    private final DownloadPolicy downloadPolicy;
     private final Clock clock;
     private final DigestCalculatorProvider digestCalculators = createDigestCalculators();
 
+    /**
+     * Construtor de produção: o transporte é compartilhado com os demais clientes de artefatos
+     * X.509 e traz consigo a {@link DownloadPolicy} aplicada a cada requisição.
+     */
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
-                      TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        this.cache = cache;
-        this.retryPolicy = retryPolicy;
-        this.config = trustStoreConfig.getRevocation();
-        this.downloadPolicy = downloadPolicy;
-        this.transport = new CertificateHttpTransport(downloadPolicy,
-                Duration.ofSeconds(config.getOcspTimeoutSeconds()));
-        this.clock = Clock.systemUTC();
+                      TrustStoreConfig trustStoreConfig, CertificateHttpTransport transport) {
+        this(cache, retryPolicy, trustStoreConfig.getRevocation(), transport, Clock.systemUTC());
     }
 
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
@@ -112,11 +109,15 @@ public class OcspClient {
      */
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
                       HttpClient httpClient, DownloadPolicy downloadPolicy, Clock clock) {
+        this(cache, retryPolicy, config, new CertificateHttpTransport(downloadPolicy, httpClient), clock);
+    }
+
+    private OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+                       CertificateHttpTransport transport, Clock clock) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
-        this.downloadPolicy = downloadPolicy;
-        this.transport = new CertificateHttpTransport(downloadPolicy, httpClient);
+        this.transport = Objects.requireNonNull(transport, "transport");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -148,7 +149,7 @@ public class OcspClient {
         }
 
         try {
-            downloadPolicy.validateUrl(url);
+            transport.policy().validateUrl(url);
         } catch (DownloadPolicyException e) {
             log.warn("URL OCSP bloqueada pela política de download: {}", e.getMessage());
             return new RevocationStatus.OcspUnavailable();
@@ -196,7 +197,7 @@ public class OcspClient {
                                String url) throws Exception {
         byte[] requestBytes = buildRequest(cert, issuer);
         return transport.post(url, requestBytes, OCSP_REQUEST_CONTENT_TYPE, OCSP_RESPONSE_CONTENT_TYPE,
-                downloadPolicy.getMaxOcspResponseBytes(), Duration.ofSeconds(config.getOcspTimeoutSeconds()));
+                transport.policy().getMaxOcspResponseBytes(), Duration.ofSeconds(config.getOcspTimeoutSeconds()));
     }
 
     private byte[] buildRequest(X509Certificate cert, X509Certificate issuer) throws Exception {

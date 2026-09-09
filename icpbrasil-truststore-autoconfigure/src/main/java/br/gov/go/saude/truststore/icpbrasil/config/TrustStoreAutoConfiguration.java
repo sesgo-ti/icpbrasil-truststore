@@ -1,5 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -32,6 +33,7 @@ import org.springframework.core.io.support.ResourcePatternResolver;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -190,12 +192,27 @@ public class TrustStoreAutoConfiguration {
                 trustStoreCache);
     }
 
+    /**
+     * Transporte único para os artefatos referenciados em certificados (AIA, OCSP e CRL): um só
+     * {@code HttpClient} (pool e selector) para os três clientes. O timeout de conexão é o menor
+     * dos três configurados; o prazo total de cada requisição continua sendo o do artefato.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public CertificateHttpTransport certificateHttpTransport(DownloadPolicy downloadPolicy,
+                                                             TrustStoreConfig trustStoreConfig) {
+        int connectTimeoutSeconds = Math.min(trustStoreConfig.getChain().getDownloadTimeoutSeconds(),
+                Math.min(trustStoreConfig.getRevocation().getOcspTimeoutSeconds(),
+                        trustStoreConfig.getRevocation().getCrlTimeoutSeconds()));
+        return new CertificateHttpTransport(downloadPolicy, Duration.ofSeconds(connectTimeoutSeconds));
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public CertificateChainResolver certificateChainResolver(RetryPolicy retryPolicy,
                                                              TrustStoreConfig trustStoreConfig,
-                                                             DownloadPolicy downloadPolicy) {
-        return new CertificateChainResolver(retryPolicy, trustStoreConfig, downloadPolicy);
+                                                             CertificateHttpTransport certificateHttpTransport) {
+        return new CertificateChainResolver(retryPolicy, trustStoreConfig, certificateHttpTransport);
     }
 
     @Bean
@@ -207,15 +224,15 @@ public class TrustStoreAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public OcspClient ocspClient(RevocationCache revocationCache, RetryPolicy retryPolicy,
-                                 TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        return new OcspClient(revocationCache, retryPolicy, trustStoreConfig, downloadPolicy);
+                                 TrustStoreConfig trustStoreConfig, CertificateHttpTransport certificateHttpTransport) {
+        return new OcspClient(revocationCache, retryPolicy, trustStoreConfig, certificateHttpTransport);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public CrlClient crlClient(RevocationCache revocationCache, RetryPolicy retryPolicy,
-                               TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        return new CrlClient(revocationCache, retryPolicy, trustStoreConfig, downloadPolicy);
+                               TrustStoreConfig trustStoreConfig, CertificateHttpTransport certificateHttpTransport) {
+        return new CrlClient(revocationCache, retryPolicy, trustStoreConfig, certificateHttpTransport);
     }
 
     @Bean

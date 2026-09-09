@@ -1,5 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
@@ -94,6 +95,8 @@ class TrustStoreAutoConfigurationTest {
             assertNotNull(context.getBean(TrustStoreConfig.class));
             assertNotNull(context.getBean(TrustStoreService.class));
             assertInstanceOf(FilesystemTrustStoreRepository.class, context.getBean(TrustStoreRepository.class));
+            assertEquals(1, context.getBeansOfType(CertificateHttpTransport.class).size(),
+                    "AIA, OCSP e CRL compartilham um único transporte HTTP");
         });
     }
 

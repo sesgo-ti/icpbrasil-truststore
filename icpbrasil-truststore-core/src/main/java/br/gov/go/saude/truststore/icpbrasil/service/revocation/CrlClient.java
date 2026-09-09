@@ -71,18 +71,15 @@ public class CrlClient {
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
     private final CertificateHttpTransport transport;
-    private final DownloadPolicy downloadPolicy;
     private final Clock clock;
 
+    /**
+     * Construtor de produção: o transporte é compartilhado com os demais clientes de artefatos
+     * X.509 e traz consigo a {@link DownloadPolicy} aplicada a cada requisição.
+     */
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy,
-                     TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        this.cache = cache;
-        this.retryPolicy = retryPolicy;
-        this.config = trustStoreConfig.getRevocation();
-        this.downloadPolicy = downloadPolicy;
-        this.transport = new CertificateHttpTransport(downloadPolicy,
-                Duration.ofSeconds(config.getCrlTimeoutSeconds()));
-        this.clock = Clock.systemUTC();
+                     TrustStoreConfig trustStoreConfig, CertificateHttpTransport transport) {
+        this(cache, retryPolicy, trustStoreConfig.getRevocation(), transport, Clock.systemUTC());
     }
 
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
@@ -96,11 +93,15 @@ public class CrlClient {
      */
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
                      HttpClient httpClient, DownloadPolicy downloadPolicy, Clock clock) {
+        this(cache, retryPolicy, config, new CertificateHttpTransport(downloadPolicy, httpClient), clock);
+    }
+
+    private CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
+                      CertificateHttpTransport transport, Clock clock) {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
-        this.downloadPolicy = downloadPolicy;
-        this.transport = new CertificateHttpTransport(downloadPolicy, httpClient);
+        this.transport = Objects.requireNonNull(transport, "transport");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -139,7 +140,7 @@ public class CrlClient {
         }
 
         try {
-            downloadPolicy.validateUrl(url);
+            transport.policy().validateUrl(url);
         } catch (DownloadPolicyException e) {
             log.warn("URL CRL bloqueada pela política de download: {}", e.getMessage());
             return new RevocationStatus.CrlUnavailable();
@@ -171,7 +172,7 @@ public class CrlClient {
     }
 
     private byte[] download(String url) throws IOException, InterruptedException {
-        return transport.get(url, downloadPolicy.getMaxCrlResponseBytes(),
+        return transport.get(url, transport.policy().getMaxCrlResponseBytes(),
                 Duration.ofSeconds(config.getCrlTimeoutSeconds()));
     }
 

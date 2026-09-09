@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -40,23 +41,26 @@ public class CertificateChainResolver {
     private final CertificateHttpTransport transport;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.ChainConfig chainConfig;
-    private final DownloadPolicy downloadPolicy;
 
+    /**
+     * Construtor de produção: o transporte é compartilhado com os clientes OCSP e CRL e traz
+     * consigo a {@link DownloadPolicy} aplicada a cada requisição.
+     */
     public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig trustStoreConfig,
-                                    DownloadPolicy downloadPolicy) {
-        this.retryPolicy = retryPolicy;
-        this.chainConfig = trustStoreConfig.getChain();
-        this.downloadPolicy = downloadPolicy;
-        this.transport = new CertificateHttpTransport(downloadPolicy,
-                Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()));
+                                    CertificateHttpTransport transport) {
+        this(retryPolicy, trustStoreConfig.getChain(), transport);
     }
 
     public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
                                     HttpClient httpClient, DownloadPolicy downloadPolicy) {
+        this(retryPolicy, chainConfig, new CertificateHttpTransport(downloadPolicy, httpClient));
+    }
+
+    private CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
+                                     CertificateHttpTransport transport) {
         this.retryPolicy = retryPolicy;
         this.chainConfig = chainConfig;
-        this.downloadPolicy = downloadPolicy;
-        this.transport = new CertificateHttpTransport(downloadPolicy, httpClient);
+        this.transport = Objects.requireNonNull(transport, "transport");
     }
 
     /**
@@ -148,7 +152,7 @@ public class CertificateChainResolver {
     private List<X509Certificate> downloadCertificates(List<String> urls) {
         for (String url : urls) {
             try {
-                downloadPolicy.validateUrl(url);
+                transport.policy().validateUrl(url);
             } catch (DownloadPolicyException e) {
                 log.warn("URL de CA Issuers bloqueada pela política de download: {}", e.getMessage());
                 continue;
@@ -180,7 +184,7 @@ public class CertificateChainResolver {
     }
 
     private byte[] downloadBytes(String url) throws IOException, InterruptedException {
-        return transport.get(url, downloadPolicy.getMaxAiaResponseBytes(),
+        return transport.get(url, transport.policy().getMaxAiaResponseBytes(),
                 Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()));
     }
 

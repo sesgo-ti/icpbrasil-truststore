@@ -68,6 +68,14 @@ public final class CertificateHttpTransport {
     }
 
     /**
+     * Política aplicada a cada requisição; também é a fonte dos limites de tamanho por tipo de
+     * artefato, para que quem compartilha o transporte não precise de uma referência separada.
+     */
+    public DownloadPolicy policy() {
+        return downloadPolicy;
+    }
+
+    /**
      * Executa um GET e devolve o corpo de uma resposta 200.
      *
      * @param url      URL absoluta http(s); validada pela {@link DownloadPolicy} antes do envio
