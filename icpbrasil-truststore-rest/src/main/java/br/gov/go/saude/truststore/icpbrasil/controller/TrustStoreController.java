@@ -22,6 +22,8 @@ public class TrustStoreController {
     private static final String TYPE_PEM = "pem";
     private static final String TYPE_DER = "der";
     private static final String DEFAULT_TYPE = TYPE_PEM;
+    /** Um SKI SHA-1 tem 40 dígitos hexadecimais; valores maiores são truncados no log. */
+    private static final int MAX_SKI_LOG_LENGTH = 64;
 
     private final Cache cache;
 
@@ -41,7 +43,7 @@ public class TrustStoreController {
     public ResponseEntity<?> getCertificate(@RequestParam String ski, 
                                            @RequestParam(defaultValue = DEFAULT_TYPE) String type) {
         try {
-            log.info("Buscando certificado para SKI: {}", ski);
+            log.debug("Buscando certificado para SKI: {}", skiParaLog(ski));
 
             // Uma única leitura do snapshot decide 503 e 404: acervo indisponível (não confiável
             // no momento) é distinto de SKI ausente no acervo vigente, e duas leituras poderiam
@@ -56,7 +58,7 @@ public class TrustStoreController {
             X509Certificate cert = lookup.certificate();
 
             if (cert == null) {
-                log.warn("Certificado não encontrado para SKI: {}", ski);
+                log.warn("Certificado não encontrado para SKI: {}", skiParaLog(ski));
                 return resposta(HttpStatus.NOT_FOUND).build();
             }
 
@@ -85,6 +87,18 @@ public class TrustStoreController {
      */
     private static ResponseEntity.BodyBuilder resposta(HttpStatus status) {
         return ResponseEntity.status(status).cacheControl(CacheControl.noStore());
+    }
+
+    /**
+     * O parâmetro vem do cliente e não pode ir cru para o log: qualquer caractere fora do
+     * alfabeto hexadecimal de um SKI vira {@code ?} e o tamanho é limitado, o que neutraliza
+     * quebras de linha e sequências de controle sem esconder que algo inesperado foi enviado.
+     */
+    private static String skiParaLog(String ski) {
+        String saneado = ski.replaceAll("[^0-9A-Fa-f]", "?");
+        return saneado.length() <= MAX_SKI_LOG_LENGTH
+                ? saneado
+                : saneado.substring(0, MAX_SKI_LOG_LENGTH) + "...";
     }
 
     /**
