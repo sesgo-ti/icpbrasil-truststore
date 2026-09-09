@@ -31,15 +31,17 @@ Cache `EXPIRED` → readiness probe `DOWN`.
 ### Degradação (filtrar para alertas)
 
 ```bash
-grep -E "ERROR.*(TrustStoreService|Cache)" app.log
+grep -E "(WARN|ERROR).*(TrustStoreService|TrustStoreBootstrap)" app.log
 ```
 
 | Nível | Mensagem | Significado |
 |---|---|---|
-| ERROR | `Cache crítico - falha prolongada na atualização` | Sem sync além do limiar crítico, cache ainda ativo |
-| ERROR | `Cache expirado - não há como garantir segurança` | Cache invalidado |
-| ERROR | `Falha ao repor artefatos no repositório local` | Download ou armazenamento falhou |
-| ERROR | `Falha na validação de integridade do zip` | ZIP corrompido ou hash divergente |
+| WARN | `Falha na sincronização com o ITI; snapshot atual mantido até o prazo original` | Download, hash, bundle ou rede falharam; acervo anterior segue servido até expirar |
+| WARN | `Falha ao carregar acervo do repositório local` | Storage ilegível, hash divergente ou bundle inválido na carga local |
+| WARN | `Acervo local expirado desde` | Confirmação persistida além de `cache-ttl-max-hours`; depende do ITI para voltar a servir |
+| WARN | `Falha ao persistir … no repositório local` | Acervo válido apenas em memória; próximo cold start dependerá do ITI |
+| ERROR | `Acervo ICP-Brasil indisponível: nenhum snapshot válido após a sincronização` | Nenhum certificado servido (endpoint responde 503) |
+| ERROR | `aplicação subirá com cache indisponível (fail-fast=false)` | Bootstrap falhou e o startup prosseguiu sem acervo |
 
 ### Operação normal
 
@@ -47,7 +49,7 @@ grep -E "ERROR.*(TrustStoreService|Cache)" app.log
 |---|---|
 | INFO | `Executando atualização agendada do TrustStore` |
 | INFO | `O repositório local está sincronizado com a fonte ICP-Brasil` |
-| INFO | `Cache de certificados atualizado com {N} entradas.` |
+| INFO | `Cache de certificados atualizado com {N} entradas (hash {H}, expira em {T}).` |
 
 ---
 
