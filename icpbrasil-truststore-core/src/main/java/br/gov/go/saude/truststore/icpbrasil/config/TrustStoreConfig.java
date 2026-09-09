@@ -306,7 +306,7 @@ public class TrustStoreConfig {
         }
 
         if (cacheTtlMaxHours < 72 || cacheTtlMaxHours > 720) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] TTL Máximo: Deve ser entre 168 e 720 horas. Propriedade: 'icpbrasil-truststore.cache-ttl-max-hours' (Valor: '%d')",
+            throw new IllegalStateException(String.format("[Erro de Configuração] TTL Máximo: Deve ser entre 72 e 720 horas. Propriedade: 'icpbrasil-truststore.cache-ttl-max-hours' (Valor: '%d')",
                     cacheTtlMaxHours));
         }
 
