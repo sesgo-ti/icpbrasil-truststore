@@ -1,5 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  child.project.url.inherit.append.path="false">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>br.gov.go.saude</groupId>
@@ -36,7 +37,9 @@
     </developer>
   </developers>
 
-  <scm>
+  <scm child.scm.connection.inherit.append.path="false"
+       child.scm.developerConnection.inherit.append.path="false"
+       child.scm.url.inherit.append.path="false">
     <connection>scm:git:https://github.com/sesgo-ti/icpbrasil-truststore.git</connection>
     <developerConnection>scm:git:git@github.com:sesgo-ti/icpbrasil-truststore.git</developerConnection>
     <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
@@ -296,12 +299,18 @@
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>0.7.0</version>
+            <version>0.11.0</version>
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
               <waitUntil>published</waitUntil>
+              <!-- O fat jar do REST é artefato de deploy, não biblioteca. O workflow já o deixa
+                   fora do reactor (-pl core,autoconfigure -am); esta exclusão protege um
+                   "deploy" executado no reactor completo. Filtra por artifactId, incluindo anexos. -->
+              <excludeArtifacts>
+                <excludeArtifact>icpbrasil-truststore-rest</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
         </plugins>

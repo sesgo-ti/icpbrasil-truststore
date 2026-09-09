@@ -23,4 +23,14 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - `SSLContext` e `X509TrustManager` dedicados com trust exclusivo nas ACs da ICP-Brasil.
 - Proteção contra SSRF e limites de tamanho para downloads derivados de extensões de certificados (AIA, OCSP, CRL).
 
+### Corrigido
+
+- Downloads de AIA/OCSP/CRL: limite de tamanho aplicado durante o recebimento, redirects rejeitados, bloqueio de IPv6 ULA/CGNAT e falha de DNS tratada como bloqueio.
+- OCSP: resposta aceita somente se o `CertID` corresponder ao certificado consultado, dentro da janela `thisUpdate`/`nextUpdate` e assinada pelo emissor ou por delegado válido com EKU `id-kp-OCSPSigning`.
+- CRL: exige emissor, assinatura, `nextUpdate` vigente e cobertura comprovada; delta CRL, IDP não coberto, motivos parciais e extensões críticas desconhecidas são inconclusivos, nunca `Good`.
+- Acervo: o cache só é publicado após validar hash e conteúdo da geração; a validade expira pelo relógio nas leituras e não é renovada por confirmações de outra geração; limites no ZIP e no download do ITI.
+- Auto-configuração funciona sem AWS SDK e sem Actuator (integrações opcionais isoladas) e com a configuração mínima documentada (defaults na biblioteca); `S3Client` do consumidor é respeitado.
+- Health indicator lê apenas o estado em memória; readiness do serviço standalone inclui `trustStoreCache`; `/certificate` decide 503/404 em uma única leitura e responde com `Cache-Control: no-store`.
+- Publicação: `central-publishing-maven-plugin` 0.11.0 com REST excluído, SCM herdado sem sufixo de módulo e validação da tag contra a versão dos POMs.
+
 [Unreleased]: https://github.com/sesgo-ti/icpbrasil-truststore/commits/main

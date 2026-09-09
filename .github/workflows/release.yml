@@ -12,18 +12,40 @@ jobs:
   release:
     name: Publicar no Maven Central e criar GitHub Release
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar JDK 21, credenciais do Central e chave GPG
+      - name: Configurar JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      # A tag é o único gatilho: antes de qualquer credencial, garante que ela corresponde
+      # exatamente à versão dos POMs (sem -SNAPSHOT) — uma tag errada não pode publicar
+      # uma versão diferente da anunciada.
+      - name: Validar tag contra a versão do projeto
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version=$(./mvnw -B -q -ntp help:evaluate -Dexpression=project.version -DforceStdout)
+          echo "Tag: $RELEASE_TAG | Versão Maven: $version"
+          [[ "$version" != *-SNAPSHOT ]] || { echo "Versão SNAPSHOT não pode ser publicada"; exit 1; }
+          [[ "$RELEASE_TAG" == "v$version" ]] || { echo "Tag $RELEASE_TAG não corresponde à versão $version"; exit 1; }
+
+      - name: Build e testes de todos os módulos (sem assinatura)
+        run: ./mvnw -B -ntp clean verify -Prelease -Dgpg.skip=true
+
+      - name: Configurar credenciais do Central e chave GPG
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
           # Gera o <server id="central"> no settings.xml do runner, com as
           # credenciais lidas das env vars declaradas abaixo no passo de deploy.
           # O id deve ser igual ao <publishingServerId> do pom.xml.
@@ -35,18 +57,17 @@ jobs:
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
-      - name: Build, assinar e publicar no Maven Central
+      # Somente parent + core + autoconfigure vão para o Central; o REST (fat jar) é
+      # artefato de deploy e fica fora do reactor de publicação.
+      - name: Assinar e publicar as bibliotecas no Maven Central
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: ./mvnw -B -Prelease deploy --no-transfer-progress
+        run: ./mvnw -B -ntp -Prelease -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am deploy
 
       - name: Criar GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-from-tag \
-            --verify-tag
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-from-tag --verify-tag
