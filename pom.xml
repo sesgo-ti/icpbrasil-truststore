@@ -42,9 +42,9 @@
        child.scm.url.inherit.append.path="false">
     <connection>scm:git:https://github.com/sesgo-ti/icpbrasil-truststore.git</connection>
     <developerConnection>scm:git:git@github.com:sesgo-ti/icpbrasil-truststore.git</developerConnection>
-  <!-- Os atributos child.*.inherit.append.path="false" (em <project> e em <scm>) impedem o Maven de
-       anexar o artifactId de cada módulo às URLs herdadas: todos os módulos vivem neste repositório. -->
-  <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
+    <!-- Os atributos child.*.inherit.append.path="false" (em <project> e em <scm>) impedem o Maven de
+         anexar o artifactId de cada módulo às URLs herdadas: todos os módulos vivem neste repositório. -->
+    <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
     <tag>HEAD</tag>
   </scm>
 
