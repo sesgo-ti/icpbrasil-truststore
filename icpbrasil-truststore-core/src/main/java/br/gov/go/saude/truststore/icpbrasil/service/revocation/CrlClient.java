@@ -6,6 +6,8 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -120,13 +122,21 @@ public class CrlClient {
      *         utilizável para este certificado neste instante
      */
     public RevocationStatus check(X509Certificate cert, X509Certificate issuer, String url) {
+        return lookup(cert, issuer, url).status();
+    }
+
+    /**
+     * Como {@link #check}, devolvendo também, para os status conclusivos, a CRL decodificada e
+     * verificada que os fundamenta ({@link RevocationEvidence.Crl}).
+     */
+    public RevocationLookup lookup(X509Certificate cert, X509Certificate issuer, String url) {
         DistributionPoint point = CertificateParser.getCrlDistributionPoint(cert, url).orElse(null);
         // Sem o DP não há como conferir o escopo da CRL; com reasons ela cobre só parte dos motivos
         // e com cRLIssuer a emissão é delegada a outro emissor, cuja cadeia este cliente não valida.
         if (point == null || point.getReasons() != null || point.getCRLIssuer() != null) {
             log.warn("Certificado serial {} não aponta para {} em um CRL Distribution Point utilizável " +
                     "(ausente, com reasons ou com cRLIssuer)", cert.getSerialNumber().toString(16), url);
-            return new RevocationStatus.Malformed("CRL");
+            return RevocationLookup.inconclusive(new RevocationStatus.Malformed("CRL"));
         }
 
         Optional<X509CRL> cached = cache.getCrl(url);
@@ -134,7 +144,7 @@ public class CrlClient {
             RevocationStatus status = evaluate(cached.get(), null, cert, issuer, url, point);
             if (status.isConclusive()) {
                 log.debug("CRL encontrada no cache para {}", url);
-                return status;
+                return lookupOf(status, cached.get());
             }
             // Uma CRL que venceu não é erro do emissor; devolver Malformed aqui prenderia o resultado
             // ao TTL do cache. O putCrl da nova CRL a substitui.
@@ -145,7 +155,7 @@ public class CrlClient {
             transport.policy().validateUrl(url);
         } catch (DownloadPolicyException e) {
             log.warn("URL CRL bloqueada pela política de download: {}", e.getMessage());
-            return new RevocationStatus.CrlUnavailable();
+            return RevocationLookup.inconclusive(new RevocationStatus.CrlUnavailable());
         }
 
         try {
@@ -158,28 +168,34 @@ public class CrlClient {
             X509CRL crl = decode(crlBytes);
             if (crl == null) {
                 log.warn("Conteúdo de {} não é uma CRL X.509 decodificável", url);
-                return new RevocationStatus.Malformed("CRL");
+                return RevocationLookup.inconclusive(new RevocationStatus.Malformed("CRL"));
             }
             if (hasCertificateIssuerEntries(crl)) {
                 log.warn("CRL de {} tem entrada com certificateIssuer; lista direta ambígua, descartada", url);
-                return new RevocationStatus.Malformed("CRL");
+                return RevocationLookup.inconclusive(new RevocationStatus.Malformed("CRL"));
             }
             RevocationStatus result = evaluate(crl, crlBytes, cert, issuer, url, point);
             if (result.isConclusive()) {
                 cache.putCrl(url, crl);
             }
-            return result;
+            return lookupOf(result, crl);
         } catch (DownloadPolicyException e) {
             log.warn("Resposta CRL bloqueada pela política de download: {}", e.getMessage());
-            return new RevocationStatus.CrlUnavailable();
+            return RevocationLookup.inconclusive(new RevocationStatus.CrlUnavailable());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação CRL interrompida para {}", url);
-            return new RevocationStatus.NoConnectivity();
+            return RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity());
         } catch (Exception e) {
             log.warn("CRL indisponível para {}: {}", url, e.getMessage());
-            return new RevocationStatus.CrlUnavailable();
+            return RevocationLookup.inconclusive(new RevocationStatus.CrlUnavailable());
         }
+    }
+
+    private static RevocationLookup lookupOf(RevocationStatus status, X509CRL crl) {
+        return status.isConclusive()
+                ? new RevocationLookup(status, new RevocationEvidence.Crl(crl))
+                : RevocationLookup.inconclusive(status);
     }
 
     private byte[] download(String url) throws IOException, InterruptedException {

@@ -4,6 +4,8 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.ASN1Integer;
@@ -179,6 +181,33 @@ class CrlClientTest {
 
         assertInstanceOf(RevocationStatus.Revoked.class, status);
         assertArrayEquals(crl, cachedCrl().getEncoded());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupSerialListadoRetornaACrlDecodificadaComoEvidencia() {
+        byte[] crl = rootSigned(crlBuilder()
+                .addCRLEntry(leafCert.getSerialNumber(), yesterday(), CRLReason.keyCompromise));
+        mockHttpResponse(crl);
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, CRL_URL);
+
+        assertInstanceOf(RevocationStatus.Revoked.class, lookup.status());
+        RevocationEvidence.Crl evidence = assertInstanceOf(RevocationEvidence.Crl.class, lookup.evidence());
+        assertArrayEquals(crl, evidence.crl().getEncoded());
+        assertSame(evidence.crl(), cachedCrl(), "a evidência é a mesma instância guardada no cache");
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupHitDeCacheRetornaAInstanciaDoCacheComoEvidencia() {
+        X509CRL cached = decode(rootSigned(crlBuilder()));
+        when(cache.getCrl(CRL_URL)).thenReturn(Optional.of(cached));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, CRL_URL);
+
+        assertInstanceOf(RevocationStatus.Good.class, lookup.status());
+        assertSame(cached, assertInstanceOf(RevocationEvidence.Crl.class, lookup.evidence()).crl());
     }
 
     // --- Emissor ---

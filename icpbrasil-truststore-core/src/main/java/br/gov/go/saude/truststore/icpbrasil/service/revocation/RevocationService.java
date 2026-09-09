@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,11 +44,19 @@ public class RevocationService {
      * @return status de revogação — ver {@link RevocationStatus} para os possíveis resultados
      */
     public RevocationStatus check(X509Certificate cert, X509Certificate issuer) {
+        return lookup(cert, issuer).status();
+    }
+
+    /**
+     * Como {@link #check}, devolvendo também, para os status conclusivos, a evidência (resposta
+     * OCSP ou CRL) que os fundamenta.
+     */
+    public RevocationLookup lookup(X509Certificate cert, X509Certificate issuer) {
         List<String> ocspUrls = CertificateParser.getOcspUrls(cert);
         List<String> crlUrls = CertificateParser.getCrlUrls(cert);
 
         if (ocspUrls.isEmpty() && crlUrls.isEmpty()) {
-            return new RevocationStatus.NoDistributionPoints();
+            return RevocationLookup.inconclusive(new RevocationStatus.NoDistributionPoints());
         }
 
         boolean noConnectivity = false;
@@ -55,25 +64,25 @@ public class RevocationService {
             if (Thread.currentThread().isInterrupted()) {
                 break;
             }
-            RevocationStatus result = ocspClient.check(cert, issuer, url);
+            RevocationLookup result = ocspClient.lookup(cert, issuer, url);
             if (result.isConclusive()) return result;
-            noConnectivity |= result instanceof RevocationStatus.NoConnectivity;
+            noConnectivity |= result.status() instanceof RevocationStatus.NoConnectivity;
         }
 
         for (String url : crlUrls) {
             if (Thread.currentThread().isInterrupted()) {
                 break;
             }
-            RevocationStatus result = crlClient.check(cert, issuer, url);
+            RevocationLookup result = crlClient.lookup(cert, issuer, url);
             if (result.isConclusive()) return result;
-            noConnectivity |= result instanceof RevocationStatus.NoConnectivity;
+            noConnectivity |= result.status() instanceof RevocationStatus.NoConnectivity;
         }
 
         if (noConnectivity || Thread.currentThread().isInterrupted()) {
-            return new RevocationStatus.NoConnectivity();
+            return RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity());
         }
-        return crlUrls.isEmpty()
+        return RevocationLookup.inconclusive(crlUrls.isEmpty()
                 ? new RevocationStatus.OcspUnavailable()
-                : new RevocationStatus.CrlUnavailable();
+                : new RevocationStatus.CrlUnavailable());
     }
 }

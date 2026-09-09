@@ -4,6 +4,8 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.DERNull;
@@ -177,6 +179,32 @@ class OcspClientTest {
 
         assertInstanceOf(RevocationStatus.Revoked.class, status);
         verify(cache).putOcsp(anyString(), any());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupRespostaRevokedRetornaEvidenciaComOsBytesDaResposta() {
+        byte[] response = issuerSigned(single(leafCertId(),
+                new RevokedStatus(Date.from(now.minus(1, ChronoUnit.DAYS)))));
+        mockHttpResponse(response);
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL);
+
+        assertInstanceOf(RevocationStatus.Revoked.class, lookup.status());
+        RevocationEvidence.OcspResponse evidence =
+                assertInstanceOf(RevocationEvidence.OcspResponse.class, lookup.evidence());
+        assertArrayEquals(response, evidence.der());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupRespostaUnknownNaoTemEvidencia() {
+        mockHttpResponse(issuerSigned(single(leafCertId(), new UnknownStatus())));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL);
+
+        assertInstanceOf(RevocationStatus.OcspUnavailable.class, lookup.status());
+        assertNull(lookup.evidence());
     }
 
     @Test

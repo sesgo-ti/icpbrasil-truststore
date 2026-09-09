@@ -5,6 +5,8 @@ import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -134,6 +136,14 @@ public class OcspClient {
      *         evidência utilizável para este certificado neste instante
      */
     public RevocationStatus check(X509Certificate cert, X509Certificate issuer, String url) {
+        return lookup(cert, issuer, url).status();
+    }
+
+    /**
+     * Como {@link #check}, devolvendo também, para os status conclusivos, a resposta OCSP em DER
+     * que os fundamenta ({@link RevocationEvidence.OcspResponse}).
+     */
+    public RevocationLookup lookup(X509Certificate cert, X509Certificate issuer, String url) {
         String cacheKey = buildCacheKey(cert, issuer);
 
         Optional<byte[]> cached = cache.getOcsp(cacheKey);
@@ -141,7 +151,7 @@ public class OcspClient {
             ParsedResponse parsed = parseResponse(cached.get(), cert, issuer);
             if (parsed.status().isConclusive()) {
                 log.debug("Resposta OCSP encontrada no cache para {}", cacheKey);
-                return parsed.status();
+                return lookupOf(parsed.status(), cached.get());
             }
             // Uma entrada que venceu ou cujo delegado expirou não é erro do responder; devolver
             // Malformed aqui prenderia o resultado ao TTL do cache. O putOcsp da nova resposta a substitui.
@@ -152,7 +162,7 @@ public class OcspClient {
             transport.policy().validateUrl(url);
         } catch (DownloadPolicyException e) {
             log.warn("URL OCSP bloqueada pela política de download: {}", e.getMessage());
-            return new RevocationStatus.OcspUnavailable();
+            return RevocationLookup.inconclusive(new RevocationStatus.OcspUnavailable());
         }
 
         try {
@@ -166,18 +176,24 @@ public class OcspClient {
             if (parsed.cacheable()) {
                 cache.putOcsp(cacheKey, responseBytes);
             }
-            return parsed.status();
+            return lookupOf(parsed.status(), responseBytes);
         } catch (DownloadPolicyException e) {
             log.warn("Resposta OCSP bloqueada pela política de download: {}", e.getMessage());
-            return new RevocationStatus.OcspUnavailable();
+            return RevocationLookup.inconclusive(new RevocationStatus.OcspUnavailable());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Verificação OCSP interrompida para {}", url);
-            return new RevocationStatus.NoConnectivity();
+            return RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity());
         } catch (Exception e) {
             log.warn("OCSP indisponível para {}: {}", url, e.getMessage());
-            return new RevocationStatus.OcspUnavailable();
+            return RevocationLookup.inconclusive(new RevocationStatus.OcspUnavailable());
         }
+    }
+
+    private static RevocationLookup lookupOf(RevocationStatus status, byte[] responseBytes) {
+        return status.isConclusive()
+                ? new RevocationLookup(status, new RevocationEvidence.OcspResponse(responseBytes))
+                : RevocationLookup.inconclusive(status);
     }
 
     /**

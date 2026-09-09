@@ -2,6 +2,8 @@ package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import lombok.SneakyThrows;
@@ -24,6 +26,7 @@ import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyPairGenerator;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
@@ -73,11 +76,11 @@ class RevocationServiceTest {
 
         List<String> ocspUrls = CertificateParser.getOcspUrls(leafCert);
         for (String url : ocspUrls) {
-            when(ocspClient.check(leafCert, issuerCert, url))
-                    .thenReturn(new RevocationStatus.OcspUnavailable());
+            when(ocspClient.lookup(leafCert, issuerCert, url))
+                    .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.OcspUnavailable()));
         }
-        when(crlClient.check(leafCert, issuerCert, crlUrls.get(0)))
-                .thenReturn(new RevocationStatus.Good("CRL", null));
+        when(crlClient.lookup(leafCert, issuerCert, crlUrls.get(0)))
+                .thenReturn(crlGood());
 
         // When
         RevocationStatus status = revocationService.check(leafCert, issuerCert);
@@ -91,8 +94,9 @@ class RevocationServiceTest {
     @Test
     void testCheck_OcspMalformedECrlGood_DeveRetornarGood() {
         X509Certificate cert = generateCertComOcspECrl();
-        when(ocspClient.check(cert, issuerCert, OCSP_URL)).thenReturn(new RevocationStatus.Malformed("OCSP"));
-        when(crlClient.check(cert, issuerCert, CRL_URL)).thenReturn(new RevocationStatus.Good("CRL", null));
+        when(ocspClient.lookup(cert, issuerCert, OCSP_URL))
+                .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.Malformed("OCSP")));
+        when(crlClient.lookup(cert, issuerCert, CRL_URL)).thenReturn(crlGood());
 
         RevocationStatus status = revocationService.check(cert, issuerCert);
 
@@ -103,8 +107,10 @@ class RevocationServiceTest {
     @Test
     void testCheck_TudoInconclusivoComNoConnectivity_DeveRetornarNoConnectivity() {
         X509Certificate cert = generateCertComOcspECrl();
-        when(ocspClient.check(cert, issuerCert, OCSP_URL)).thenReturn(new RevocationStatus.NoConnectivity());
-        when(crlClient.check(cert, issuerCert, CRL_URL)).thenReturn(new RevocationStatus.Malformed("CRL"));
+        when(ocspClient.lookup(cert, issuerCert, OCSP_URL))
+                .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity()));
+        when(crlClient.lookup(cert, issuerCert, CRL_URL))
+                .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.Malformed("CRL")));
 
         RevocationStatus status = revocationService.check(cert, issuerCert);
 
@@ -115,16 +121,16 @@ class RevocationServiceTest {
     void testCheck_ThreadInterrompida_DeveEncerrarTentativas() {
         List<String> crlUrls = CertificateParser.getCrlUrls(leafCert);
         assertEquals(2, crlUrls.size());
-        when(crlClient.check(leafCert, issuerCert, crlUrls.get(0))).thenAnswer(invocation -> {
+        when(crlClient.lookup(leafCert, issuerCert, crlUrls.get(0))).thenAnswer(invocation -> {
             Thread.currentThread().interrupt();
-            return new RevocationStatus.NoConnectivity();
+            return RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity());
         });
 
         try {
             RevocationStatus status = revocationService.check(leafCert, issuerCert);
 
             assertInstanceOf(RevocationStatus.NoConnectivity.class, status);
-            verify(crlClient, never()).check(leafCert, issuerCert, crlUrls.get(1));
+            verify(crlClient, never()).lookup(leafCert, issuerCert, crlUrls.get(1));
         } finally {
             // O serviço deve preservar a flag; limpá-la aqui evita contaminar os testes seguintes
             assertTrue(Thread.interrupted());
@@ -180,6 +186,12 @@ class RevocationServiceTest {
         assertEquals(3, config.getRetryIntervalSeconds());
         assertEquals(3600, config.getOcspCacheTtlSeconds());
         assertEquals(3600, config.getCrlCacheTtlSeconds());
+    }
+
+    /** Good por CRL com uma evidência qualquer: o serviço só repassa o que o cliente devolveu. */
+    private static RevocationLookup crlGood() {
+        return new RevocationLookup(new RevocationStatus.Good("CRL", new byte[0]),
+                new RevocationEvidence.Crl(mock(X509CRL.class)));
     }
 
     /** Folha emitida pela AC de teste com um responder OCSP na AIA e um único CRL DP. */
