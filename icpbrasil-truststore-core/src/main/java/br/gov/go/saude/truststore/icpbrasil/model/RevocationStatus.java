@@ -13,4 +13,12 @@ public sealed interface RevocationStatus permits
     record CrlUnavailable() implements RevocationStatus {}
     record NoConnectivity() implements RevocationStatus {}
     record Malformed(String source) implements RevocationStatus {}
+
+    /**
+     * Apenas {@link Good} e {@link Revoked} são veredictos sobre o certificado; os demais
+     * status descrevem por que nenhum veredicto foi obtido e nunca equivalem a "não revogado".
+     */
+    default boolean isConclusive() {
+        return this instanceof Good || this instanceof Revoked;
+    }
 }

@@ -129,7 +129,7 @@ public class CrlClient {
         Optional<byte[]> cached = cache.getCrl(url);
         if (cached.isPresent()) {
             RevocationStatus status = parse(cached.get(), cert, issuer, url, point);
-            if (isConclusive(status)) {
+            if (status.isConclusive()) {
                 log.debug("CRL encontrada no cache para {}", url);
                 return status;
             }
@@ -153,7 +153,7 @@ public class CrlClient {
                     () -> download(url));
 
             RevocationStatus result = parse(crlBytes, cert, issuer, url, point);
-            if (isConclusive(result)) {
+            if (result.isConclusive()) {
                 cache.putCrl(url, crlBytes);
             }
             return result;
@@ -173,10 +173,6 @@ public class CrlClient {
     private byte[] download(String url) throws IOException, InterruptedException {
         return transport.get(url, downloadPolicy.getMaxCrlResponseBytes(),
                 Duration.ofSeconds(config.getCrlTimeoutSeconds()));
-    }
-
-    private boolean isConclusive(RevocationStatus status) {
-        return status instanceof RevocationStatus.Good || status instanceof RevocationStatus.Revoked;
     }
 
     /**

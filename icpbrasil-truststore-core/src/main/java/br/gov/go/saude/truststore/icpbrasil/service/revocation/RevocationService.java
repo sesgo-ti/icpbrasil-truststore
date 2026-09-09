@@ -56,7 +56,7 @@ public class RevocationService {
                 break;
             }
             RevocationStatus result = ocspClient.check(cert, issuer, url);
-            if (isConclusive(result)) return result;
+            if (result.isConclusive()) return result;
             noConnectivity |= result instanceof RevocationStatus.NoConnectivity;
         }
 
@@ -65,7 +65,7 @@ public class RevocationService {
                 break;
             }
             RevocationStatus result = crlClient.check(cert, issuer, url);
-            if (isConclusive(result)) return result;
+            if (result.isConclusive()) return result;
             noConnectivity |= result instanceof RevocationStatus.NoConnectivity;
         }
 
@@ -75,19 +75,5 @@ public class RevocationService {
         return crlUrls.isEmpty()
                 ? new RevocationStatus.OcspUnavailable()
                 : new RevocationStatus.CrlUnavailable();
-    }
-
-    /**
-     * Determina se um resultado é conclusivo (Good ou Revoked)
-     * ou se deve prosseguir para o próximo mecanismo de verificação.
-     *
-     * <p>Apenas respostas definitivas são conclusivas. Qualquer outro status
-     * (Malformed, OcspUnavailable, CrlUnavailable, NoConnectivity) indica
-     * que não foi possível obter resposta válida daquele mecanismo e deve-se
-     * tentar o próximo.</p>
-     */
-    private boolean isConclusive(RevocationStatus status) {
-        return status instanceof RevocationStatus.Good
-                || status instanceof RevocationStatus.Revoked;
     }
 }

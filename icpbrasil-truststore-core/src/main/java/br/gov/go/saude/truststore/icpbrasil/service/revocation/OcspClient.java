@@ -138,7 +138,7 @@ public class OcspClient {
         Optional<byte[]> cached = cache.getOcsp(cacheKey);
         if (cached.isPresent()) {
             ParsedResponse parsed = parseResponse(cached.get(), cert, issuer);
-            if (parsed.conclusive()) {
+            if (parsed.status().isConclusive()) {
                 log.debug("Resposta OCSP encontrada no cache para {}", cacheKey);
                 return parsed.status();
             }
@@ -223,10 +223,6 @@ public class OcspClient {
 
         static ParsedResponse unavailable() {
             return new ParsedResponse(new RevocationStatus.OcspUnavailable(), false);
-        }
-
-        boolean conclusive() {
-            return status instanceof RevocationStatus.Good || status instanceof RevocationStatus.Revoked;
         }
     }
 
