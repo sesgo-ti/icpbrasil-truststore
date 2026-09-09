@@ -158,6 +158,30 @@ class CacheTest {
     }
 
     @Test
+    void testCurrentIndex_IdentidadeSegueAGeracao_MantidaEmRenewETrocadaEmPublish() {
+        assertSame(Map.of(), cache.currentIndex());
+        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        Map<String, X509Certificate> geracaoA = cache.currentIndex();
+        assertEquals(indexA.keySet(), geracaoA.keySet());
+
+        Instant t1 = T0.plus(Duration.ofHours(2));
+        assertTrue(cache.renew(HASH_A, t1, t1.plus(TTL)));
+        assertSame(geracaoA, cache.currentIndex(), "renew mantém o índice: memoizações continuam válidas");
+
+        cache.publish(indexB, HASH_B, t1, t1.plus(TTL));
+        assertNotSame(geracaoA, cache.currentIndex(), "publish troca a geração");
+        assertThrows(UnsupportedOperationException.class, () -> cache.currentIndex().clear());
+    }
+
+    @Test
+    void testCurrentIndex_SnapshotExpirado_Vazio() {
+        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        clock.advance(TTL);
+
+        assertTrue(cache.currentIndex().isEmpty());
+    }
+
+    @Test
     void testRenew_SnapshotExpirado_RenovaSemNovoParse() {
         cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
         clock.advance(TTL.plus(Duration.ofDays(3)));

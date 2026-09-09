@@ -183,6 +183,19 @@ public class Cache {
     }
 
     /**
+     * Índice do acervo vigente, imutável e sem cópia. A identidade da referência é a da geração
+     * publicada: muda a cada {@code publish} e se mantém em {@code renew}, o que permite a quem
+     * deriva estruturas do acervo (ex.: âncoras PKIX) memoizá-las por geração sem copiar o índice
+     * a cada consulta.
+     *
+     * @return o índice vigente, ou mapa vazio se não há acervo vigente
+     */
+    public Map<String, X509Certificate> currentIndex() {
+        Snapshot atual = vigente();
+        return atual == null ? Map.of() : atual.index();
+    }
+
+    /**
      * Retorna os certificados raiz (auto-assinados) indexados por SKI.
      * Um certificado é considerado raiz quando subject e issuer são iguais
      * e a assinatura é verificável com a própria chave pública.
