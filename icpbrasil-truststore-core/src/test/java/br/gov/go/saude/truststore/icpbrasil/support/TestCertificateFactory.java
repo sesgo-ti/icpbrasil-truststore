@@ -46,13 +46,22 @@ public final class TestCertificateFactory {
     @SneakyThrows
     public static X509Certificate generateLeafCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                                     X509Certificate issuerCert) {
-        X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
+        X500Name issuerName = issuerNameOf(issuerCert);
         X500Name subject = new X500Name("CN=Test Leaf, O=Test, C=BR");
         X509v3CertificateBuilder builder = createBuilder(issuerName, subject, 3, subjectKeyPair);
         builder.addExtension(Extension.basicConstraints, false, new BasicConstraints(false));
         addSki(builder, subjectKeyPair);
         addAki(builder, issuerKeyPair);
         return sign(builder, issuerKeyPair);
+    }
+
+    /**
+     * Issuer copiado do subject DER do emissor, como uma AC real faz. Reconstruí-lo a partir da
+     * string RFC 2253 inverteria a ordem dos RDNs e o nome deixaria de casar na comparação
+     * canônica que o PKIX exige entre issuer da folha e subject do emissor.
+     */
+    public static X500Name issuerNameOf(X509Certificate issuerCert) {
+        return X500Name.getInstance(issuerCert.getSubjectX500Principal().getEncoded());
     }
 
     public static X509v3CertificateBuilder createBuilder(X500Name issuer, X500Name subject,
@@ -126,7 +135,7 @@ public final class TestCertificateFactory {
     public static X509Certificate generateIcpBrasilPersonCert(KeyPair subjectKeyPair,
                                                               KeyPair issuerKeyPair,
                                                               X509Certificate issuerCert) {
-        X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
+        X500Name issuerName = issuerNameOf(issuerCert);
         X500Name subject = new X500Name("CN=" + CN_TITULAR_TESTE + ", OU=Teste, O=ICP-Brasil, C=BR");
         X509v3CertificateBuilder builder = createBuilder(issuerName, subject, 11, subjectKeyPair);
 
