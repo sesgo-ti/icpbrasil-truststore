@@ -5,10 +5,8 @@ import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreBootstrap;
-import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
-import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
@@ -22,15 +20,15 @@ import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationCache;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
-import org.springframework.validation.annotation.Validated;
-import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,11 +43,18 @@ import java.util.List;
  * Todos os beans usam {@link ConditionalOnMissingBean @ConditionalOnMissingBean},
  * permitindo que o consumidor sobrescreva qualquer componente.</p>
  *
- * <p>O binding de {@link TrustStoreConfig} e {@link S3Properties} é feito aqui
- * via {@code @Bean @ConfigurationProperties} — as classes são POJOs puros no core,
- * sem anotações Spring, o que as torna testáveis de forma isolada.</p>
+ * <p>O binding de {@link TrustStoreConfig} é feito aqui via
+ * {@code @Bean @ConfigurationProperties} — a classe é um POJO puro no core,
+ * sem anotações Spring, o que a torna testável de forma isolada.</p>
+ *
+ * <p>Integrações que dependem de bibliotecas opcionais (AWS SDK para S3, Actuator para
+ * health) ficam em {@link S3StorageConfiguration} e {@link HealthConfiguration}, condicionadas
+ * no nível da classe. Esta classe não pode referenciar tipos dessas bibliotecas em campos ou
+ * assinaturas: a introspecção dos métodos {@code @Bean} carregaria as classes ausentes e
+ * derrubaria o contexto mesmo com {@code storage.type=filesystem}.</p>
  */
 @AutoConfiguration
+@Import({S3StorageConfiguration.class, HealthConfiguration.class})
 public class TrustStoreAutoConfiguration {
 
     /**
@@ -67,18 +72,19 @@ public class TrustStoreAutoConfiguration {
     }
 
     /**
-     * Binding de {@link S3Properties} ativado apenas quando o storage type é S3.
-     * A validação Bean Validation ({@code @Validated}) roda após o binding.
-     * {@code @ConditionalOnMissingBean} permite que o consumidor forneça o próprio bean
-     * sem causar {@code NoUniqueBeanDefinitionException}.
+     * Falha cedo, com diagnóstico legível, quando o storage S3 é selecionado sem o AWS SDK
+     * no classpath. Sem esta configuração, {@link S3StorageConfiguration} seria apenas
+     * ignorada e o erro apareceria como ausência genérica de {@link TrustStoreRepository}.
      */
-    @Bean
-    @ConfigurationProperties(prefix = "icpbrasil-truststore.s3")
-    @Validated
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-    @ConditionalOnMissingBean(S3Properties.class)
-    S3Properties s3Properties() {
-        return new S3Properties();
+    @ConditionalOnMissingClass("software.amazon.awssdk.services.s3.S3Client")
+    static class S3SdkAusenteConfiguration {
+        S3SdkAusenteConfiguration() {
+            throw new IllegalStateException("icpbrasil-truststore.storage.type=s3 requer as dependências "
+                    + "software.amazon.awssdk:s3 e software.amazon.awssdk:apache-client no classpath "
+                    + "(opcionais no icpbrasil-truststore-autoconfigure)");
+        }
     }
 
     @Bean
@@ -153,14 +159,6 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "filesystem", matchIfMissing = true)
     public FilesystemTrustStoreRepository filesystemTrustStoreRepository(TrustStoreConfig trustStoreConfig) {
         return new FilesystemTrustStoreRepository(trustStoreConfig);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(TrustStoreRepository.class)
-    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-    public S3Repository s3Repository(S3Client s3Client, TrustStoreConfig trustStoreConfig,
-                                     S3Properties s3Properties) {
-        return new S3Repository(s3Client, trustStoreConfig, s3Properties);
     }
 
     @Bean
@@ -242,14 +240,5 @@ public class TrustStoreAutoConfiguration {
     public TrustStoreScheduler trustStoreScheduler(TrustStoreService trustStoreService,
                                                    TrustStoreConfig trustStoreConfig) {
         return new TrustStoreScheduler(trustStoreService, trustStoreConfig);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
-    public TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
-                                                                         TrustStoreConfig config,
-                                                                         Cache trustStoreCache) {
-        return new TrustStoreCacheHealthIndicator(repository, config, trustStoreCache);
     }
 }

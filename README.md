@@ -144,7 +144,7 @@ icpbrasil-truststore:
     type: s3
 ```
 
-Credenciais via variáveis de ambiente:
+Credenciais via variáveis de ambiente (no modo biblioteca, adicione `software.amazon.awssdk:s3` e `software.amazon.awssdk:apache-client` à aplicação — são dependências opcionais do `autoconfigure`):
 
 | Variável | Descrição |
 |---|---|

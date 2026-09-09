@@ -1,9 +1,8 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.util.StringUtils;
@@ -25,11 +24,14 @@ import java.time.Duration;
 import java.util.Arrays;
 
 /**
- * Fábrica do {@link S3Client}, ativada apenas quando {@code icpbrasil-truststore.storage.type=s3}.
+ * Fábrica do {@link S3Client} padrão da biblioteca. Importada por {@link S3StorageConfiguration}
+ * (que já garante SDK presente e {@code storage.type=s3}); não é descoberta por component scan,
+ * evitando registro duplicado no serviço standalone.
  *
  * <p>Separada de {@link S3Properties} para manter o core livre de dependências do AWS SDK:
  * {@code S3Properties} é um POJO puro; este módulo ({@code autoconfigure}) detém a dependência
- * do SDK e toda a lógica de construção do cliente.</p>
+ * do SDK e toda a lógica de construção do cliente. Um bean {@code S3Client} definido pelo
+ * consumidor tem precedência.</p>
  *
  * <p>Quando {@code icpbrasil-truststore.s3.ca-cert-path} é definido, o cliente usa um
  * {@code TrustManager} exclusivo para aquele certificado CA, isolando a confiança do S3
@@ -37,9 +39,7 @@ import java.util.Arrays;
  * adequado para AWS S3 e endpoints com CA pública reconhecida.</p>
  */
 @Slf4j
-@Configuration
-@ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-public class S3ClientFactory {
+class S3ClientFactory {
 
     /**
      * Produz o {@link S3Client} configurado a partir das propriedades S3.
@@ -47,6 +47,7 @@ public class S3ClientFactory {
      * corretamente durante o shutdown do contexto Spring.
      */
     @Bean(destroyMethod = "close")
+    @ConditionalOnMissingBean(S3Client.class)
     public S3Client s3Client(S3Properties props) {
         var httpClientBuilder = ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(10))

@@ -13,6 +13,11 @@ import java.util.List;
  * Propriedades de configuração para o TrustStore ICP-Brasil.
  * Esta classe gerencia todas as configurações necessárias para download,
  * validação e armazenamento dos certificados do TrustStore ICP-Brasil.
+ *
+ * <p>Os valores iniciais dos campos são os defaults da biblioteca: uma aplicação
+ * consumidora precisa informar apenas o que não tem default (hoje, o diretório base
+ * do storage filesystem). {@link #validateProperties()} valida o resultado final
+ * do binding, com ou sem sobrescrita.</p>
  */
 @Data
 @Slf4j
@@ -30,75 +35,77 @@ public class TrustStoreConfig {
      * URL do arquivo de certificados (Trust Store ICP-Brasil).
      * [Resultado]: Define de onde o sistema baixa as atualizações.
      */
-    private String certificateUrl;
+    private String certificateUrl =
+            "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip";
 
     /**
      * URL do arquivo contendo o hash do arquivo de certificados.
      * [Resultado]: Usado para verificar a integridade do download.
      */
-    private String hashUrl;
+    private String hashUrl =
+            "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt";
 
     /**
      * Configurações de Rede e Resiliência.
      * [Resultado]: Controla o comportamento em caso de falha na conexão.
      */
-    private NetworkConfig network;
+    private NetworkConfig network = new NetworkConfig();
 
     /**
      * TTL crítico do cache em horas (usado para alertas).
      * [Resultado]: Tempo sem atualização para entrar em estado CRÍTICO.
      */
-    private int cacheTtlCriticalHours;
+    private int cacheTtlCriticalHours = 72;
 
     /**
      * TTL máximo do cache em horas (usado para alertas).
      * [Resultado]: Tempo máximo de vida do cache antes de expirar.
      */
-    private int cacheTtlMaxHours;
+    private int cacheTtlMaxHours = 168;
 
     /**
      * Período para recuperação de Trust Store atualizado em horas.
      * [Resultado]: Frequência de verificação de novas atualizações.
      */
-    private int refreshIntervalHours;
+    private int refreshIntervalHours = 2;
 
     /**
      * Estratégia de Armazenamento.
      * [Resultado]: Define se os artefatos ficam em disco local ou na nuvem (S3-compatível).
      */
-    private StorageConfig storage;
+    private StorageConfig storage = new StorageConfig();
 
     /**
      * Configurações específicas para armazenamento no filesystem local.
      * Ativado quando storage.type=filesystem.
      */
-    private FilesystemConfig filesystem;
+    private FilesystemConfig filesystem = new FilesystemConfig();
 
     /**
      * Diretório de Certificados Confiáveis Fixos.
      * [Resultado]: Local onde o sistema busca certificados adicionais (JSON).
      */
-    private TrustedCertsConfig trustedCerts;
+    private TrustedCertsConfig trustedCerts = new TrustedCertsConfig();
 
     /**
      * Configurações de verificação de revogação (OCSP e CRL).
      */
-    private RevocationConfig revocation;
+    private RevocationConfig revocation = new RevocationConfig();
 
     /**
      * Configurações de montagem de cadeia de certificados via AIA CA Issuers.
      */
-    private ChainConfig chain;
+    private ChainConfig chain = new ChainConfig();
 
     /**
      * Configurações de política de download (proteção SSRF e limites de tamanho).
      */
-    private DownloadPolicyConfig downloadPolicy;
+    private DownloadPolicyConfig downloadPolicy = new DownloadPolicyConfig();
 
     /**
      * Configurações do bootstrap síncrono (carga do cache durante o startup).
      */
-    private BootstrapConfig bootstrap;
+    private BootstrapConfig bootstrap = new BootstrapConfig();
 
     /**
      * Configurações de armazenamento — caminhos dos artefatos (comuns a todos os tipos).
@@ -108,22 +115,22 @@ public class TrustStoreConfig {
         /**
          * Tipo de armazenamento (filesystem | s3).
          */
-        private String type;
+        private String type = "filesystem";
 
         /**
          * Caminho do arquivo compactado do truststore.
          */
-        private String truststoreArchivePath;
+        private String truststoreArchivePath = "ACcompactado.zip";
 
         /**
          * Caminho do arquivo de hash.
          */
-        private String hashFilePath;
+        private String hashFilePath = "hash.txt";
 
         /**
          * Caminho do arquivo de última confirmação.
          */
-        private String confirmationFilePath;
+        private String confirmationFilePath = "ultima_confirmacao.txt";
     }
 
     /**
@@ -133,6 +140,7 @@ public class TrustStoreConfig {
     public static class FilesystemConfig {
         /**
          * Diretório base onde os artefatos são armazenados no disco.
+         * Sem default: cada aplicação define onde o acervo pode ser gravado.
          */
         private String baseDir;
     }
@@ -145,7 +153,7 @@ public class TrustStoreConfig {
         /**
          * Diretório contendo os arquivos JSON de certificados confiáveis (classpath ou disco).
          */
-        private String dir;
+        private String dir = "classpath:registries/certificates";
     }
 
     /**
@@ -156,17 +164,17 @@ public class TrustStoreConfig {
         /**
          * Timeout de download em segundos (padrão 60, intervalo [30, 300]).
          */
-        private int downloadTimeoutSeconds;
+        private int downloadTimeoutSeconds = 60;
 
         /**
          * Número máximo de tentativas (padrão 3, intervalo [1, 10]).
          */
-        private int maxRetries;
+        private int maxRetries = 3;
 
         /**
          * Intervalo entre tentativas em segundos (padrão 30, intervalo [10, 300]).
          */
-        private int retryIntervalSeconds;
+        private int retryIntervalSeconds = 30;
 
         /**
          * Retorna o timeout de download em milissegundos
