@@ -194,7 +194,7 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 | `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
 | `CrlUnavailable` | CRL inacessível após todas as tentativas |
 | `NoConnectivity` | Verificação interrompida (thread interrupted) |
-| `Malformed` | Resposta OCSP ou CRL corrompida ou com status inesperado |
+| `Malformed` | Resposta OCSP ou CRL corrompida, com status inesperado ou evidência inválida, vencida ou não correspondente ao certificado consultado |
 
 Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
 
