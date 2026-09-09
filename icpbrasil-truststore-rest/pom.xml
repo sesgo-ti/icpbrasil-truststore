@@ -15,10 +15,7 @@
   <description>Microserviço standalone: endpoint REST de consulta por SKI, health checks e fat jar executável.</description>
 
   <properties>
-    <!-- Artefato de deploy (fat jar) — não é publicado no Maven Central. A exclusão fica em
-         excludeArtifacts no parent e na seleção do reactor no workflow. Não usar skipPublishing
-         aqui: sua semântica variou entre versões do plugin e o REST é o último módulo do reactor
-         completo, posição em que a flag já suprimiu o upload do bundle inteiro. -->
+    <!-- Artefato de deploy (fat jar): não é publicado no Maven Central (ver excludeArtifacts no parent) -->
     <maven.deploy.skip>true</maven.deploy.skip>
   </properties>
 

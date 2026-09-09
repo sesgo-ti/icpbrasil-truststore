@@ -30,8 +30,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # -Prelease exercita sources e Javadoc (exigidos pelo Central) a cada build,
-      # sem assinatura: falhas de empacotamento aparecem no PR, não só na tag.
+      # -Prelease gera os sources/Javadoc exigidos pelo Central; -Dgpg.skip dispensa chave no CI.
       - name: Build e testes
         run: ./mvnw -B --no-transfer-progress verify -Prelease -Dgpg.skip=true
 

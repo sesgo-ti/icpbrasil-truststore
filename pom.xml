@@ -42,7 +42,9 @@
        child.scm.url.inherit.append.path="false">
     <connection>scm:git:https://github.com/sesgo-ti/icpbrasil-truststore.git</connection>
     <developerConnection>scm:git:git@github.com:sesgo-ti/icpbrasil-truststore.git</developerConnection>
-    <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
+  <!-- Os atributos child.*.inherit.append.path="false" (em <project> e em <scm>) impedem o Maven de
+       anexar o artifactId de cada módulo às URLs herdadas: todos os módulos vivem neste repositório. -->
+  <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
     <tag>HEAD</tag>
   </scm>
 
@@ -305,9 +307,8 @@
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
               <waitUntil>published</waitUntil>
-              <!-- O fat jar do REST é artefato de deploy, não biblioteca. O workflow já o deixa
-                   fora do reactor (-pl core,autoconfigure -am); esta exclusão protege um
-                   "deploy" executado no reactor completo. Filtra por artifactId, incluindo anexos. -->
+              <!-- Exclui o fat jar do REST. Não usar skipPublishing no módulo: como último do
+                   reactor, a flag suprimia o upload de todos os módulos (plugin anterior à 0.9.0). -->
               <excludeArtifacts>
                 <excludeArtifact>icpbrasil-truststore-rest</excludeArtifact>
               </excludeArtifacts>

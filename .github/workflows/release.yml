@@ -25,9 +25,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # A tag é o único gatilho: antes de qualquer credencial, garante que ela corresponde
-      # exatamente à versão dos POMs (sem -SNAPSHOT) — uma tag errada não pode publicar
-      # uma versão diferente da anunciada.
+      # Roda antes de qualquer credencial: tag diferente de v<versão dos POMs> ou versão SNAPSHOT aborta.
       - name: Validar tag contra a versão do projeto
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -57,9 +55,7 @@ jobs:
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
-      # Somente parent + core + autoconfigure vão para o Central; o REST (fat jar) é
-      # artefato de deploy e fica fora do reactor de publicação.
-      - name: Assinar e publicar as bibliotecas no Maven Central
+      - name: Assinar e publicar parent, core e autoconfigure no Maven Central
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
