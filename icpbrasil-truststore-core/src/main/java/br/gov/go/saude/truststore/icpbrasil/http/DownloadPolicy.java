@@ -5,14 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Aplica regras de segurança a downloads iniciados por URLs extraídas de certificados.
  *
- * <p>Protege contra SSRF bloqueando esquemas não-HTTP(S), IPs privados e hostnames
- * reservados. Aplica limites de tamanho de resposta por tipo de artefato.</p>
+ * <p>Protege contra SSRF bloqueando esquemas não-HTTP(S), hostnames reservados e endereços
+ * não públicos, tanto em literais quanto nos endereços resolvidos via DNS. Expõe os limites de
+ * tamanho por tipo de artefato, aplicados pelo {@link CertificateHttpTransport} durante o
+ * recebimento da resposta.</p>
  */
 @Slf4j
 public class DownloadPolicy {
@@ -20,6 +24,10 @@ public class DownloadPolicy {
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
     private static final Set<String> BLOCKED_HOSTNAMES =
             Set.of("localhost", "ip6-localhost", "ip6-loopback");
+
+    // Um host só de dígitos e pontos nunca é um nome DNS válido (TLD não pode ser numérico);
+    // tratá-lo como literal cobre formas abreviadas como "1234", que a JVM expande para IPv4.
+    private static final Pattern IPV4_LITERAL = Pattern.compile("[0-9.]+");
 
     private final TrustStoreConfig.DownloadPolicyConfig config;
 
@@ -48,24 +56,24 @@ public class DownloadPolicy {
     }
 
     /**
-     * Valida o tamanho da resposta OCSP.
+     * Limite em bytes para respostas OCSP, aplicado durante o recebimento.
      */
-    public void validateOcspResponseSize(byte[] response, String url) {
-        validateSize(response, url, config.getMaxOcspResponseBytes(), "OCSP");
+    public long getMaxOcspResponseBytes() {
+        return config.getMaxOcspResponseBytes();
     }
 
     /**
-     * Valida o tamanho da resposta CRL.
+     * Limite em bytes para CRLs, aplicado durante o recebimento.
      */
-    public void validateCrlResponseSize(byte[] response, String url) {
-        validateSize(response, url, config.getMaxCrlResponseBytes(), "CRL");
+    public long getMaxCrlResponseBytes() {
+        return config.getMaxCrlResponseBytes();
     }
 
     /**
-     * Valida o tamanho da resposta AIA CA Issuers.
+     * Limite em bytes para respostas AIA CA Issuers, aplicado durante o recebimento.
      */
-    public void validateAiaResponseSize(byte[] response, String url) {
-        validateSize(response, url, config.getMaxAiaResponseBytes(), "AIA");
+    public long getMaxAiaResponseBytes() {
+        return config.getMaxAiaResponseBytes();
     }
 
     private void validateScheme(URI uri, String rawUrl) {
@@ -87,13 +95,14 @@ public class DownloadPolicy {
             throw new DownloadPolicyException("Host reservado bloqueado: " + host);
         }
 
-        if (isPrivateIpLiteral(host)) {
-            throw new DownloadPolicyException(
-                    "Endereço IP privado ou de loopback bloqueado: " + host + " em: " + rawUrl);
-        }
-
-        if (config.isBlockPrivateHostnames()) {
-            checkResolvedAddress(host, rawUrl);
+        if (isIpLiteral(host)) {
+            InetAddress address = parseIpLiteral(host, rawUrl);
+            if (isNonPublicAddress(address)) {
+                throw new DownloadPolicyException(
+                        "Endereço IP não público bloqueado: " + host + " em: " + rawUrl);
+            }
+        } else if (config.isBlockPrivateHostnames()) {
+            checkResolvedAddresses(host, rawUrl);
         }
 
         List<String> allowlist = config.getAllowedDomains();
@@ -103,56 +112,71 @@ public class DownloadPolicy {
         }
     }
 
-    private void validateSize(byte[] response, String url, long maxBytes, String type) {
-        if (response.length > maxBytes) {
-            throw new DownloadPolicyException(
-                    "Resposta " + type + " muito grande: " + response.length
-                    + " bytes de " + url + " (máximo: " + maxBytes + " bytes)");
-        }
+    private boolean isIpLiteral(String host) {
+        return host.startsWith("[") || IPV4_LITERAL.matcher(host).matches();
     }
 
-    private boolean isPrivateIpLiteral(String host) {
-        String cleanHost = (host.startsWith("[") && host.endsWith("]"))
+    private InetAddress parseIpLiteral(String host, String rawUrl) {
+        String literal = (host.startsWith("[") && host.endsWith("]"))
                 ? host.substring(1, host.length() - 1)
                 : host;
-
-        if (!looksLikeIpLiteral(cleanHost)) {
-            return false;
-        }
-
         try {
-            InetAddress addr = InetAddress.getByName(cleanHost);
-            return addr.isLoopbackAddress()
-                    || addr.isSiteLocalAddress()
-                    || addr.isLinkLocalAddress()
-                    || addr.isAnyLocalAddress()
-                    || addr.isMulticastAddress();
-        } catch (Exception e) {
-            return false;
+            return InetAddress.getByName(literal);
+        } catch (UnknownHostException | SecurityException e) {
+            throw new DownloadPolicyException("Endereço IP inválido '" + host + "' em: " + rawUrl);
         }
     }
 
-    private boolean looksLikeIpLiteral(String host) {
-        return host.matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+") || host.contains(":");
-    }
-
-    private void checkResolvedAddress(String host, String url) {
+    /**
+     * Falha de resolução bloqueia: sem o endereço não há como garantir que o destino é público.
+     */
+    private void checkResolvedAddresses(String host, String rawUrl) {
+        InetAddress[] addresses;
         try {
-            InetAddress[] addresses = InetAddress.getAllByName(host);
-            for (InetAddress addr : addresses) {
-                if (addr.isLoopbackAddress() || addr.isSiteLocalAddress()
-                        || addr.isLinkLocalAddress() || addr.isAnyLocalAddress()) {
-                    throw new DownloadPolicyException(
-                            "Host '" + host + "' resolve para endereço privado "
-                            + addr.getHostAddress() + " em: " + url);
-                }
+            addresses = resolve(host);
+        } catch (UnknownHostException | SecurityException e) {
+            log.debug("Falha ao resolver '{}' para verificação SSRF: {}", host, e.getMessage());
+            throw new DownloadPolicyException(
+                    "Host '" + host + "' não pôde ser resolvido; download bloqueado em: " + rawUrl);
+        }
+        for (InetAddress address : addresses) {
+            if (isNonPublicAddress(address)) {
+                throw new DownloadPolicyException(
+                        "Host '" + host + "' resolve para endereço não público "
+                        + address.getHostAddress() + " em: " + rawUrl);
             }
-        } catch (DownloadPolicyException e) {
-            throw e;
-        } catch (Exception e) {
-            log.debug("Não foi possível resolver hostname '{}' para verificação SSRF: {}",
-                    host, e.getMessage());
         }
+    }
+
+    /**
+     * Resolução DNS do host; ponto de substituição em testes, que não devem depender de rede.
+     */
+    InetAddress[] resolve(String host) throws UnknownHostException {
+        return InetAddress.getAllByName(host);
+    }
+
+    /**
+     * Classifica endereços que nunca devem ser destino de download disparado por certificado:
+     * não especificado, loopback, link-local, site-local (RFC 1918 e fec0::/10), multicast,
+     * "esta rede" (0.0.0.0/8), CGNAT (100.64.0.0/10), IETF protocol assignments (192.0.0.0/24),
+     * benchmarking (198.18.0.0/15) e ULA (fc00::/7). Endereços IPv4 mapeados em IPv6 chegam
+     * aqui já convertidos pela JVM em {@code Inet4Address}.
+     */
+    private static boolean isNonPublicAddress(InetAddress address) {
+        if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress()
+                || address.isSiteLocalAddress() || address.isMulticastAddress()) {
+            return true;
+        }
+        byte[] octets = address.getAddress();
+        if (octets.length == 4) {
+            int first = octets[0] & 0xFF;
+            int second = octets[1] & 0xFF;
+            return first == 0
+                    || (first == 100 && (second & 0xC0) == 64)
+                    || (first == 192 && second == 0 && octets[2] == 0)
+                    || (first == 198 && (second & 0xFE) == 18);
+        }
+        return (octets[0] & 0xFE) == 0xFC;
     }
 
     private boolean isAllowed(String host, List<String> allowedDomains) {

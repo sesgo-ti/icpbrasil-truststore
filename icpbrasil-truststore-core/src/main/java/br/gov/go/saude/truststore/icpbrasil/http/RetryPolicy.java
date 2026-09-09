@@ -60,7 +60,9 @@ public class RetryPolicy {
      * @param intervalMillis intervalo entre tentativas em milissegundos
      * @param task           operação a executar
      * @return resultado da primeira execução bem-sucedida
-     * @throws Exception exceção da última tentativa se todas falharem
+     * @throws DownloadPolicyException imediatamente, sem novas tentativas: a violação de política
+     *                                 não é transitória e repetir só refaria o consumo bloqueado
+     * @throws Exception               exceção da última tentativa se todas falharem
      */
     public <T> T executeWithRetry(String operation, int maxRetries, long intervalMillis,
                                    Callable<T> task) throws Exception {
@@ -73,6 +75,8 @@ public class RetryPolicy {
                 return task.call();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                throw e;
+            } catch (DownloadPolicyException e) {
                 throw e;
             } catch (Exception e) {
                 lastException = e;

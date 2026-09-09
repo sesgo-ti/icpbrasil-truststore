@@ -97,4 +97,18 @@ class RetryPolicyTest {
 
         assertEquals(3, tentativas.get());
     }
+
+    @Test
+    void testExecuteWithRetry_Callable_DownloadPolicyException_NaoRetenta() {
+        AtomicInteger tentativas = new AtomicInteger(0);
+
+        DownloadPolicyException thrown = assertThrows(DownloadPolicyException.class, () ->
+                retryPolicy.executeWithRetry("operação", 2, 1, () -> {
+                    tentativas.incrementAndGet();
+                    throw new DownloadPolicyException("bloqueado pela política");
+                }));
+
+        assertEquals("bloqueado pela política", thrown.getMessage());
+        assertEquals(1, tentativas.get());
+    }
 }

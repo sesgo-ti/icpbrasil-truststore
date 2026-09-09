@@ -239,9 +239,10 @@ O `DownloadPolicy` protege contra SSRF (Server-Side Request Forgery) e exaustão
 - Apenas esquemas `http` e `https` são permitidos
 - Endereços localhost e reservados são bloqueados (127.x.x.x, ::1, etc.)
 - IPs privados literais são bloqueados (10.x.x.x, 172.16–31.x.x, 192.168.x.x)
-- O tamanho da resposta é verificado antes de carregar o conteúdo em memória
+- O limite de tamanho da resposta é aplicado durante o recebimento: a conexão é cancelada assim que o limite é excedido, inclusive em respostas de erro
+- Redirects HTTP não são seguidos
 
-**`block-private-hostnames`:** quando `true` (padrão), o hostname é resolvido via DNS antes do download — a conexão é bloqueada se o IP resultante for privado. Desabilite em ambientes de desenvolvimento onde os servidores OCSP/CRL estão em rede interna.
+**`block-private-hostnames`:** quando `true` (padrão), o hostname é resolvido via DNS antes do download — a conexão é bloqueada se algum IP resultante não for público (inclusive ULA `fc00::/7` e CGNAT `100.64.0.0/10`) ou se a resolução falhar. Desabilite em ambientes de desenvolvimento onde os servidores OCSP/CRL estão em rede interna.
 
 **`allowed-domains`:** lista de sufixos de domínio. Quando vazia (padrão), qualquer domínio público é aceito. A correspondência é por sufixo do hostname: `icpbrasil.gov.br` cobre `ocsp.icpbrasil.gov.br`, `crl.icpbrasil.gov.br`, etc. Exemplo para restringir apenas a domínios governamentais:
 

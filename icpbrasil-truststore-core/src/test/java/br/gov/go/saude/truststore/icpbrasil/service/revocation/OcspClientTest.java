@@ -16,11 +16,11 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class OcspClientTest {
@@ -30,6 +30,7 @@ class OcspClientTest {
     HttpClient mockHttpClient;
     DownloadPolicy downloadPolicy;
     RevocationCache cache;
+    RetryPolicy retryPolicy;
     OcspClient client;
 
     KeyPair rootKeyPair;
@@ -49,7 +50,9 @@ class OcspClientTest {
         leafCert = generateLeafCert(leafKeyPair, rootKeyPair, rootCert);
 
         mockHttpClient = mock(HttpClient.class);
+        when(mockHttpClient.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
         downloadPolicy = mock(DownloadPolicy.class);
+        when(downloadPolicy.getMaxOcspResponseBytes()).thenReturn(1_048_576L);
         cache = mock(RevocationCache.class);
         when(cache.getOcsp(any())).thenReturn(Optional.empty());
 
@@ -65,7 +68,7 @@ class OcspClientTest {
         networkConfig.setRetryIntervalSeconds(0);
         trustStoreConfig.setNetwork(networkConfig);
 
-        RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
+        retryPolicy = new RetryPolicy(trustStoreConfig);
         client = new OcspClient(cache, retryPolicy, revocationConfig, mockHttpClient, downloadPolicy);
     }
 
@@ -77,16 +80,13 @@ class OcspClientTest {
         RevocationStatus status = client.check(leafCert, rootCert, OCSP_URL);
 
         assertInstanceOf(RevocationStatus.OcspUnavailable.class, status);
-        verifyNoInteractions(mockHttpClient);
+        verify(mockHttpClient, never()).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
     @SneakyThrows
     void testCheckRespostaMuitoGrandeRetornaOcspUnavailable() {
-        mockHttpResponse(new byte[]{1, 2, 3});
-
-        doThrow(new DownloadPolicyException("Resposta OCSP muito grande"))
-                .when(downloadPolicy).validateOcspResponseSize(any(byte[].class), eq(OCSP_URL));
+        mockHttpFailure(new DownloadPolicyException("Resposta OCSP muito grande"));
 
         RevocationStatus status = client.check(leafCert, rootCert, OCSP_URL);
 
@@ -96,26 +96,29 @@ class OcspClientTest {
     @Test
     @SneakyThrows
     void testCheckRespostaMuitoGrandeNaoRetenta() {
-        mockHttpResponse(new byte[]{1, 2, 3});
+        TrustStoreConfig.RevocationConfig comRetries = new TrustStoreConfig.RevocationConfig();
+        comRetries.setOcspTimeoutSeconds(10);
+        comRetries.setMaxRetries(2);
+        comRetries.setRetryIntervalSeconds(0);
+        OcspClient clientComRetries =
+                new OcspClient(cache, retryPolicy, comRetries, mockHttpClient, downloadPolicy);
+        mockHttpFailure(new DownloadPolicyException("Resposta OCSP muito grande"));
 
-        doThrow(new DownloadPolicyException("Resposta OCSP muito grande"))
-                .when(downloadPolicy).validateOcspResponseSize(any(byte[].class), eq(OCSP_URL));
+        clientComRetries.check(leafCert, rootCert, OCSP_URL);
 
-        client.check(leafCert, rootCert, OCSP_URL);
-
-        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        // Violação de política não é transitória: uma única requisição mesmo com retries configurados
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     // --- Helpers: HTTP mock ---
 
-    @SneakyThrows
+    /**
+     * Simula a falha assíncrona que o transporte observa: o cancelamento por excesso de
+     * tamanho chega como future completado excepcionalmente.
+     */
     @SuppressWarnings("unchecked")
-    private void mockHttpResponse(byte[] body) {
-        HttpResponse<byte[]> mockResponse = mock(HttpResponse.class);
-        when(mockResponse.statusCode()).thenReturn(200);
-        when(mockResponse.body()).thenReturn(body);
-
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(mockResponse);
+    private void mockHttpFailure(Exception failure) {
+        doReturn(CompletableFuture.failedFuture(failure))
+                .when(mockHttpClient).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 }

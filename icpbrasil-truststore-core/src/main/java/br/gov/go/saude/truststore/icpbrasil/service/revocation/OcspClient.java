@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -18,11 +19,7 @@ import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
 
 import javax.security.auth.x500.X500Principal;
-import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -40,11 +37,13 @@ import java.util.Optional;
 public class OcspClient {
 
     private static final String BC_PROVIDER = "BC";
+    private static final String OCSP_REQUEST_CONTENT_TYPE = "application/ocsp-request";
+    private static final String OCSP_RESPONSE_CONTENT_TYPE = "application/ocsp-response";
 
     private final RevocationCache cache;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
-    private final HttpClient httpClient;
+    private final CertificateHttpTransport transport;
     private final DownloadPolicy downloadPolicy;
 
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy,
@@ -53,10 +52,8 @@ public class OcspClient {
         this.retryPolicy = retryPolicy;
         this.config = trustStoreConfig.getRevocation();
         this.downloadPolicy = downloadPolicy;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(config.getOcspTimeoutSeconds()))
-                .build();
+        this.transport = new CertificateHttpTransport(downloadPolicy,
+                Duration.ofSeconds(config.getOcspTimeoutSeconds()));
     }
 
     public OcspClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
@@ -64,8 +61,8 @@ public class OcspClient {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
-        this.httpClient = httpClient;
         this.downloadPolicy = downloadPolicy;
+        this.transport = new CertificateHttpTransport(downloadPolicy, httpClient);
     }
 
     /**
@@ -100,8 +97,6 @@ public class OcspClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> sendRequest(cert, issuer, url));
 
-            downloadPolicy.validateOcspResponseSize(responseBytes, url);
-
             RevocationStatus result = parseResponse(responseBytes, cert, issuer);
             if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
                 cache.putOcsp(cacheKey, responseBytes);
@@ -128,18 +123,8 @@ public class OcspClient {
     private byte[] sendRequest(X509Certificate cert, X509Certificate issuer,
                                String url) throws Exception {
         byte[] requestBytes = buildRequest(cert, issuer);
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(config.getOcspTimeoutSeconds()))
-                .header("Content-Type", "application/ocsp-request")
-                .header("Accept", "application/ocsp-response")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(requestBytes))
-                .build();
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IOException("OCSP HTTP status: " + response.statusCode());
-        }
-        return response.body();
+        return transport.post(url, requestBytes, OCSP_REQUEST_CONTENT_TYPE, OCSP_RESPONSE_CONTENT_TYPE,
+                downloadPolicy.getMaxOcspResponseBytes(), Duration.ofSeconds(config.getOcspTimeoutSeconds()));
     }
 
     private byte[] buildRequest(X509Certificate cert, X509Certificate issuer) throws Exception {

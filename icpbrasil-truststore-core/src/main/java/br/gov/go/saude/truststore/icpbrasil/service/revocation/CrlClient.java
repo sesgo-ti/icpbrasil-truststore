@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -9,10 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
@@ -29,7 +27,7 @@ public class CrlClient {
     private final RevocationCache cache;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.RevocationConfig config;
-    private final HttpClient httpClient;
+    private final CertificateHttpTransport transport;
     private final DownloadPolicy downloadPolicy;
 
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy,
@@ -38,10 +36,8 @@ public class CrlClient {
         this.retryPolicy = retryPolicy;
         this.config = trustStoreConfig.getRevocation();
         this.downloadPolicy = downloadPolicy;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
-                .build();
+        this.transport = new CertificateHttpTransport(downloadPolicy,
+                Duration.ofSeconds(config.getCrlTimeoutSeconds()));
     }
 
     public CrlClient(RevocationCache cache, RetryPolicy retryPolicy, TrustStoreConfig.RevocationConfig config,
@@ -49,8 +45,8 @@ public class CrlClient {
         this.cache = cache;
         this.retryPolicy = retryPolicy;
         this.config = config;
-        this.httpClient = httpClient;
         this.downloadPolicy = downloadPolicy;
+        this.transport = new CertificateHttpTransport(downloadPolicy, httpClient);
     }
 
     /**
@@ -83,8 +79,6 @@ public class CrlClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> download(url));
 
-            downloadPolicy.validateCrlResponseSize(crlBytes, url);
-
             RevocationStatus result = parse(crlBytes, cert, issuer);
             if (result instanceof RevocationStatus.Good || result instanceof RevocationStatus.Revoked) {
                 cache.putCrl(url, crlBytes);
@@ -103,17 +97,9 @@ public class CrlClient {
         }
     }
 
-    private byte[] download(String url) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(config.getCrlTimeoutSeconds()))
-                .GET()
-                .build();
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IOException("CRL HTTP status: " + response.statusCode());
-        }
-        return response.body();
+    private byte[] download(String url) throws IOException, InterruptedException {
+        return transport.get(url, downloadPolicy.getMaxCrlResponseBytes(),
+                Duration.ofSeconds(config.getCrlTimeoutSeconds()));
     }
 
     /**

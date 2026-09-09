@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -8,10 +9,7 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -32,14 +30,14 @@ import java.util.Set;
  * <p>Após montar a cadeia via AKI→SKI, cada assinatura é verificada criptograficamente
  * contra o emissor, garantindo integridade da cadeia.</p>
  *
- * <p>O HttpClient usa o trust store padrão da JVM, pois os endpoints AIA são
+ * <p>O transporte HTTP usa o trust store padrão da JVM, pois os endpoints AIA são
  * acessados via CAs públicas.</p>
  */
 @Slf4j
 public class CertificateChainResolver {
     private static final int MAX_CHAIN_DEPTH = 10;
 
-    private final HttpClient httpClient;
+    private final CertificateHttpTransport transport;
     private final RetryPolicy retryPolicy;
     private final TrustStoreConfig.ChainConfig chainConfig;
     private final DownloadPolicy downloadPolicy;
@@ -49,18 +47,16 @@ public class CertificateChainResolver {
         this.retryPolicy = retryPolicy;
         this.chainConfig = trustStoreConfig.getChain();
         this.downloadPolicy = downloadPolicy;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()))
-                .build();
+        this.transport = new CertificateHttpTransport(downloadPolicy,
+                Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()));
     }
 
     public CertificateChainResolver(RetryPolicy retryPolicy, TrustStoreConfig.ChainConfig chainConfig,
                                     HttpClient httpClient, DownloadPolicy downloadPolicy) {
         this.retryPolicy = retryPolicy;
         this.chainConfig = chainConfig;
-        this.httpClient = httpClient;
         this.downloadPolicy = downloadPolicy;
+        this.transport = new CertificateHttpTransport(downloadPolicy, httpClient);
     }
 
     /**
@@ -165,8 +161,6 @@ public class CertificateChainResolver {
                         chainConfig.getRetryIntervalSeconds() * 1000L,
                         () -> downloadBytes(url));
 
-                downloadPolicy.validateAiaResponseSize(data, url);
-
                 List<X509Certificate> certs = CertificateParser.parseAll(data);
                 if (!certs.isEmpty()) {
                     log.debug("Baixados {} certificados de {}", certs.size(), url);
@@ -186,17 +180,8 @@ public class CertificateChainResolver {
     }
 
     private byte[] downloadBytes(String url) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()))
-                .GET()
-                .build();
-
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() != 200) {
-            throw new IOException("HTTP " + response.statusCode() + " para " + url);
-        }
-        return response.body();
+        return transport.get(url, downloadPolicy.getMaxAiaResponseBytes(),
+                Duration.ofSeconds(chainConfig.getDownloadTimeoutSeconds()));
     }
 
     /**
