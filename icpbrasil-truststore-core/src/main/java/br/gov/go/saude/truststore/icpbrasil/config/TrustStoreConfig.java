@@ -35,15 +35,13 @@ public class TrustStoreConfig {
      * URL do arquivo de certificados (Trust Store ICP-Brasil).
      * [Resultado]: Define de onde o sistema baixa as atualizações.
      */
-    private String certificateUrl =
-            "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip";
+    private String certificateUrl = IcpBrasilEndpoints.BUNDLE_ZIP_URL;
 
     /**
      * URL do arquivo contendo o hash do arquivo de certificados.
      * [Resultado]: Usado para verificar a integridade do download.
      */
-    private String hashUrl =
-            "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt";
+    private String hashUrl = IcpBrasilEndpoints.BUNDLE_HASH_URL;
 
     /**
      * Configurações de Rede e Resiliência.

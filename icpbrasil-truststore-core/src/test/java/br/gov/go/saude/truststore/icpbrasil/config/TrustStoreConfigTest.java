@@ -20,8 +20,9 @@ class TrustStoreConfigTest {
 
         assertDoesNotThrow(config::validateProperties);
 
-        assertTrue(config.getCertificateUrl().startsWith("https://acraiz.icpbrasil.gov.br/"));
-        assertTrue(config.getHashUrl().startsWith("https://acraiz.icpbrasil.gov.br/"));
+        assertEquals(IcpBrasilEndpoints.BUNDLE_ZIP_URL, config.getCertificateUrl());
+        assertEquals(IcpBrasilEndpoints.BUNDLE_HASH_URL, config.getHashUrl());
+        assertTrue(IcpBrasilEndpoints.BUNDLE_ZIP_URL.startsWith("https://acraiz.icpbrasil.gov.br/"));
         assertEquals("filesystem", config.getStorage().getType());
         assertEquals("ACcompactado.zip", config.getStorage().getTruststoreArchivePath());
         assertEquals("hash.txt", config.getStorage().getHashFilePath());
