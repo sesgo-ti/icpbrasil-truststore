@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configurar JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -40,7 +40,7 @@ jobs:
         run: ./mvnw -B -ntp clean verify -Prelease -Dgpg.skip=true
 
       - name: Configurar credenciais do Central e chave GPG
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
