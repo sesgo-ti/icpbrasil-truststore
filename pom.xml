@@ -5,7 +5,7 @@
 
   <groupId>br.gov.go.saude</groupId>
   <artifactId>icpbrasil-truststore</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1</version>
   <packaging>pom</packaging>
 
   <modules>
