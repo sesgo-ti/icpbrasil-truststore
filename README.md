@@ -27,6 +27,7 @@ Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets
 - Sincronização automática em background
 - Dois backends de armazenamento: filesystem local ou S3-compatível (MinIO, AWS S3, etc.)
 - Endpoint REST opcional para consulta de certificados por SKI
+- Validação PKIX (RFC 5280) de certificados pelo `CertPathBuilder`/`CertPathValidator` do JDK, ancorada nas raízes do acervo, com revogação de todo o caminho
 - Montagem de cadeia de certificados via AIA CA Issuers (suporte a DER, PEM e PKCS#7)
 - Verificação de revogação de certificados via OCSP e CRL com cache e fallback automático
 - Proteção contra SSRF e limites de tamanho configuráveis para downloads iniciados por extensões de certificados (AIA, OCSP, CRL)
@@ -184,7 +185,7 @@ O `RevocationService` verifica se um certificado foi revogado consultando OCSP e
 2. Se OCSP for inconclusivo, tenta CRL (se o certificado possuir CRL Distribution Points)
 3. Respostas OCSP e CRLs são cacheadas em memória com TTL configurável
 
-O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados:
+O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados; `lookup(cert, issuer)` devolve, junto do status, a evidência que o fundamenta (`RevocationEvidence`: resposta OCSP em DER ou CRL decodificada) quando ele é conclusivo:
 
 | Status | Significado |
 |---|---|
@@ -198,6 +199,37 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 
 Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
 
+### Validação de certificados (PKIX)
+
+O `PkixCertificateValidator` responde se um certificado é confiável **agora**: constrói o caminho até uma raiz do acervo ICP-Brasil com o `CertPathBuilder` PKIX do JDK, valida-o (encadeamento de nomes, assinaturas, validade, BasicConstraints, KeyUsage, políticas, extensões críticas e `jdk.certpath.disabledAlgorithms`) e verifica a revogação de cada certificado do caminho.
+
+```java
+ValidationResult result = validator.validate(certificado);          // só o certificado
+ValidationResult result = validator.validate(certificado, extras);  // com intermediárias conhecidas (ex.: de uma assinatura CMS)
+
+switch (result) {
+    case ValidationResult.Valid valid -> usar(valid.path(), valid.anchor(), valid.evidence());
+    case ValidationResult.Revoked revoked -> rejeitar(revoked.certificate(), revoked.reason());
+    case ValidationResult.Untrusted untrusted -> rejeitar(untrusted.reason());
+    case ValidationResult.RevocationUndetermined undetermined -> rejeitar(undetermined.status());
+    case ValidationResult.TrustStoreUnavailable unavailable -> indisponivel();
+}
+```
+
+Somente `Valid` autoriza o uso do certificado; os demais estados são terminais e devem ser tratados como rejeição — inclusive `RevocationUndetermined`, que nunca equivale a "não revogado".
+
+| Resultado | Significado |
+|---|---|
+| `Valid` | Caminho até uma âncora do acervo, válido na data da consulta e sem revogação; `path` (folha até o último intermediário), `anchor` e uma `evidence` por certificado do caminho |
+| `Revoked` | Algum certificado do caminho consta como revogado; `revokedAt`, `reason` e a `evidence` (resposta OCSP ou CRL) que o sustenta |
+| `Untrusted` | Não há caminho válido até uma âncora — `reason` é o motivo PKIX do JDK (`EXPIRED`, `NOT_YET_VALID`, `NO_TRUST_ANCHOR`, `INVALID_SIGNATURE`, ...) |
+| `RevocationUndetermined` | Caminho confiável, mas a revogação de `certificate` não pôde ser determinada; `status` é o `RevocationStatus` correspondente |
+| `TrustStoreUnavailable` | Acervo indisponível ou expirado; nenhuma validação é possível |
+
+A revogação é verificada em duas camadas, certificado a certificado (da folha até o último intermediário): o `RevocationService` obtém e valida a evidência (OCSP, depois CRL) dentro da política de download, e o `PKIXRevocationChecker` do JDK a reavalia, alimentado exclusivamente com essa evidência — cada certificado é submetido como caminho de um só elemento ancorado no seu emissor, por isso a folha pode ser verificada por OCSP e a AC por CRL. O JDK não abre conexões por conta própria: o download de CRL exige a propriedade global `com.sun.security.enableCRLDP` e a consulta OCSP só ocorre sem resposta pré-fornecida. Evidência aceita pela biblioteca e rejeitada pelo JDK resulta em `RevocationUndetermined` com `Malformed`.
+
+Emissores ausentes do acervo e dos `extras` são baixados via AIA pelo `CertificateChainResolver` apenas como candidatos. Para confiar em um emissor por outros meios (ex.: hierarquia de homologação, fora do acervo), use `validate(certificado, extras, TrustMaterial.anchoredAt(List.of(emissor)))`; a revogação da própria âncora não é verificada. Não há validação histórica (LTV): as evidências em `Valid.evidence()` ficam disponíveis para quem precisar preservá-las.
+
 ### Montagem de cadeia (AIA CA Issuers)
 
 ```yaml
@@ -209,6 +241,8 @@ icpbrasil-truststore:
 ```
 
 O `CertificateChainResolver` recebe um certificado folha (leaf) e constrói a cadeia completa `[leaf, intermediário1, ..., raiz]` baixando os emissores via extensão AIA (Authority Information Access) — CA Issuers. O download pode retornar um certificado único (DER/PEM) ou um pacote PKCS#7 (.p7b) contendo a cadeia inteira.
+
+> **O resolver não estabelece confiança.** Ele apenas encadeia assinaturas até *qualquer* auto-assinado, sem consultar o acervo nem verificar validade, BasicConstraints, KeyUsage ou políticas. Para decidir se um certificado é confiável, use o `PkixCertificateValidator` acima, que o emprega apenas como fonte de emissores via AIA.
 
 Características:
 

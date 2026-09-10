@@ -15,7 +15,7 @@
   </modules>
 
   <name>ICP-Brasil TrustStore</name>
-  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, montagem de cadeia via AIA, verificação de revogação OCSP/CRL e SSLContext dedicado.</description>
+  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, validação PKIX de certificados com o JDK (caminho até as raízes do acervo e revogação OCSP/CRL) e SSLContext dedicado.</description>
   <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
 
   <licenses>
