@@ -1,5 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  child.project.url.inherit.append.path="false">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>br.gov.go.saude</groupId>
@@ -14,7 +15,7 @@
   </modules>
 
   <name>ICP-Brasil TrustStore</name>
-  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, montagem de cadeia via AIA, verificação de revogação OCSP/CRL e SSLContext dedicado.</description>
+  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, validação PKIX de certificados com o JDK (caminho até as raízes do acervo e revogação OCSP/CRL) e SSLContext dedicado.</description>
   <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
 
   <licenses>
@@ -36,9 +37,13 @@
     </developer>
   </developers>
 
-  <scm>
+  <scm child.scm.connection.inherit.append.path="false"
+       child.scm.developerConnection.inherit.append.path="false"
+       child.scm.url.inherit.append.path="false">
     <connection>scm:git:https://github.com/sesgo-ti/icpbrasil-truststore.git</connection>
     <developerConnection>scm:git:git@github.com:sesgo-ti/icpbrasil-truststore.git</developerConnection>
+    <!-- Os atributos child.*.inherit.append.path="false" (em <project> e em <scm>) impedem o Maven de
+         anexar o artifactId de cada módulo às URLs herdadas: todos os módulos vivem neste repositório. -->
     <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
     <tag>HEAD</tag>
   </scm>
@@ -296,12 +301,17 @@
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>0.7.0</version>
+            <version>0.11.0</version>
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
               <waitUntil>published</waitUntil>
+              <!-- Exclui o fat jar do REST. Não usar skipPublishing no módulo: como último do
+                   reactor, a flag suprimia o upload de todos os módulos (plugin anterior à 0.9.0). -->
+              <excludeArtifacts>
+                <excludeArtifact>icpbrasil-truststore-rest</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
         </plugins>

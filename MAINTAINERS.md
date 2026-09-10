@@ -92,8 +92,10 @@ Visibilidade restrita ao repositório `icpbrasil-truststore`.
 ## Publicando uma nova versão
 
 A publicação no Maven Central é **automatizada por tag**: o workflow
-[release.yml](.github/workflows/release.yml) compila, assina com GPG e publica os
-módulos `core` e `autoconfigure`.
+[release.yml](.github/workflows/release.yml) valida que a tag `vX.Y.Z` corresponde à
+versão dos POMs (sem `-SNAPSHOT`), compila e testa todos os módulos, assina com GPG e
+publica **parent POM + `core` + `autoconfigure`** (`-pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am`).
+O `rest` (fat jar) participa do build, mas não do reactor de publicação.
 
 ### Pré-requisitos (uma única vez, já configurados)
 
@@ -115,8 +117,8 @@ git checkout main && git pull
 ./mvnw versions:set -DnewVersion=X.Y.Z && ./mvnw versions:commit
 git commit -am "chore: release X.Y.Z"
 
-# 4. Valide localmente ANTES da tag (build completo + assinatura)
-./mvnw clean verify -Prelease
+# 4. Valide localmente ANTES da tag (build completo, sources e Javadoc; sem assinar)
+./mvnw clean verify -Prelease -Dgpg.skip=true
 
 # 5. Tag ANOTADA e push — a tag dispara o workflow de publicação
 git tag -a vX.Y.Z -m "vX.Y.Z"

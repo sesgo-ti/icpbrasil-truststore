@@ -30,8 +30,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # -Prelease gera os sources/Javadoc exigidos pelo Central; -Dgpg.skip dispensa chave no CI.
       - name: Build e testes
-        run: ./mvnw -B --no-transfer-progress verify
+        run: ./mvnw -B --no-transfer-progress verify -Prelease -Dgpg.skip=true
 
       - name: Publicar relatório de testes
         if: always()

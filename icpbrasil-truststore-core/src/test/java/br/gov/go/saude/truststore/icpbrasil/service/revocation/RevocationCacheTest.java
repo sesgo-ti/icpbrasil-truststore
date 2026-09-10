@@ -4,9 +4,11 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.security.cert.X509CRL;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 class RevocationCacheTest {
 
@@ -45,20 +47,20 @@ class RevocationCacheTest {
 
     @Test
     void testGetCrl_ComCacheMiss_DeveRetornarVazio() {
-        Optional<byte[]> result = cache.getCrl("http://url-inexistente");
+        Optional<X509CRL> result = cache.getCrl("http://url-inexistente");
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void testPutCrl_ComEntradaValida_DeveRetornarDados() {
-        byte[] der = new byte[]{4, 5, 6};
-        cache.putCrl("http://crl.example.com", der);
+    void testPutCrl_ComEntradaValida_DeveRetornarAMesmaInstancia() {
+        X509CRL crl = mock(X509CRL.class);
+        cache.putCrl("http://crl.example.com", crl);
 
-        Optional<byte[]> result = cache.getCrl("http://crl.example.com");
+        Optional<X509CRL> result = cache.getCrl("http://crl.example.com");
 
         assertTrue(result.isPresent());
-        assertArrayEquals(der, result.get());
+        assertSame(crl, result.get());
     }
 
     @Test
@@ -75,12 +77,14 @@ class RevocationCacheTest {
     @Test
     void testPutCrl_ComMesmaUrl_DeveSobrescrever() {
         String url = "http://crl.example.com";
-        cache.putCrl(url, new byte[]{1});
-        cache.putCrl(url, new byte[]{2});
+        X509CRL antiga = mock(X509CRL.class);
+        X509CRL nova = mock(X509CRL.class);
+        cache.putCrl(url, antiga);
+        cache.putCrl(url, nova);
 
-        Optional<byte[]> result = cache.getCrl(url);
+        Optional<X509CRL> result = cache.getCrl(url);
 
         assertTrue(result.isPresent());
-        assertArrayEquals(new byte[]{2}, result.get());
+        assertSame(nova, result.get());
     }
 }

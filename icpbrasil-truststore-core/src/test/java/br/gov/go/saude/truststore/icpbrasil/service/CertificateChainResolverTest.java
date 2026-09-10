@@ -28,11 +28,11 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CertificateChainResolverTest {
@@ -42,6 +42,7 @@ class CertificateChainResolverTest {
 
     HttpClient mockHttpClient;
     DownloadPolicy downloadPolicy;
+    RetryPolicy retryPolicy;
     CertificateChainResolver resolver;
 
     KeyPair rootKeyPair;
@@ -67,6 +68,7 @@ class CertificateChainResolverTest {
                 leafKeyPair, intermediateKeyPair, intermediateCert, INTERMEDIATE_AIA_URL);
 
         mockHttpClient = mock(HttpClient.class);
+        when(mockHttpClient.followRedirects()).thenReturn(HttpClient.Redirect.NEVER);
 
         TrustStoreConfig.ChainConfig chainConfig = new TrustStoreConfig.ChainConfig();
         chainConfig.setDownloadTimeoutSeconds(10);
@@ -81,8 +83,9 @@ class CertificateChainResolverTest {
         trustStoreConfig.setNetwork(networkConfig);
 
         downloadPolicy = mock(DownloadPolicy.class); // permissivo: não bloqueia nada
+        when(downloadPolicy.getMaxAiaResponseBytes()).thenReturn(10_485_760L);
 
-        RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
+        retryPolicy = new RetryPolicy(trustStoreConfig);
         resolver = new CertificateChainResolver(retryPolicy, chainConfig, mockHttpClient, downloadPolicy);
     }
 
@@ -139,8 +142,7 @@ class CertificateChainResolverTest {
     @Test
     @SneakyThrows
     void testResolveChainDownloadFalhaLancaExcecao() {
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenThrow(new IOException("Conexão recusada"));
+        mockHttpFailure(INTERMEDIATE_AIA_URL, new IOException("Conexão recusada"));
 
         IncompleteChainException ex = assertThrows(IncompleteChainException.class,
                 () -> resolver.resolveChain(leafCert));
@@ -186,7 +188,7 @@ class CertificateChainResolverTest {
 
         resolver.resolveChain(leafCert);
 
-        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
@@ -198,7 +200,7 @@ class CertificateChainResolverTest {
         List<X509Certificate> chain = resolver.resolveChain(leafCert);
 
         assertEquals(3, chain.size());
-        verify(mockHttpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, times(2)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
 
@@ -214,16 +216,13 @@ class CertificateChainResolverTest {
 
         assertEquals(1, ex.getPartialChain().size());
         assertEquals(leafCert, ex.getPartialChain().getFirst());
-        verify(mockHttpClient, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(mockHttpClient, never()).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
     @SneakyThrows
     void testResolveChainRespostaMuitoGrandeBloqueada() {
-        mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
-
-        doThrow(new DownloadPolicyException("Resposta AIA muito grande"))
-                .when(downloadPolicy).validateAiaResponseSize(any(byte[].class), eq(INTERMEDIATE_AIA_URL));
+        mockHttpFailure(INTERMEDIATE_AIA_URL, new DownloadPolicyException("Resposta AIA muito grande"));
 
         IncompleteChainException ex = assertThrows(IncompleteChainException.class,
                 () -> resolver.resolveChain(leafCert));
@@ -235,17 +234,19 @@ class CertificateChainResolverTest {
     @Test
     @SneakyThrows
     void testResolveChainRespostaMuitoGrandeNaoRetenta() {
-        mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
-
-        doThrow(new DownloadPolicyException("Resposta AIA muito grande"))
-                .when(downloadPolicy).validateAiaResponseSize(any(byte[].class), eq(INTERMEDIATE_AIA_URL));
+        TrustStoreConfig.ChainConfig comRetries = new TrustStoreConfig.ChainConfig();
+        comRetries.setDownloadTimeoutSeconds(10);
+        comRetries.setMaxRetries(2);
+        comRetries.setRetryIntervalSeconds(0);
+        CertificateChainResolver resolverComRetries =
+                new CertificateChainResolver(retryPolicy, comRetries, mockHttpClient, downloadPolicy);
+        mockHttpFailure(INTERMEDIATE_AIA_URL, new DownloadPolicyException("Resposta AIA muito grande"));
 
         assertThrows(IncompleteChainException.class,
-                () -> resolver.resolveChain(leafCert));
+                () -> resolverComRetries.resolveChain(leafCert));
 
-        // Deve ter feito apenas 1 request HTTP — a validação de tamanho é após o retry,
-        // portanto não há retentativa
-        verify(mockHttpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        // Violação de política não é transitória: uma única requisição mesmo com retries configurados
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     // --- Helpers: HTTP mock ---
@@ -257,10 +258,22 @@ class CertificateChainResolverTest {
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.body()).thenReturn(body);
 
-        when(mockHttpClient.send(
-                argThat(req -> req != null && req.uri().toString().equals(url)),
-                any(HttpResponse.BodyHandler.class)))
-                .thenReturn(mockResponse);
+        doReturn(CompletableFuture.completedFuture(mockResponse))
+                .when(mockHttpClient).sendAsync(
+                        argThat(req -> req != null && req.uri().toString().equals(url)),
+                        any(HttpResponse.BodyHandler.class));
+    }
+
+    /**
+     * Simula a falha assíncrona que o transporte observa: tanto erros de rede quanto o
+     * cancelamento por excesso de tamanho chegam como future completado excepcionalmente.
+     */
+    @SuppressWarnings("unchecked")
+    private void mockHttpFailure(String url, Exception failure) {
+        doReturn(CompletableFuture.failedFuture(failure))
+                .when(mockHttpClient).sendAsync(
+                        argThat(req -> req != null && req.uri().toString().equals(url)),
+                        any(HttpResponse.BodyHandler.class));
     }
 
     // --- Helpers: geração de certificados ---

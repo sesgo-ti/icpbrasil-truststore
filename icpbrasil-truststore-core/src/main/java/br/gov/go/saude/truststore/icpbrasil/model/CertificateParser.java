@@ -364,6 +364,32 @@ public class CertificateParser {
     }
 
     /**
+     * Localiza o Distribution Point da extensão CRL Distribution Points cujo fullName contém
+     * {@code url} como URI — o DP que originou essa URL em {@link #getCrlUrls(X509Certificate)}.
+     *
+     * @return o DP correspondente, ou vazio se nenhum DP do certificado aponta para a URL
+     */
+    public static Optional<DistributionPoint> getCrlDistributionPoint(X509Certificate certificate, String url) {
+        try {
+            for (DistributionPoint dp : getCrlDistributionPoints(certificate)) {
+                DistributionPointName dpn = dp.getDistributionPoint();
+                if (dpn == null || dpn.getType() != DistributionPointName.FULL_NAME) {
+                    continue;
+                }
+                for (GeneralName name : GeneralNames.getInstance(dpn.getName()).getNames()) {
+                    if (name.getTagNo() == GeneralName.uniformResourceIdentifier
+                            && url.equals(name.getName().toString())) {
+                        return Optional.of(dp);
+                    }
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            log.debug("Extensão CRL Distribution Points não encontrada no certificado: {}", e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Retorna o Subject Key Identifier (SKI) do certificado em formato hexadecimal.
      */
     public static String getSubjectKeyIdentifier(X509Certificate certificate) {

@@ -9,9 +9,10 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
 /**
- * Garante que o cache ICP-Brasil esteja carregado antes de o Spring Boot
- * declarar o contexto "Started" — eliminando a race condition entre o startup
- * e a primeira execução do scheduler.
+ * Carrega o cache ICP-Brasil de forma síncrona durante o startup, antes do
+ * {@code ApplicationReadyEvent}. O servidor HTTP já pode aceitar conexões nesse intervalo:
+ * quem impede tráfego até a carga concluir é a readiness ({@code readinessState} e, quando
+ * incluído no grupo, {@code trustStoreCache}), não este runner.
  *
  * <p>Implementa {@link ApplicationRunner}, que é executado de forma síncrona
  * imediatamente antes de {@code SpringApplication.run()} retornar. Qualquer

@@ -15,9 +15,8 @@
   <description>Microserviço standalone: endpoint REST de consulta por SKI, health checks e fat jar executável.</description>
 
   <properties>
-    <!-- Artefato de deploy (fat jar) — não é publicado no Maven Central -->
+    <!-- Artefato de deploy (fat jar): não é publicado no Maven Central (ver excludeArtifacts no parent) -->
     <maven.deploy.skip>true</maven.deploy.skip>
-    <skipPublishing>true</skipPublishing>
   </properties>
 
   <dependencies>

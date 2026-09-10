@@ -1,18 +1,20 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreBootstrap;
-import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
-import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.CacheTrustMaterialSource;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
+import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
@@ -22,18 +24,19 @@ import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationCache;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
-import org.springframework.validation.annotation.Validated;
-import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,11 +48,18 @@ import java.util.List;
  * Todos os beans usam {@link ConditionalOnMissingBean @ConditionalOnMissingBean},
  * permitindo que o consumidor sobrescreva qualquer componente.</p>
  *
- * <p>O binding de {@link TrustStoreConfig} e {@link S3Properties} é feito aqui
- * via {@code @Bean @ConfigurationProperties} — as classes são POJOs puros no core,
- * sem anotações Spring, o que as torna testáveis de forma isolada.</p>
+ * <p>O binding de {@link TrustStoreConfig} é feito aqui via
+ * {@code @Bean @ConfigurationProperties} — a classe é um POJO puro no core,
+ * sem anotações Spring, o que a torna testável de forma isolada.</p>
+ *
+ * <p>Integrações que dependem de bibliotecas opcionais (AWS SDK para S3, Actuator para
+ * health) ficam em {@link S3StorageConfiguration} e {@link HealthConfiguration}, condicionadas
+ * no nível da classe. Esta classe não pode referenciar tipos dessas bibliotecas em campos ou
+ * assinaturas: a introspecção dos métodos {@code @Bean} carregaria as classes ausentes e
+ * derrubaria o contexto mesmo com {@code storage.type=filesystem}.</p>
  */
 @AutoConfiguration
+@Import({S3StorageConfiguration.class, HealthConfiguration.class})
 public class TrustStoreAutoConfiguration {
 
     /**
@@ -67,18 +77,19 @@ public class TrustStoreAutoConfiguration {
     }
 
     /**
-     * Binding de {@link S3Properties} ativado apenas quando o storage type é S3.
-     * A validação Bean Validation ({@code @Validated}) roda após o binding.
-     * {@code @ConditionalOnMissingBean} permite que o consumidor forneça o próprio bean
-     * sem causar {@code NoUniqueBeanDefinitionException}.
+     * Falha cedo, com diagnóstico legível, quando o storage S3 é selecionado sem o AWS SDK
+     * no classpath. Sem esta configuração, {@link S3StorageConfiguration} seria apenas
+     * ignorada e o erro apareceria como ausência genérica de {@link TrustStoreRepository}.
      */
-    @Bean
-    @ConfigurationProperties(prefix = "icpbrasil-truststore.s3")
-    @Validated
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-    @ConditionalOnMissingBean(S3Properties.class)
-    S3Properties s3Properties() {
-        return new S3Properties();
+    @ConditionalOnMissingClass("software.amazon.awssdk.services.s3.S3Client")
+    static class S3SdkAusenteConfiguration {
+        S3SdkAusenteConfiguration() {
+            throw new IllegalStateException("icpbrasil-truststore.storage.type=s3 requer as dependências "
+                    + "software.amazon.awssdk:s3 e software.amazon.awssdk:apache-client no classpath "
+                    + "(opcionais no icpbrasil-truststore-autoconfigure)");
+        }
     }
 
     @Bean
@@ -156,14 +167,6 @@ public class TrustStoreAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(TrustStoreRepository.class)
-    @ConditionalOnProperty(name = "icpbrasil-truststore.storage.type", havingValue = "s3")
-    public S3Repository s3Repository(S3Client s3Client, TrustStoreConfig trustStoreConfig,
-                                     S3Properties s3Properties) {
-        return new S3Repository(s3Client, trustStoreConfig, s3Properties);
-    }
-
-    @Bean
     @ConditionalOnMissingBean
     public IcpBrasilCertificateProvider icpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig,
                                                                      Downloader downloader,
@@ -192,12 +195,27 @@ public class TrustStoreAutoConfiguration {
                 trustStoreCache);
     }
 
+    /**
+     * Transporte único para os artefatos referenciados em certificados (AIA, OCSP e CRL): um só
+     * {@code HttpClient} (pool e selector) para os três clientes. O timeout de conexão é o menor
+     * dos três configurados; o prazo total de cada requisição continua sendo o do artefato.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public CertificateHttpTransport certificateHttpTransport(DownloadPolicy downloadPolicy,
+                                                             TrustStoreConfig trustStoreConfig) {
+        int connectTimeoutSeconds = Math.min(trustStoreConfig.getChain().getDownloadTimeoutSeconds(),
+                Math.min(trustStoreConfig.getRevocation().getOcspTimeoutSeconds(),
+                        trustStoreConfig.getRevocation().getCrlTimeoutSeconds()));
+        return new CertificateHttpTransport(downloadPolicy, Duration.ofSeconds(connectTimeoutSeconds));
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public CertificateChainResolver certificateChainResolver(RetryPolicy retryPolicy,
                                                              TrustStoreConfig trustStoreConfig,
-                                                             DownloadPolicy downloadPolicy) {
-        return new CertificateChainResolver(retryPolicy, trustStoreConfig, downloadPolicy);
+                                                             CertificateHttpTransport certificateHttpTransport) {
+        return new CertificateChainResolver(retryPolicy, trustStoreConfig, certificateHttpTransport);
     }
 
     @Bean
@@ -209,21 +227,39 @@ public class TrustStoreAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public OcspClient ocspClient(RevocationCache revocationCache, RetryPolicy retryPolicy,
-                                 TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        return new OcspClient(revocationCache, retryPolicy, trustStoreConfig, downloadPolicy);
+                                 TrustStoreConfig trustStoreConfig, CertificateHttpTransport certificateHttpTransport) {
+        return new OcspClient(revocationCache, retryPolicy, trustStoreConfig, certificateHttpTransport);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public CrlClient crlClient(RevocationCache revocationCache, RetryPolicy retryPolicy,
-                               TrustStoreConfig trustStoreConfig, DownloadPolicy downloadPolicy) {
-        return new CrlClient(revocationCache, retryPolicy, trustStoreConfig, downloadPolicy);
+                               TrustStoreConfig trustStoreConfig, CertificateHttpTransport certificateHttpTransport) {
+        return new CrlClient(revocationCache, retryPolicy, trustStoreConfig, certificateHttpTransport);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public RevocationService revocationService(OcspClient ocspClient, CrlClient crlClient) {
         return new RevocationService(ocspClient, crlClient);
+    }
+
+    /**
+     * Âncoras e intermediárias PKIX derivadas do acervo em memória. Um bean próprio de
+     * {@link TrustMaterialSource} substitui a derivação padrão.
+     */
+    @Bean
+    @ConditionalOnMissingBean(TrustMaterialSource.class)
+    public CacheTrustMaterialSource trustMaterialSource(Cache trustStoreCache) {
+        return new CacheTrustMaterialSource(trustStoreCache);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public PkixCertificateValidator pkixCertificateValidator(TrustMaterialSource trustMaterialSource,
+                                                             CertificateChainResolver certificateChainResolver,
+                                                             RevocationService revocationService) {
+        return new PkixCertificateValidator(trustMaterialSource, certificateChainResolver, revocationService);
     }
 
     @Bean
@@ -242,14 +278,5 @@ public class TrustStoreAutoConfiguration {
     public TrustStoreScheduler trustStoreScheduler(TrustStoreService trustStoreService,
                                                    TrustStoreConfig trustStoreConfig) {
         return new TrustStoreScheduler(trustStoreService, trustStoreConfig);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
-    public TrustStoreCacheHealthIndicator trustStoreCacheHealthIndicator(TrustStoreRepository repository,
-                                                                         TrustStoreConfig config,
-                                                                         Cache trustStoreCache) {
-        return new TrustStoreCacheHealthIndicator(repository, config, trustStoreCache);
     }
 }

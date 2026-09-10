@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,44 +34,55 @@ public class RevocationService {
     /**
      * Verifica se um certificado foi revogado, tentando OCSP primeiro e CRL como fallback.
      *
+     * <p>Resultados inconclusivos nunca viram {@code Good}: sem conclusão em nenhuma URL, o
+     * retorno é {@code NoConnectivity} se alguma tentativa foi interrompida, senão
+     * {@code CrlUnavailable} (ou {@code OcspUnavailable} quando não há CRL). Uma interrupção da
+     * thread encerra as tentativas restantes.</p>
+     *
      * @param cert   certificado a verificar
      * @param issuer certificado do emissor (necessário para construir a requisição OCSP)
      * @return status de revogação — ver {@link RevocationStatus} para os possíveis resultados
      */
     public RevocationStatus check(X509Certificate cert, X509Certificate issuer) {
+        return lookup(cert, issuer).status();
+    }
+
+    /**
+     * Como {@link #check}, devolvendo também, para os status conclusivos, a evidência (resposta
+     * OCSP ou CRL) que os fundamenta.
+     */
+    public RevocationLookup lookup(X509Certificate cert, X509Certificate issuer) {
         List<String> ocspUrls = CertificateParser.getOcspUrls(cert);
         List<String> crlUrls = CertificateParser.getCrlUrls(cert);
 
         if (ocspUrls.isEmpty() && crlUrls.isEmpty()) {
-            return new RevocationStatus.NoDistributionPoints();
+            return RevocationLookup.inconclusive(new RevocationStatus.NoDistributionPoints());
         }
 
+        boolean noConnectivity = false;
         for (String url : ocspUrls) {
-            RevocationStatus result = ocspClient.check(cert, issuer, url);
-            if (isConclusive(result)) return result;
+            if (Thread.currentThread().isInterrupted()) {
+                break;
+            }
+            RevocationLookup result = ocspClient.lookup(cert, issuer, url);
+            if (result.isConclusive()) return result;
+            noConnectivity |= result.status() instanceof RevocationStatus.NoConnectivity;
         }
 
         for (String url : crlUrls) {
-            RevocationStatus result = crlClient.check(cert, issuer, url);
-            if (isConclusive(result)) return result;
+            if (Thread.currentThread().isInterrupted()) {
+                break;
+            }
+            RevocationLookup result = crlClient.lookup(cert, issuer, url);
+            if (result.isConclusive()) return result;
+            noConnectivity |= result.status() instanceof RevocationStatus.NoConnectivity;
         }
 
-        return crlUrls.isEmpty()
+        if (noConnectivity || Thread.currentThread().isInterrupted()) {
+            return RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity());
+        }
+        return RevocationLookup.inconclusive(crlUrls.isEmpty()
                 ? new RevocationStatus.OcspUnavailable()
-                : new RevocationStatus.CrlUnavailable();
-    }
-
-    /**
-     * Determina se um resultado é conclusivo (Good ou Revoked)
-     * ou se deve prosseguir para o próximo mecanismo de verificação.
-     *
-     * <p>Apenas respostas definitivas são conclusivas. Qualquer outro status
-     * (Malformed, OcspUnavailable, CrlUnavailable, NoConnectivity) indica
-     * que não foi possível obter resposta válida daquele mecanismo e deve-se
-     * tentar o próximo.</p>
-     */
-    private boolean isConclusive(RevocationStatus status) {
-        return status instanceof RevocationStatus.Good
-                || status instanceof RevocationStatus.Revoked;
+                : new RevocationStatus.CrlUnavailable());
     }
 }

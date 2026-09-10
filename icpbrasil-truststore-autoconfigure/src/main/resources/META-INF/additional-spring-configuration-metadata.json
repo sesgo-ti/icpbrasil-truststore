@@ -1,0 +1,201 @@
+{
+  "properties": [
+    {
+      "name": "icpbrasil-truststore.certificate-url",
+      "type": "java.lang.String",
+      "description": "URL HTTPS do ZIP com os certificados das ACs vigentes da ICP-Brasil.",
+      "defaultValue": "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
+    },
+    {
+      "name": "icpbrasil-truststore.hash-url",
+      "type": "java.lang.String",
+      "description": "URL HTTPS do hash SHA-512 do ZIP, no formato sha512sum.",
+      "defaultValue": "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+    },
+    {
+      "name": "icpbrasil-truststore.refresh-interval-hours",
+      "type": "java.lang.Integer",
+      "description": "Intervalo, em horas, entre verificações de nova geração do acervo (1 a cache-ttl-critical-hours).",
+      "defaultValue": 2
+    },
+    {
+      "name": "icpbrasil-truststore.cache-ttl-critical-hours",
+      "type": "java.lang.Integer",
+      "description": "Horas sem confirmação junto ao ITI para o health indicator reportar CRITICAL (24 a 168).",
+      "defaultValue": 72
+    },
+    {
+      "name": "icpbrasil-truststore.cache-ttl-max-hours",
+      "type": "java.lang.Integer",
+      "description": "Horas após a última confirmação em que o acervo deixa de ser servido (72 a 720, maior que o TTL crítico).",
+      "defaultValue": 168
+    },
+    {
+      "name": "icpbrasil-truststore.scheduling.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Ativa a atualização periódica do acervo em background.",
+      "defaultValue": true
+    },
+    {
+      "name": "icpbrasil-truststore.bootstrap.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Carrega o acervo de forma síncrona no startup, antes do ApplicationReadyEvent.",
+      "defaultValue": true
+    },
+    {
+      "name": "icpbrasil-truststore.bootstrap.fail-fast",
+      "type": "java.lang.Boolean",
+      "description": "Aborta o startup se a carga inicial do acervo falhar.",
+      "defaultValue": true
+    },
+    {
+      "name": "icpbrasil-truststore.storage.type",
+      "type": "java.lang.String",
+      "description": "Backend de persistência dos artefatos: filesystem ou s3.",
+      "defaultValue": "filesystem"
+    },
+    {
+      "name": "icpbrasil-truststore.storage.truststore-archive-path",
+      "type": "java.lang.String",
+      "description": "Nome do arquivo ZIP do acervo no storage.",
+      "defaultValue": "ACcompactado.zip"
+    },
+    {
+      "name": "icpbrasil-truststore.storage.hash-file-path",
+      "type": "java.lang.String",
+      "description": "Nome do arquivo com o hash SHA-512 da geração persistida.",
+      "defaultValue": "hash.txt"
+    },
+    {
+      "name": "icpbrasil-truststore.storage.confirmation-file-path",
+      "type": "java.lang.String",
+      "description": "Nome do arquivo com o instante da última confirmação junto ao ITI.",
+      "defaultValue": "ultima_confirmacao.txt"
+    },
+    {
+      "name": "icpbrasil-truststore.filesystem.base-dir",
+      "type": "java.lang.String",
+      "description": "Diretório base do storage filesystem. Obrigatório: sem default."
+    },
+    {
+      "name": "icpbrasil-truststore.trusted-certs.dir",
+      "type": "java.lang.String",
+      "description": "Diretório (classpath: ou file:) com os JSONs das CAs embutidas usadas no TLS do download do ITI.",
+      "defaultValue": "classpath:registries/certificates"
+    },
+    {
+      "name": "icpbrasil-truststore.network.download-timeout-seconds",
+      "type": "java.lang.Integer",
+      "description": "Prazo por tentativa de download do ITI, em segundos (30 a 300).",
+      "defaultValue": 60
+    },
+    {
+      "name": "icpbrasil-truststore.network.max-retries",
+      "type": "java.lang.Integer",
+      "description": "Total de tentativas de download do ITI (1 a 10).",
+      "defaultValue": 3
+    },
+    {
+      "name": "icpbrasil-truststore.network.retry-interval-seconds",
+      "type": "java.lang.Integer",
+      "description": "Intervalo entre tentativas de download do ITI, em segundos (10 a 300).",
+      "defaultValue": 30
+    },
+    {
+      "name": "icpbrasil-truststore.chain.download-timeout-seconds",
+      "type": "java.lang.Integer",
+      "description": "Prazo do download de emissores via AIA, em segundos (1 a 60).",
+      "defaultValue": 10
+    },
+    {
+      "name": "icpbrasil-truststore.chain.max-retries",
+      "type": "java.lang.Integer",
+      "description": "Tentativas adicionais por URL AIA (0 a 5).",
+      "defaultValue": 1
+    },
+    {
+      "name": "icpbrasil-truststore.chain.retry-interval-seconds",
+      "type": "java.lang.Integer",
+      "description": "Intervalo entre tentativas de download AIA, em segundos (1 a 30).",
+      "defaultValue": 2
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.ocsp-timeout-seconds",
+      "type": "java.lang.Integer",
+      "description": "Prazo da consulta OCSP, em segundos (1 a 60).",
+      "defaultValue": 10
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.crl-timeout-seconds",
+      "type": "java.lang.Integer",
+      "description": "Prazo do download de CRL, em segundos (1 a 60).",
+      "defaultValue": 10
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.max-retries",
+      "type": "java.lang.Integer",
+      "description": "Tentativas adicionais por URL de OCSP ou CRL (0 a 10).",
+      "defaultValue": 2
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.retry-interval-seconds",
+      "type": "java.lang.Integer",
+      "description": "Intervalo entre tentativas de OCSP ou CRL, em segundos (1 a 60).",
+      "defaultValue": 3
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.ocsp-cache-ttl-seconds",
+      "type": "java.lang.Long",
+      "description": "TTL do cache de respostas OCSP, em segundos (60 a 86400).",
+      "defaultValue": 3600
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.crl-cache-ttl-seconds",
+      "type": "java.lang.Long",
+      "description": "TTL do cache de CRLs, em segundos (60 a 86400).",
+      "defaultValue": 3600
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.ocsp-cache-max-size",
+      "type": "java.lang.Long",
+      "description": "Máximo de respostas OCSP em cache (100 a 1000000).",
+      "defaultValue": 10000
+    },
+    {
+      "name": "icpbrasil-truststore.revocation.crl-cache-max-size",
+      "type": "java.lang.Long",
+      "description": "Máximo de CRLs em cache (100 a 100000).",
+      "defaultValue": 1000
+    },
+    {
+      "name": "icpbrasil-truststore.download-policy.max-ocsp-response-bytes",
+      "type": "java.lang.Long",
+      "description": "Tamanho máximo de uma resposta OCSP, em bytes; a conexão é cancelada ao exceder.",
+      "defaultValue": 1048576
+    },
+    {
+      "name": "icpbrasil-truststore.download-policy.max-crl-response-bytes",
+      "type": "java.lang.Long",
+      "description": "Tamanho máximo de uma CRL, em bytes; a conexão é cancelada ao exceder.",
+      "defaultValue": 52428800
+    },
+    {
+      "name": "icpbrasil-truststore.download-policy.max-aia-response-bytes",
+      "type": "java.lang.Long",
+      "description": "Tamanho máximo de uma resposta AIA CA Issuers, em bytes; a conexão é cancelada ao exceder.",
+      "defaultValue": 10485760
+    },
+    {
+      "name": "icpbrasil-truststore.download-policy.block-private-hostnames",
+      "type": "java.lang.Boolean",
+      "description": "Resolve o hostname antes do download e bloqueia endereços não públicos ou falha de resolução.",
+      "defaultValue": true
+    },
+    {
+      "name": "icpbrasil-truststore.download-policy.allowed-domains",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Sufixos de domínio permitidos para URLs de AIA, OCSP e CRL; vazio aceita qualquer destino público.",
+      "defaultValue": []
+    }
+  ]
+}

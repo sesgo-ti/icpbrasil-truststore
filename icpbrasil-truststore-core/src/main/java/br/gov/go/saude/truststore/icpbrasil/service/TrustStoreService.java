@@ -6,26 +6,58 @@ import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificat
 import lombok.extern.slf4j.Slf4j;
 
 import java.security.cert.X509Certificate;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Pipeline de carga do acervo ICP-Brasil: repositório local → sincronização com o ITI →
+ * publicação no {@link Cache}.
+ *
+ * <p>Invariante: nada é persistido nem publicado antes de o ZIP ter o hash validado, todos os
+ * certificados parseados e o índice montado. A validade publicada ({@code expiresAt}) deriva
+ * sempre do instante em que a geração foi confirmada junto ao ITI — nunca da hora em que o
+ * arquivo foi lido ou validado — somado a {@code cache-ttl-max-hours}.</p>
+ */
 @Slf4j
 public class TrustStoreService {
+
+    /**
+     * Tolerância para a última confirmação persistida estar à frente do relógio local (relógios
+     * de hosts distintos compartilhando o repositório). Além disso a confirmação é rejeitada,
+     * pois estenderia a validade do acervo para além do TTL configurado.
+     */
+    private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(15);
+
     private final TrustStoreRepository trustStoreRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
     private final TrustStoreConfig trustStoreConfig;
     private final Cache cache;
-    private boolean artefatosCarregadosNestaExecucao = false;
+    private final Clock clock;
 
     public TrustStoreService(TrustStoreRepository trustStoreRepository,
                              IcpBrasilCertificateProvider icpBrasilCertificateProvider,
                              TrustStoreConfig trustStoreConfig,
                              Cache cache) {
+        this(trustStoreRepository, icpBrasilCertificateProvider, trustStoreConfig, cache, Clock.systemUTC());
+    }
+
+    public TrustStoreService(TrustStoreRepository trustStoreRepository,
+                             IcpBrasilCertificateProvider icpBrasilCertificateProvider,
+                             TrustStoreConfig trustStoreConfig,
+                             Cache cache,
+                             Clock clock) {
         this.trustStoreRepository = trustStoreRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
         this.trustStoreConfig = trustStoreConfig;
         this.cache = cache;
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
@@ -36,151 +68,140 @@ public class TrustStoreService {
         return cache.isCacheValid();
     }
 
-    public void assegurarDisponibilidade() {
-        if (verificarDisponibilidadeRepositorioLocal().equals(DisponibilidadeRepositorio.DISPONIVEL)) {
-            artefatosCarregadosNestaExecucao = true;
-            log.info("Artefatos estão disponíveis no repositório local");
-        } else {
-            if (artefatosCarregadosNestaExecucao) {
-                log.warn("Repositório local removido inesperadamente. Iniciando reposição automática.");
-            } else {
-                log.info("Repositório local vazio. Iniciando download inicial dos artefatos ICP-Brasil.");
+    /**
+     * Atualiza o acervo servido. Nunca lança: falhas são registradas e o snapshot anterior,
+     * quando existe, continua sendo servido até o seu prazo original.
+     *
+     * <ol>
+     *   <li>Sem snapshot vigente, tenta publicar o acervo persistido no repositório local,
+     *       com a validade derivada da confirmação persistida (carga repetível: uma leitura que
+     *       falhe hoje pode ter sucesso no próximo ciclo).</li>
+     *   <li>Baixa o hash publicado pelo ITI. Se repositório local e snapshot atual já têm essa
+     *       geração, apenas renova a confirmação; caso contrário baixa o ZIP, valida, parseia,
+     *       publica e persiste.</li>
+     * </ol>
+     *
+     * <p>Persistência vem depois da publicação e nunca a desfaz: o repositório serve ao próximo
+     * cold start, não à validade do que já foi validado nesta execução.</p>
+     *
+     * <p>Sincronizado porque bootstrap e agendador podem coincidir; leituras do cache não são
+     * bloqueadas.</p>
+     */
+    public synchronized void refresh() {
+        Instant now = clock.instant();
+        if (!cache.isCacheValid()) {
+            carregarAcervoLocal(now);
+        }
+        sincronizarComIti(now);
+        if (!cache.isCacheValid()) {
+            log.error("Acervo ICP-Brasil indisponível: nenhum snapshot válido após a sincronização");
+        }
+    }
+
+    private void carregarAcervoLocal(Instant now) {
+        try {
+            Optional<byte[]> zipOpt = trustStoreRepository.recuperarZip().filter(zip -> zip.length > 0);
+            Optional<String> hashOpt = trustStoreRepository.recuperarHash().filter(hash -> !hash.isBlank());
+            Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
+            if (zipOpt.isEmpty() || hashOpt.isEmpty() || confirmacaoOpt.isEmpty()) {
+                log.info("Repositório local sem acervo completo; aguardando sincronização com o ITI");
+                return;
             }
-            try {
-                reposicaoArtefatosRepositorioLocal();
-            } catch (Exception e1) {
-                log.error("Falha ao repor artefatos no repositório local", e1);
+
+            Instant confirmedAt = confirmacaoOpt.get();
+            if (confirmedAt.isAfter(now.plus(MAX_CLOCK_SKEW))) {
+                log.warn("Última confirmação persistida ({}) está no futuro; acervo local rejeitado", confirmedAt);
+                return;
             }
+            Instant expiresAt = expiracao(confirmedAt);
+            if (!expiresAt.isAfter(now)) {
+                log.warn("Acervo local expirado desde {}; aguardando sincronização com o ITI", expiresAt);
+                return;
+            }
+
+            String hash = normalizarHash(hashOpt.get());
+            byte[] zipData = zipOpt.get();
+            icpBrasilCertificateProvider.validateZipIntegrity(zipData, hash);
+            Map<String, X509Certificate> index = Cache.indexBySki(
+                    icpBrasilCertificateProvider.parseCertificates(zipData));
+            cache.publish(index, hash, confirmedAt, expiresAt);
+            log.info("Acervo do repositório local publicado (confirmado em {})", confirmedAt);
+        } catch (RuntimeException e) {
+            log.warn("Falha ao carregar acervo do repositório local: {}", e.getMessage());
         }
     }
 
-    public void reposicaoArtefatosRepositorioLocal() {
-        byte[] zipData = icpBrasilCertificateProvider.baixarZipIcpBrasil();
-        String hash = icpBrasilCertificateProvider.baixarHashIcpBrasil();
-
-        reposicaoArtefatosRepositorioLocal(zipData, hash);
-    }
-
-    public void reposicaoArtefatosRepositorioLocal(byte[] zipData, String hash) {
-        Instant ultimaConfirmacao;
+    private void sincronizarComIti(Instant now) {
         try {
-            ultimaConfirmacao =
-                    icpBrasilCertificateProvider.validateZipIntegrity(zipData, hash);
-        } catch (SecurityException e) {
-            log.error("Falha na validação de integridade do zip ICP-Brasil durante a reposição: {}", e.getMessage());
-            return;
-        }
-        carregarArtefatosNoRepositorioLocal(zipData, hash, ultimaConfirmacao);
-    }
+            String hashRemoto = icpBrasilCertificateProvider.baixarHashIcpBrasil();
+            Instant expiresAt = expiracao(now);
 
-    public void carregarArtefatosNoRepositorioLocal(byte[] zipData, String hash, Instant ultimaConfirmacao) throws RuntimeException {
-        log.info("Carregando artefatos no repositório local");
-        try {
-            trustStoreRepository.armazenarZip(zipData);
-            trustStoreRepository.armazenarHash(hash);
-            trustStoreRepository.armazenarUltimaConfirmacao(ultimaConfirmacao);
-            artefatosCarregadosNestaExecucao = true;
-        } catch (Exception e) {
-            throw new RuntimeException("Falha ao carregar artefatos no repositório local", e);
-        }
-    }
-
-    public DisponibilidadeRepositorio verificarDisponibilidadeRepositorioLocal() {
-        Optional<byte[]> zipOpt = trustStoreRepository.recuperarZip();
-        Optional<String> hashOpt = trustStoreRepository.recuperarHash();
-        Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
-
-        boolean disponivel = zipOpt.isPresent()
-                && hashOpt.filter(s -> s != null && !s.isBlank()).isPresent()
-                && confirmacaoOpt.isPresent();
-
-        return disponivel ? DisponibilidadeRepositorio.DISPONIVEL :
-                DisponibilidadeRepositorio.INDISPONIVEL;
-    }
-
-    public void verificarSincronizacaoRepositorioLocal() {
-        log.info("Iniciando verificação de sincronização do repositório local");
-        try {
-            String hashIcpBrasil = icpBrasilCertificateProvider.baixarHashIcpBrasil();
-            String hashLocal = trustStoreRepository.recuperarHash().orElse(null);
-            if (!hashIcpBrasil.equals(hashLocal)) {
-                log.warn("O repositório local está desatualizado. Iniciando atualização.");
-                reposicaoArtefatosRepositorioLocal();
-            } else {
+            // Reconfirmar só pelo hash exige que repositório E snapshot já tenham essa geração:
+            // o repositório, para que a confirmação persistida nunca prolongue uma geração que o
+            // ITI não anuncia mais (ex.: publicação em memória cuja persistência falhou); o
+            // snapshot, de forma atômica, para não republicar um índice invalidado nesse meio-tempo.
+            if (repositorioTemGeracao(hashRemoto) && cache.renew(hashRemoto, now, expiresAt)) {
                 log.info("O repositório local está sincronizado com a fonte ICP-Brasil");
-                trustStoreRepository.armazenarUltimaConfirmacao(Instant.now());
+                persistir("última confirmação", () -> trustStoreRepository.armazenarUltimaConfirmacao(now));
+                return;
             }
 
-        } catch (Exception e) {
-            log.error("Erro ao verificar sincronização do repositório local", e);
+            log.info("Geração {} anunciada pelo ITI não corresponde ao snapshot atual ou ao repositório local; "
+                    + "baixando o bundle", hashRemoto);
+            byte[] zipData = icpBrasilCertificateProvider.baixarZipIcpBrasil();
+            icpBrasilCertificateProvider.validateZipIntegrity(zipData, hashRemoto);
+            List<X509Certificate> certificates = icpBrasilCertificateProvider.parseCertificates(zipData);
+            Map<String, X509Certificate> index = Cache.indexBySki(certificates);
+
+            // Publicar antes de persistir: a validação já precedeu ambos, e uma geração que remove
+            // uma AC deve valer imediatamente mesmo com o repositório indisponível.
+            cache.publish(index, hashRemoto, now, expiresAt);
+            persistir("acervo", () -> {
+                trustStoreRepository.armazenarZip(zipData);
+                trustStoreRepository.armazenarHash(hashRemoto);
+                trustStoreRepository.armazenarUltimaConfirmacao(now);
+            });
+        } catch (RuntimeException e) {
+            log.warn("Falha na sincronização com o ITI; snapshot atual mantido até o prazo original: {}",
+                    e.getMessage());
         }
     }
 
-    public void assegurrarNaoExpiracaoCache() {
+    /**
+     * Falha de leitura conta como geração ausente: o caminho completo regrava o repositório em
+     * vez de confirmar um conteúdo que não pôde ser conferido.
+     */
+    private boolean repositorioTemGeracao(String hash) {
         try {
-            Optional<Instant> ultimaConfirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
-            if (ultimaConfirmacaoOpt.isEmpty()) {
-                log.warn("Última confirmação não encontrada. Cache será marcado como inválido.");
-                cache.setCacheValid(false);
-                return;
-            }
-            Instant ultimaConfirmacao = ultimaConfirmacaoOpt.get();
-            long idadeCache = Instant.now().toEpochMilli() - ultimaConfirmacao.toEpochMilli();
-
-            if (idadeCache <= trustStoreConfig.getRefreshIntervalMillis()) {
-                log.info("Cache está atualizado e válido");
-                cache.setCacheValid(true);
-                return;
-            }
-
-            // Falha na atualização do cache, mas ainda estável
-            if (idadeCache <= trustStoreConfig.getCacheTtlCriticalMillis()) {
-                log.warn("Falha na atualização do cache, utilizando cache local válido");
-                cache.setCacheValid(true);
-                return;
-            }
-
-            // Cache passaou do tempo crítico de vida. Estado crítico
-            if (idadeCache <= trustStoreConfig.getCacheTtlMaxMillis()) {
-                log.error("Cache crítico - falha prolongada na atualização do cache, utilizando cache local válido");
-
-                // TODO: Implementar notificação ao operador (e-mail, SMS, etc.)
-                log.info("Operador notificado sobre estado crítico do cache");
-                cache.setCacheValid(true);
-                return;
-            }
-
-            // Cache expirou completamente
-            if (idadeCache > trustStoreConfig.getCacheTtlMaxMillis()) {
-                log.error("Cache expirado - não há como garantir segurança");
-
-                // TODO: Implementar notificação ao operador (e-mail, SMS, etc.)
-                log.info("Operador notificado sobre expiração do cache");
-                cache.setCacheValid(false);
-            }
-        } catch (Exception e) {
-            log.error("Erro ao assegurar não expiração do cache", e);
-            cache.setCacheValid(false);
+            return trustStoreRepository.recuperarHash()
+                    .map(TrustStoreService::normalizarHash)
+                    .filter(hash::equals)
+                    .isPresent();
+        } catch (RuntimeException e) {
+            log.warn("Falha ao ler o hash do repositório local: {}", e.getMessage());
+            return false;
         }
     }
 
-    public void refresh() {
+    /**
+     * O snapshot já está publicado; se a escrita falhar, apenas o próximo cold start deixa de
+     * contar com o repositório, o que é conservador.
+     */
+    private void persistir(String descricao, Runnable escrita) {
         try {
-            log.info("Iniciando verificação automática de sincronização do repositório local");
-            assegurarDisponibilidade();
-
-            verificarSincronizacaoRepositorioLocal();
-        } catch (Exception e) {
-            log.error("Erro durante a verificação automática de sincronização do repositório local", e);
-        } finally {
-            assegurrarNaoExpiracaoCache();
-            if (cache.isCacheValid()) {
-                var certificates = icpBrasilCertificateProvider.getCertificates();
-                cache.refreshCache(certificates);
-            } else {
-                log.warn("Cache inválido, não será atualizado");
-            }
+            escrita.run();
+        } catch (RuntimeException e) {
+            log.warn("Falha ao persistir {} no repositório local; acervo válido apenas em memória: {}",
+                    descricao, e.getMessage());
         }
+    }
+
+    private Instant expiracao(Instant confirmedAt) {
+        return confirmedAt.plusMillis(trustStoreConfig.getCacheTtlMaxMillis());
+    }
+
+    private static String normalizarHash(String hash) {
+        return hash.trim().toLowerCase(Locale.ROOT);
     }
 
     public boolean isTrustedRoot(X509Certificate cert) {
@@ -197,10 +218,5 @@ public class TrustStoreService {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    public enum DisponibilidadeRepositorio {
-        DISPONIVEL,
-        INDISPONIVEL
     }
 }
