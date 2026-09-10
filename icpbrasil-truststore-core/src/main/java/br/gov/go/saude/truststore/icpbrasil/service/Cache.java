@@ -76,6 +76,10 @@ public class Cache {
      * Falha se algum certificado não tiver SKI, para que o pipeline detecte o problema antes
      * de persistir ou publicar qualquer coisa.
      *
+     * <p>Contrato: o índice tem uma entrada por SKI. Se o bundle trouxer dois certificados com o
+     * mesmo SKI (reemissão de uma AC com a mesma chave), o último na ordem do ZIP prevalece e o
+     * anterior deixa de constar do acervo servido; o caso é registrado em WARN.</p>
+     *
      * @throws IllegalArgumentException se algum certificado não possuir a extensão SKI
      */
     static Map<String, X509Certificate> indexBySki(List<X509Certificate> certificates) {

@@ -31,7 +31,7 @@ Cache `EXPIRED` → readiness probe `DOWN`.
 ### Degradação (filtrar para alertas)
 
 ```bash
-grep -E "(WARN|ERROR).*(TrustStoreService|TrustStoreBootstrap)" app.log
+grep -E "(WARN|ERROR).*(TrustStoreService|TrustStoreBootstrap|Cache)" app.log
 ```
 
 | Nível | Mensagem | Significado |
@@ -40,6 +40,7 @@ grep -E "(WARN|ERROR).*(TrustStoreService|TrustStoreBootstrap)" app.log
 | WARN | `Falha ao carregar acervo do repositório local` | Storage ilegível, hash divergente ou bundle inválido na carga local |
 | WARN | `Acervo local expirado desde` | Confirmação persistida além de `cache-ttl-max-hours`; depende do ITI para voltar a servir |
 | WARN | `Falha ao persistir … no repositório local` | Acervo válido apenas em memória; próximo cold start dependerá do ITI |
+| WARN | `SKI {S} duplicado no acervo; mantido o último certificado` | O bundle do ITI trouxe dois certificados com a mesma chave; só o último consta do índice — conferir se a AC anterior ainda é necessária |
 | ERROR | `Acervo ICP-Brasil indisponível: nenhum snapshot válido após a sincronização` | Nenhum certificado servido (endpoint responde 503) |
 | ERROR | `aplicação subirá com cache indisponível (fail-fast=false)` | Bootstrap falhou e o startup prosseguiu sem acervo |
 
