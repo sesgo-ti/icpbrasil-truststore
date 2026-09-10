@@ -1,5 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil;
 
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
+import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
@@ -35,5 +37,14 @@ class TrustStoreApplicationTest {
         assertInstanceOf(FilesystemTrustStoreRepository.class, context.getBean(TrustStoreRepository.class));
         assertEquals(1, context.getBeanNamesForType(TrustStoreCacheHealthIndicator.class).length);
         assertNotNull(context.getBean("trustStoreCacheHealthIndicator"));
+    }
+
+    /** O application.yaml do serviço não repete as URLs do ITI: elas vêm dos defaults da biblioteca. */
+    @Test
+    void testConfig_UrlsDoIti_VemDosDefaultsDaBiblioteca() {
+        TrustStoreConfig config = context.getBean(TrustStoreConfig.class);
+
+        assertEquals(IcpBrasilEndpoints.BUNDLE_ZIP_URL, config.getCertificateUrl());
+        assertEquals(IcpBrasilEndpoints.BUNDLE_HASH_URL, config.getHashUrl());
     }
 }

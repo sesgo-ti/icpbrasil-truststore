@@ -27,10 +27,8 @@ management:
 
 # Configurações do TrustStore ICP-Brasil
 icpbrasil-truststore:
-  # URLs Oficiais da ICP-Brasil para download dos certificados e hash
-  # [Resultado]: Define de onde o sistema baixa as atualizações
-  certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
-  hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
+  # As URLs do ITI (certificate-url e hash-url) vêm dos defaults da biblioteca (IcpBrasilEndpoints);
+  # defina-as aqui apenas para apontar a um espelho.
 
   # Configurações de Rede e Resiliência
   # [Resultado]: Controla o comportamento em caso de falha na conexão
