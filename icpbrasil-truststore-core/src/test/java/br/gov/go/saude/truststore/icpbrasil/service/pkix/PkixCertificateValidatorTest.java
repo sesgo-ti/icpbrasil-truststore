@@ -21,7 +21,6 @@ import java.security.cert.CertPathValidatorException.BasicReason;
 import java.security.cert.CertificateFactory;
 import java.security.cert.PKIXReason;
 import java.security.cert.X509CRL;
-import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
