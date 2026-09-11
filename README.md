@@ -51,7 +51,7 @@ Adicione a dependência:
 <dependency>
     <groupId>br.gov.go.saude</groupId>
     <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
 </dependency>
 ```
 
