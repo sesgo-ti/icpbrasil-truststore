@@ -12,7 +12,7 @@ Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de
 |---|---|---|
 | `icpbrasil-truststore-core` | Domínio e lógica (parsers X.509, cache, revogação OCSP/CRL, download) — **Java puro, zero Spring/AWS** | ✅ |
 | `icpbrasil-truststore-autoconfigure` | Auto-configuração Spring Boot: beans, binding de properties, scheduler, bootstrap, health, S3 | ✅ |
-| `icpbrasil-truststore-rest` | Microserviço standalone (endpoint REST + fat jar) | ❌ (artefato de deploy) |
+| `icpbrasil-truststore-rest` | Microserviço standalone (endpoint REST + fat jar) | ❌ |
 
 Para consumir como **biblioteca**, dependa de `icpbrasil-truststore-autoconfigure`. Para rodar como **serviço**, use o fat jar do módulo `rest`.
 
