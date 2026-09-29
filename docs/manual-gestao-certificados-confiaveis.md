@@ -19,6 +19,16 @@ Este exemplo não é "acidental", pois o portal do ITI (ICP-Brasil) que disponib
 Ou seja, para que uma aplicação possa baixar os certificados das CAs vigentes da ICP-Brasil, ele terá que construir um truststore com o certificado baixado. 
 Sem esse passo a segurança pode ser comprometida.
 
+**Qual certificado registrar para o ITI.** `acraiz.icpbrasil.gov.br` envia apenas o seu próprio certificado no handshake TLS, sem a intermediária, e o JDK não busca emissores via AIA. Registrar só a raiz (como no exemplo) **não basta**: o registro precisa conter a intermediária que emitiu o certificado do servidor. Para identificá-la:
+
+```bash
+# Emissor atual e URL da intermediária (campo "CA Issuers")
+echo | openssl s_client -connect acraiz.icpbrasil.gov.br:443 -servername acraiz.icpbrasil.gov.br 2>/dev/null \
+  | openssl x509 -noout -issuer -ext authorityInfoAccess
+```
+
+Baixe a intermediária indicada a partir de `https://letsencrypt.org/certificates/` (não da URL AIA, que é HTTP simples) e confira-a pelos Passos 1 a 4. Como a Let's Encrypt alterna entre as intermediárias de uma mesma geração, registre todas as da geração em uso (em 2026: YE1–YE3 e YR1–YR3). Veja a seção "Contexto SSL e segurança" do README.
+
 Pré-requisitos
 - OpenSSL disponível no PATH (`openssl version`).
 - JDK instalado, para `keytool`: `keytool -version`.

@@ -338,9 +338,12 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 
 | Arquivo | Tipo | Propósito |
 |---|---|---|
-| `isrgrootx1.json` | Raiz (ISRG Root X1) | Âncora de confiança para cadeia E7 |
-| `isrgrootx2.json` | Raiz (ISRG Root X2) | Âncora de confiança para cadeia E7 |
-| `letsencrypt_e7.json` | Intermediário (E7) | Necessário pois `acraiz.icpbrasil.gov.br` não envia o intermediário no TLS handshake |
+| `letsencrypt_ye1.json`, `letsencrypt_ye2.json`, `letsencrypt_ye3.json` | Intermediárias ECDSA (emitidas por ISRG Root YE) | Emissoras possíveis do certificado TLS de `acraiz.icpbrasil.gov.br` com chave ECDSA (desde 2026-07-21 o ITI usa a YE1) |
+| `letsencrypt_yr1.json`, `letsencrypt_yr2.json`, `letsencrypt_yr3.json` | Intermediárias RSA (emitidas por ISRG Root YR) | Emissoras possíveis caso o ITI renove com chave RSA |
+
+`acraiz.icpbrasil.gov.br` **não envia a intermediária** no handshake TLS e o JDK não busca emissores via AIA; por isso a própria intermediária precisa constar do registro — no `TrustManager` do `SSLContext` interno, toda entrada é âncora. As raízes ISRG não são embutidas: sem a intermediária no handshake elas não formam caminho algum. A Let's Encrypt alterna entre as intermediárias da mesma hierarquia a cada emissão, então todas as da geração Y ficam no registro.
+
+Quando o ITI trocar de hierarquia (nova geração de intermediárias da Let's Encrypt ou outra AC), o download falha com `PKIX path building failed` até o registro ser atualizado. O teste `EmbeddedTrustedCertsTest` fixa o certificado TLS vigente do ITI (snapshot em `src/test/resources/tls/`) e o teste de integração `DownloaderTest` (`./mvnw verify -Pintegration-tests`) usa o registro de produção contra o ITI real. Em produção, é possível trocar o registro sem nova versão apontando `icpbrasil-truststore.trusted-certs.dir` para um diretório com os JSON atualizados — ele **substitui** o registro embutido.
 
 ---
 
