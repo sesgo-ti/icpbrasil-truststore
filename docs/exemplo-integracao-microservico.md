@@ -29,21 +29,29 @@ Retorna um certificado indexado por SKI.
 
 **Query params:**
 
-| Param | Obrigatório | Valores | Default | Descrição |
+| Param | Obrigatório | Gramática | Default | Descrição |
 |---|---|---|---|---|
-| `ski` | sim | hex lowercase | — | Subject Key Identifier do certificado |
-| `type` | não | `pem` \| `der` | `pem` | Formato de saída |
+| `ski` | sim, uma vez | octetos em hexadecimal, maiúsculas ou minúsculas, de 1 a 64 (2 a 128 dígitos, quantidade par) | — | Subject Key Identifier do certificado; normalizado para minúsculas |
+| `type` | não, no máximo uma vez | `pem` \| `der`, sem distinção de caixa | `pem` | Formato de saída |
 
-**Respostas:**
+O tamanho do SKI não é fixo: o SHA-1 de 20 octetos é o método mais comum da RFC 5280, mas não o
+único. Se o acervo tiver mais de um certificado com o mesmo SKI (a mesma chave reemitida ou
+cross-signed), o endpoint devolve o preferido: o autoassinado; depois, o de maior `notAfter`; por
+fim, o de menor fingerprint SHA-256. Na biblioteca, `Cache.getCertificatesBySki` devolve todos.
+
+**Respostas** — a precedência é 400 → 503 → 404: os parâmetros são validados antes de consultar o
+acervo, então a mesma entrada inválida responde 400 em qualquer estado do cache.
 
 | Código | Content-Type | Corpo |
 |---|---|---|
 | `200 OK` (pem) | `text/plain` | Certificado em PEM (`-----BEGIN CERTIFICATE-----` ...) |
 | `200 OK` (der) | `application/x-x509-ca-cert` | Bytes DER. `Content-Disposition: attachment; filename=<ski>.der` |
-| `400 Bad Request` | `text/plain` | `type` fora de `pem`/`der` |
-| `404 Not Found` | — | SKI não está no acervo vigente |
+| `400 Bad Request` | `text/plain` | `ski` ausente, vazio, repetido ou fora da gramática; `type` vazio, repetido ou fora de `pem`/`der` |
 | `503 Service Unavailable` | `text/plain` | Cache inválido/expirado — acervo temporariamente não confiável (distinto de 404) |
+| `404 Not Found` | — | SKI válido que não está no acervo vigente |
 | `500 Internal Server Error` | — | Erro interno (conversão ou leitura do certificado) |
+
+Todas as respostas saem com `Cache-Control: no-store`.
 
 **Exemplos:**
 

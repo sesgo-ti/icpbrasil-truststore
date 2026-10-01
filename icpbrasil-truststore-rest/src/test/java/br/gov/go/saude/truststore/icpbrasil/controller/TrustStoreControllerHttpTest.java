@@ -95,6 +95,30 @@ class TrustStoreControllerHttpTest {
         assertEquals(HttpStatus.OK, http.getForEntity("/actuator/health/liveness", String.class).getStatusCode());
     }
 
+    /**
+     * Entrada inválida é rejeitada antes de consultar o acervo: o mesmo parâmetro errado responde
+     * 400 com ou sem acervo vigente (precedência 400 → 503 → 404).
+     */
+    @Test
+    @Order(1)
+    void testSemAcervo_ParametrosInvalidos_Respondem400AntesDe503() {
+        String valido = ski(root);
+        for (String query : new String[]{
+                "",                                   // ski ausente
+                "?ski=",                              // ski vazio
+                "?ski=xyz1",                          // fora do alfabeto hexadecimal
+                "?ski=abc",                           // quantidade ímpar de dígitos
+                "?ski=" + "ab".repeat(65),            // acima de 64 octetos
+                "?ski=" + valido + "&ski=" + valido,  // ski repetido
+                "?ski=" + valido + "&type=pdf",       // type desconhecido
+                "?ski=" + valido + "&type=",          // type vazio
+                "?ski=" + valido + "&type=pem&type=der"}) { // type repetido
+            ResponseEntity<String> resposta = http.getForEntity("/certificate" + query, String.class);
+            assertEquals(HttpStatus.BAD_REQUEST, resposta.getStatusCode(), query);
+            assertEquals("no-store", resposta.getHeaders().getCacheControl(), query);
+        }
+    }
+
     @SneakyThrows
     @Test
     @Order(2)
@@ -124,6 +148,18 @@ class TrustStoreControllerHttpTest {
         ResponseEntity<String> readiness = http.getForEntity("/actuator/health/readiness", String.class);
         assertEquals(HttpStatus.OK, readiness.getStatusCode());
         assertEquals("VALID", json(readiness).at("/components/trustStoreCache/details/status").asText());
+    }
+
+    @Test
+    @Order(3)
+    void testAposCarga_SkiMaiusculoETypeMaiusculo_Aceitos_TypeInvalidoNaoViraNotFound() {
+        ResponseEntity<String> maiusculo = http.getForEntity(
+                "/certificate?ski=" + ski(root).toUpperCase() + "&type=PEM", String.class);
+        assertEquals(HttpStatus.OK, maiusculo.getStatusCode());
+
+        ResponseEntity<String> tipoInvalido = http.getForEntity(
+                "/certificate?ski=" + "0".repeat(40) + "&type=pdf", String.class);
+        assertEquals(HttpStatus.BAD_REQUEST, tipoInvalido.getStatusCode());
     }
 
     @SneakyThrows

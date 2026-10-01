@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Controller REST para gerenciar e consultar certificados vigentes ICP-Brasil.
@@ -21,7 +24,11 @@ public class TrustStoreController {
     // Constantes para tipos de certificado
     private static final String TYPE_PEM = "pem";
     private static final String TYPE_DER = "der";
-    private static final String DEFAULT_TYPE = TYPE_PEM;
+    /**
+     * Gramática de {@code ski}: octetos em hexadecimal (maiúsculas ou minúsculas), de 1 a 64. O
+     * tamanho não é fixo porque a RFC 5280 admite outros métodos além do SHA-1 de 20 octetos.
+     */
+    private static final Pattern SKI = Pattern.compile("(?:[0-9A-Fa-f]{2}){1,64}");
     /** Um SKI SHA-1 tem 40 dígitos hexadecimais; valores maiores são truncados no log. */
     private static final int MAX_SKI_LOG_LENGTH = 64;
 
@@ -35,13 +42,31 @@ public class TrustStoreController {
      * Retorna o certificado com base no Subject Key Identifier (SKI).
      * Por padrão retorna em formato PEM, mas pode ser especificado DER através do parâmetro type.
      *
-     * @param ski identificador SKI do certificado
-     * @param type tipo de formato do certificado (pem ou der). Padrão: pem
+     * <p>Precedência das respostas: 400 (parâmetro ausente, vazio, repetido ou fora da gramática)
+     * antes de 503 (sem acervo vigente) antes de 404 (SKI ausente do acervo). Os parâmetros são
+     * validados antes da consulta, então a mesma entrada inválida responde 400 em qualquer estado.
+     *
+     * @param skis identificador SKI do certificado (exatamente um)
+     * @param types tipo de formato do certificado, {@code pem} ou {@code der} (no máximo um). Padrão: pem
      * @return certificado correspondente ao SKI fornecido no formato especificado
      */
     @GetMapping
-    public ResponseEntity<?> getCertificate(@RequestParam String ski, 
-                                           @RequestParam(defaultValue = DEFAULT_TYPE) String type) {
+    public ResponseEntity<?> getCertificate(@RequestParam(name = "ski", required = false) List<String> skis,
+                                            @RequestParam(name = "type", required = false) List<String> types) {
+        if (skis == null || skis.size() != 1 || !SKI.matcher(skis.getFirst()).matches()) {
+            log.warn("Parâmetro ski inválido: {}", skis == null ? "ausente" : skiParaLog(String.join(",", skis)));
+            return resposta(HttpStatus.BAD_REQUEST)
+                    .body("Parâmetro 'ski' obrigatório: único, hexadecimal, de 1 a 64 octetos");
+        }
+        if (types != null && (types.size() != 1
+                || !(TYPE_PEM.equalsIgnoreCase(types.getFirst()) || TYPE_DER.equalsIgnoreCase(types.getFirst())))) {
+            log.warn("Parâmetro type inválido. Tipos válidos: pem, der");
+            return resposta(HttpStatus.BAD_REQUEST)
+                    .body("Tipo de formato inválido. Use 'pem' ou 'der'");
+        }
+        // O acervo indexa o SKI em hexadecimal minúsculo
+        String ski = skis.getFirst().toLowerCase(Locale.ROOT);
+        String type = types == null ? TYPE_PEM : types.getFirst();
         try {
             log.debug("Buscando certificado para SKI: {}", skiParaLog(ski));
 
@@ -60,13 +85,6 @@ public class TrustStoreController {
             if (cert == null) {
                 log.warn("Certificado não encontrado para SKI: {}", skiParaLog(ski));
                 return resposta(HttpStatus.NOT_FOUND).build();
-            }
-
-            // Validar tipo de formato
-            if (!TYPE_PEM.equalsIgnoreCase(type) && !TYPE_DER.equalsIgnoreCase(type)) {
-                log.warn("Tipo de formato inválido: {}. Tipos válidos: pem, der", type);
-                return resposta(HttpStatus.BAD_REQUEST)
-                    .body("Tipo de formato inválido. Use 'pem' ou 'der'");
             }
 
             if (TYPE_DER.equalsIgnoreCase(type)) {
