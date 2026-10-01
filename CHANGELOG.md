@@ -7,6 +7,10 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Corrigido
+
+- Âncoras TLS do download do ITI com o mesmo CN (reemissões e cross-signs) deixaram de se sobrescrever: o alias passou a ser o fingerprint SHA-256; certificado sem CN deixou de impedir a carga (#18).
+
 ## [0.0.1] - 2026-09-10
 
 ### Adicionado
