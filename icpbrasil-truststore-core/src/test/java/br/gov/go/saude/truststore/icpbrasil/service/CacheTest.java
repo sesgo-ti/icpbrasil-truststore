@@ -33,6 +33,10 @@ class CacheTest {
     static X509Certificate otherRoot;
     static Map<String, X509Certificate> indexA;
     static Map<String, X509Certificate> indexB;
+    static List<X509Certificate> certsA;
+    static List<X509Certificate> certsB;
+    /** Mesma chave, mesmo subject e mesmo SKI de {@code root}, emitido por {@code otherRoot}. */
+    static X509Certificate rootCrossSigned;
 
     TestClock clock;
     Cache cache;
@@ -45,8 +49,11 @@ class CacheTest {
         root = TestBundleFactory.caCert("Raiz A", rootKp);
         intermediate = TestBundleFactory.intermediateCaCert("Intermediaria A", intermediateKp, root, rootKp);
         otherRoot = TestBundleFactory.caCert("Raiz B", otherKp);
-        indexA = Cache.indexBySki(List.of(root, intermediate));
-        indexB = Cache.indexBySki(List.of(otherRoot));
+        certsA = List.of(root, intermediate);
+        certsB = List.of(otherRoot);
+        indexA = Cache.indexBySki(certsA);
+        indexB = Cache.indexBySki(certsB);
+        rootCrossSigned = TestBundleFactory.intermediateCaCert("Raiz A", rootKp, otherRoot, otherKp);
     }
 
     @BeforeEach
@@ -66,7 +73,7 @@ class CacheTest {
 
     @Test
     void testPublish_SnapshotVigente_ServeIndiceEEstado() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
         assertTrue(cache.isCacheValid());
         assertEquals(root, cache.getCertificateBySki(ski(root)));
@@ -82,7 +89,7 @@ class CacheTest {
 
     @Test
     void testGetRootCertificates_ApenasAutoassinados() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
         Map<String, X509Certificate> roots = cache.getRootCertificates();
 
@@ -92,7 +99,7 @@ class CacheTest {
 
     @Test
     void testGetAllCertificates_RetornaCopiaDefensiva() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
         cache.getAllCertificates().clear();
 
@@ -101,7 +108,7 @@ class CacheTest {
 
     @Test
     void testLeituras_ExpiradoPeloRelogio_RetornamVazioEEstadoInvalido() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         clock.advance(TTL.minusSeconds(1));
         assertTrue(cache.isCacheValid());
 
@@ -118,7 +125,7 @@ class CacheTest {
 
     @Test
     void testInvalidate_DescartaSnapshot() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
         cache.invalidate();
 
@@ -129,7 +136,7 @@ class CacheTest {
 
     @Test
     void testRenew_HashIgual_MantemIndiceERenovaValidade() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         Instant t1 = T0.plus(Duration.ofHours(2));
 
         assertTrue(cache.renew(HASH_A, t1, t1.plus(TTL)));
@@ -142,7 +149,7 @@ class CacheTest {
 
     @Test
     void testRenew_HashDiferente_NaoAlteraSnapshot() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
         assertFalse(cache.renew(HASH_B, T0.plus(Duration.ofHours(2)), T0.plus(Duration.ofHours(200))));
 
@@ -160,7 +167,7 @@ class CacheTest {
     @Test
     void testCurrentIndex_IdentidadeSegueAGeracao_MantidaEmRenewETrocadaEmPublish() {
         assertSame(Map.of(), cache.currentIndex());
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         Map<String, X509Certificate> geracaoA = cache.currentIndex();
         assertEquals(indexA.keySet(), geracaoA.keySet());
 
@@ -168,14 +175,14 @@ class CacheTest {
         assertTrue(cache.renew(HASH_A, t1, t1.plus(TTL)));
         assertSame(geracaoA, cache.currentIndex(), "renew mantém o índice: memoizações continuam válidas");
 
-        cache.publish(indexB, HASH_B, t1, t1.plus(TTL));
+        cache.publish(certsB, HASH_B, t1, t1.plus(TTL));
         assertNotSame(geracaoA, cache.currentIndex(), "publish troca a geração");
         assertThrows(UnsupportedOperationException.class, () -> cache.currentIndex().clear());
     }
 
     @Test
     void testCurrentIndex_SnapshotExpirado_Vazio() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         clock.advance(TTL);
 
         assertTrue(cache.currentIndex().isEmpty());
@@ -183,7 +190,7 @@ class CacheTest {
 
     @Test
     void testRenew_SnapshotExpirado_RenovaSemNovoParse() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         clock.advance(TTL.plus(Duration.ofDays(3)));
         assertFalse(cache.isCacheValid());
         Instant agora = clock.instant();
@@ -196,9 +203,9 @@ class CacheTest {
 
     @Test
     void testPublish_SubstituiSnapshot_LeitoresVeemUmaGeracaoInteira() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
-        cache.publish(indexB, HASH_B, T0, T0.plus(TTL));
+        cache.publish(certsB, HASH_B, T0, T0.plus(TTL));
 
         assertEquals(indexB.keySet(), cache.getAllCertificates().keySet());
         assertNull(cache.getCertificateBySki(ski(root)));
@@ -208,7 +215,7 @@ class CacheTest {
     @SneakyThrows
     @Test
     void testPublish_Concorrente_NuncaExpoeIndiceMisto() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         AtomicBoolean parar = new AtomicBoolean(false);
         AtomicReference<Set<String>> misto = new AtomicReference<>();
 
@@ -222,7 +229,7 @@ class CacheTest {
         });
         leitor.start();
         for (int i = 0; i < 2_000; i++) {
-            cache.publish(i % 2 == 0 ? indexB : indexA, i % 2 == 0 ? HASH_B : HASH_A, T0, T0.plus(TTL));
+            cache.publish(i % 2 == 0 ? certsB : certsA, i % 2 == 0 ? HASH_B : HASH_A, T0, T0.plus(TTL));
         }
         parar.set(true);
         leitor.join();
@@ -247,6 +254,39 @@ class CacheTest {
     }
 
     @Test
+    void testIndexBySki_AutoassinadaECrossSignedComMesmoSki_PrefereAutoassinadaEmAmbasAsOrdens() {
+        assertEquals(ski(root), ski(rootCrossSigned));
+
+        assertEquals(root, Cache.indexBySki(List.of(root, rootCrossSigned)).get(ski(root)));
+        assertEquals(root, Cache.indexBySki(List.of(rootCrossSigned, root)).get(ski(root)));
+    }
+
+    @Test
+    void testPublish_CertificadosComMesmoSki_TodosPreservadosComPreferidoPrimeiro() {
+        cache.publish(List.of(rootCrossSigned, root, intermediate), HASH_A, T0, T0.plus(TTL));
+
+        assertEquals(List.of(root, rootCrossSigned), cache.getCertificatesBySki(ski(root)));
+        assertEquals(root, cache.lookupCertificate(ski(root)).certificate());
+        assertEquals(Set.of(root, rootCrossSigned, intermediate), Set.copyOf(cache.currentCertificates()));
+    }
+
+    @Test
+    void testPublish_DuplicataIdentica_ContadaUmaVez() {
+        cache.publish(List.of(root, root, intermediate), HASH_A, T0, T0.plus(TTL));
+
+        assertEquals(List.of(root), cache.getCertificatesBySki(ski(root)));
+        assertEquals(2, cache.currentCertificates().size());
+    }
+
+    @Test
+    void testGetCertificatesBySki_SemAcervoOuSkiAusente_Vazio() {
+        assertTrue(cache.getCertificatesBySki(ski(root)).isEmpty());
+        cache.publish(certsB, HASH_B, T0, T0.plus(TTL));
+
+        assertTrue(cache.getCertificatesBySki(ski(root)).isEmpty());
+    }
+
+    @Test
     void testGetState_SemSnapshot_Vazio() {
         Optional<Cache.State> state = cache.getState();
 
@@ -263,7 +303,7 @@ class CacheTest {
 
     @Test
     void testLookupCertificate_SnapshotVigente_DistingueSkiAusenteDeIndisponivel() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
 
         Cache.Lookup existente = cache.lookupCertificate(ski(root));
         Cache.Lookup ausente = cache.lookupCertificate(ski(otherRoot));
@@ -276,7 +316,7 @@ class CacheTest {
 
     @Test
     void testLookupCertificate_SnapshotExpirado_Indisponivel() {
-        cache.publish(indexA, HASH_A, T0, T0.plus(TTL));
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
         clock.advance(TTL);
 
         Cache.Lookup lookup = cache.lookupCertificate(ski(root));

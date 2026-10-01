@@ -31,6 +31,8 @@ class TrustMaterialTest {
     static X509Certificate root;
     static X509Certificate intermediate;
     static X509Certificate otherRoot;
+    /** Mesma chave, mesmo subject e mesmo SKI de {@code root}, emitido por {@code otherRoot}. */
+    static X509Certificate rootCrossSigned;
 
     @BeforeAll
     static void generateCertificates() {
@@ -38,7 +40,9 @@ class TrustMaterialTest {
         KeyPair intermediateKp = TestBundleFactory.newKeyPair();
         root = TestBundleFactory.caCert("Raiz A", rootKp);
         intermediate = TestBundleFactory.intermediateCaCert("Intermediaria A", intermediateKp, root, rootKp);
-        otherRoot = TestBundleFactory.caCert("Raiz B", TestBundleFactory.newKeyPair());
+        KeyPair otherKp = TestBundleFactory.newKeyPair();
+        otherRoot = TestBundleFactory.caCert("Raiz B", otherKp);
+        rootCrossSigned = TestBundleFactory.intermediateCaCert("Raiz A", rootKp, otherRoot, otherKp);
     }
 
     @Test
@@ -102,6 +106,20 @@ class TrustMaterialTest {
         TrustMaterial segunda = source.current().orElseThrow();
         assertNotSame(primeira.orElseThrow(), segunda);
         assertEquals(Set.of(otherRoot), trustedCerts(segunda.anchors()));
+    }
+
+    @Test
+    void testCacheSource_RaizECrossSignedComMesmoSki_AmbosUsadosEmQualquerOrdem() throws CertStoreException {
+        for (List<X509Certificate> acervo : List.of(List.of(root, rootCrossSigned), List.of(rootCrossSigned, root))) {
+            Cache cache = new Cache(new TestClock(T0));
+            CacheFixture.publish(cache, acervo, HASH_A, T0, T0.plus(TTL));
+
+            TrustMaterial material = new CacheTrustMaterialSource(cache).current().orElseThrow();
+
+            assertEquals(Set.of(root), trustedCerts(material.anchors()));
+            assertEquals(List.of(rootCrossSigned),
+                    List.copyOf(material.intermediates().getCertificates(new X509CertSelector())));
+        }
     }
 
     private static Set<X509Certificate> trustedCerts(Set<TrustAnchor> anchors) {

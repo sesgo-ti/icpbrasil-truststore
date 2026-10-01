@@ -15,7 +15,7 @@ public final class CacheFixture {
 
     public static void publish(Cache cache, List<X509Certificate> certificates, String hash,
                                Instant confirmedAt, Instant expiresAt) {
-        cache.publish(Cache.indexBySki(certificates), hash, confirmedAt, expiresAt);
+        cache.publish(certificates, hash, confirmedAt, expiresAt);
     }
 
     public static boolean renew(Cache cache, String hash, Instant confirmedAt, Instant expiresAt) {

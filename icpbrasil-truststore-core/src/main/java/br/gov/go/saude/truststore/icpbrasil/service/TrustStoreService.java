@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -122,9 +121,7 @@ public class TrustStoreService {
             String hash = normalizarHash(hashOpt.get());
             byte[] zipData = zipOpt.get();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hash);
-            Map<String, X509Certificate> index = Cache.indexBySki(
-                    icpBrasilCertificateProvider.parseCertificates(zipData));
-            cache.publish(index, hash, confirmedAt, expiresAt);
+            cache.publish(icpBrasilCertificateProvider.parseCertificates(zipData), hash, confirmedAt, expiresAt);
             log.info("Acervo do repositório local publicado (confirmado em {})", confirmedAt);
         } catch (RuntimeException e) {
             log.warn("Falha ao carregar acervo do repositório local: {}", e.getMessage());
@@ -151,11 +148,10 @@ public class TrustStoreService {
             byte[] zipData = icpBrasilCertificateProvider.baixarZipIcpBrasil();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hashRemoto);
             List<X509Certificate> certificates = icpBrasilCertificateProvider.parseCertificates(zipData);
-            Map<String, X509Certificate> index = Cache.indexBySki(certificates);
 
             // Publicar antes de persistir: a validação já precedeu ambos, e uma geração que remove
             // uma AC deve valer imediatamente mesmo com o repositório indisponível.
-            cache.publish(index, hashRemoto, now, expiresAt);
+            cache.publish(certificates, hashRemoto, now, expiresAt);
             persistir("acervo", () -> {
                 trustStoreRepository.armazenarZip(zipData);
                 trustStoreRepository.armazenarHash(hashRemoto);

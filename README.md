@@ -248,7 +248,8 @@ Características:
 
 - **Independente do cache ICP-Brasil** — funciona com qualquer certificado X.509
 - Profundidade máxima de 10 níveis, com detecção de referência circular
-- Verificação criptográfica da assinatura em cada nível da cadeia
+- Emissor escolhido entre **todos** os candidatos com SKI igual ao AKI, exigindo subject igual ao issuer e assinatura válida; o autoassinado é preferido. Um SKI forjado ou a versão cross-signed de uma raiz não desviam a cadeia
+- URLs CA Issuers tentadas em ordem até uma fornecer emissor utilizável
 - Pool de certificados baixados (um p7b com cadeia completa evita downloads redundantes)
 - Lança `IncompleteChainException` se não alcançar um certificado raiz (auto-assinado)
 

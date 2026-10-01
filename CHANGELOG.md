@@ -7,9 +7,15 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
+
 ### Corrigido
 
 - Âncoras TLS do download do ITI com o mesmo CN (reemissões e cross-signs) deixaram de se sobrescrever: o alias passou a ser o fingerprint SHA-256; certificado sem CN deixou de impedir a carga (#18).
+- Montagem de cadeia: a primeira URL AIA sem o emissor correto não encerra mais a busca; entre candidatos com o mesmo SKI, o emissor é escolhido pelo nome e pela assinatura, preferindo o autoassinado, em qualquer ordem (#20).
+- Acervo: a raiz autoassinada e sua versão cross-signed com o mesmo SKI são mantidas; o material PKIX usa ambas (#20).
 
 ## [0.0.1] - 2026-09-10
 
