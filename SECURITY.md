@@ -55,6 +55,25 @@ The trust chain (pinned TLS to ITI → SHA-512 validation → storage → in-mem
 1. **Hash and bundle share the same origin and channel.** ITI does not publish a detached signature for the CA bundle; the SHA-512 file is downloaded from the same host over the same TLS channel. Integrity validation therefore protects against corruption and storage tampering of a single artifact, not against a full compromise of the origin. Mitigation: TLS is pinned to a dedicated trust store (not the JVM defaults).
 2. **Storage (filesystem/S3) must have restrictive ACLs.** An attacker with write access to the storage can replace the *pair* (bundle + hash), which passes local revalidation until the next remote sync detects the divergence. Restrict write access to the artifact directory/bucket to the application identity only.
 
+## Dependency analysis (SBOM and SCA)
+
+Every CI run generates a CycloneDX SBOM of the distributed artifacts (`./mvnw package -Psbom`,
+aggregated in `target/bom.json`, covering `core`, `autoconfigure` and the REST executable, without
+test or `provided` dependencies) and scans it with [osv-scanner](https://github.com/google/osv-scanner)
+against the OSV database at scan time. The SBOM is kept as a CI artifact and attached to each
+GitHub Release.
+
+- **Blocking criterion:** any known vulnerability in a distributed dependency fails the build.
+- **Triage** (target: the initial-assessment deadline above): upgrade the dependency — for
+  versions managed by the Spring Boot BOM, pin the fixed version in the root `pom.xml` before the
+  BOM import — or, when the vulnerable code is not reachable or a mitigation exists, add an
+  exception to `osv-scanner.toml` with the reason, the owner and an expiry date (`ignoreUntil`, at
+  most 90 days ahead). Expired exceptions fail the build again.
+- **Limitations:** the scan only finds vulnerabilities already published in OSV, matches versions
+  without reachability analysis and does not cover the dependency versions chosen by applications
+  that consume the library (they resolve their own tree and should scan it). A clean scan is not
+  evidence that no vulnerability exists.
+
 ### PGP key for release verification
 
 Release artifacts are signed with the key below. Verify it via public keyservers (`keyserver.ubuntu.com`, `keys.openpgp.org`):

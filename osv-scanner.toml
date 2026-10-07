@@ -1,0 +1,13 @@
+# Exceções da análise de composição (SCA) feita pelo osv-scanner no CI sobre o SBOM (target/bom.json).
+#
+# Critério de bloqueio: toda vulnerabilidade conhecida em dependência distribuída falha o build.
+# Uma exceção só entra aqui depois da triagem descrita em SECURITY.md, com:
+#   - id: identificador OSV/GHSA/CVE;
+#   - ignoreUntil: data de validade (a exceção expira e o build volta a falhar);
+#   - reason: por que o código não é afetado ou qual mitigação existe, e o responsável.
+#
+# Exemplo:
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
+# reason = "Só afeta o conector AJP, desabilitado no serviço REST. Responsável: @usuario"
