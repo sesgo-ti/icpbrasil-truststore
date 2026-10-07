@@ -99,15 +99,15 @@ public class TrustStoreService {
 
     private void carregarAcervoLocal(Instant now) {
         try {
-            Optional<byte[]> zipOpt = trustStoreRepository.recuperarZip().filter(zip -> zip.length > 0);
-            Optional<String> hashOpt = trustStoreRepository.recuperarHash().filter(hash -> !hash.isBlank());
-            Optional<Instant> confirmacaoOpt = trustStoreRepository.recuperarUltimaConfirmacao();
-            if (zipOpt.isEmpty() || hashOpt.isEmpty() || confirmacaoOpt.isEmpty()) {
+            Optional<TrustStoreRepository.Geracao> geracaoOpt = trustStoreRepository.recuperarGeracao()
+                    .filter(geracao -> geracao.zip().length > 0);
+            if (geracaoOpt.isEmpty()) {
                 log.info("Repositório local sem acervo completo; aguardando sincronização com o ITI");
                 return;
             }
+            TrustStoreRepository.Geracao geracao = geracaoOpt.get();
 
-            Instant confirmedAt = confirmacaoOpt.get();
+            Instant confirmedAt = geracao.ultimaConfirmacao();
             if (confirmedAt.isAfter(now.plus(MAX_CLOCK_SKEW))) {
                 log.warn("Última confirmação persistida ({}) está no futuro; acervo local rejeitado", confirmedAt);
                 return;
@@ -118,8 +118,8 @@ public class TrustStoreService {
                 return;
             }
 
-            String hash = normalizarHash(hashOpt.get());
-            byte[] zipData = zipOpt.get();
+            String hash = normalizarHash(geracao.hash());
+            byte[] zipData = geracao.zip();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hash);
             cache.publish(icpBrasilCertificateProvider.parseCertificates(zipData), hash, confirmedAt, expiresAt);
             log.info("Acervo do repositório local publicado (confirmado em {})", confirmedAt);
@@ -152,11 +152,7 @@ public class TrustStoreService {
             // Publicar antes de persistir: a validação já precedeu ambos, e uma geração que remove
             // uma AC deve valer imediatamente mesmo com o repositório indisponível.
             cache.publish(certificates, hashRemoto, now, expiresAt);
-            persistir("acervo", () -> {
-                trustStoreRepository.armazenarZip(zipData);
-                trustStoreRepository.armazenarHash(hashRemoto);
-                trustStoreRepository.armazenarUltimaConfirmacao(now);
-            });
+            persistir("acervo", () -> trustStoreRepository.armazenarGeracao(zipData, hashRemoto, now));
         } catch (RuntimeException e) {
             log.warn("Falha na sincronização com o ITI; snapshot atual mantido até o prazo original: {}",
                     e.getMessage());

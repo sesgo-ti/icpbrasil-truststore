@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.LinkedHashMap;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -299,8 +300,7 @@ class IcpBrasilCertificateProviderTest {
 
     @Test
     void testGetCertificates_RepositorioLocalCompleto_RetornaCertificadosSemRede() {
-        repository.armazenarZip(bundle);
-        repository.armazenarHash(bundleHash);
+        repository.armazenarGeracao(bundle, bundleHash, Instant.now());
 
         List<X509Certificate> certificates = provider.getCertificates();
 
@@ -314,8 +314,7 @@ class IcpBrasilCertificateProviderTest {
 
     @Test
     void testGetCertificates_HashLocalDivergente_LancaSecurityException() {
-        repository.armazenarZip(bundle);
-        repository.armazenarHash(HashValidator.computeSha512(new byte[]{9}));
+        repository.armazenarGeracao(bundle, HashValidator.computeSha512(new byte[]{9}), Instant.now());
 
         assertThrows(SecurityException.class, () -> provider.getCertificates());
     }

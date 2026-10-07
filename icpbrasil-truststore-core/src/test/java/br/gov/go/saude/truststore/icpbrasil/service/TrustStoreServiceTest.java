@@ -464,8 +464,7 @@ class TrustStoreServiceTest {
     /** Leituras reais; toda escrita falha como um disco cheio ou bucket inacessível. */
     private TrustStoreRepository repositorioSemEscrita() {
         TrustStoreRepository semEscrita = spy(repository);
-        doThrow(new RuntimeException("armazenamento indisponível")).when(semEscrita).armazenarZip(any());
-        doThrow(new RuntimeException("armazenamento indisponível")).when(semEscrita).armazenarHash(any());
+        doThrow(new RuntimeException("armazenamento indisponível")).when(semEscrita).armazenarGeracao(any(), any(), any());
         doThrow(new RuntimeException("armazenamento indisponível")).when(semEscrita).armazenarUltimaConfirmacao(any());
         return semEscrita;
     }
@@ -483,9 +482,7 @@ class TrustStoreServiceTest {
     }
 
     private void storage(byte[] zip, String hash, Instant confirmacao) {
-        repository.armazenarZip(zip);
-        repository.armazenarHash(hash);
-        repository.armazenarUltimaConfirmacao(confirmacao);
+        repository.armazenarGeracao(zip, hash, confirmacao);
     }
 
     private static String ski(X509Certificate certificate) {
@@ -532,11 +529,11 @@ class TrustStoreServiceTest {
         }
 
         @Override
-        public Optional<byte[]> recuperarZip() {
+        public Optional<Geracao> recuperarGeracao() {
             if (falhasRestantes-- > 0) {
                 throw new RuntimeException("Falha transitória de leitura");
             }
-            return delegate.recuperarZip();
+            return delegate.recuperarGeracao();
         }
 
         @Override
@@ -545,18 +542,8 @@ class TrustStoreServiceTest {
         }
 
         @Override
-        public void armazenarZip(byte[] zip) {
-            delegate.armazenarZip(zip);
-        }
-
-        @Override
-        public void armazenarHash(String hash) {
-            delegate.armazenarHash(hash);
-        }
-
-        @Override
-        public Optional<Instant> recuperarUltimaConfirmacao() {
-            return delegate.recuperarUltimaConfirmacao();
+        public void armazenarGeracao(byte[] zip, String hash, Instant confirmacao) {
+            delegate.armazenarGeracao(zip, hash, confirmacao);
         }
 
         @Override

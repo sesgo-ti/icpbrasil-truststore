@@ -156,6 +156,23 @@ Credenciais via variáveis de ambiente (no modo biblioteca, adicione `software.a
 | `S3_BUCKET` | Nome do bucket |
 | `S3_CA_CERT_PATH` | CA do servidor S3 privado — opcional, apenas para MinIO ou endpoints com CA própria |
 
+### Layout do armazenamento
+
+Filesystem e S3 gravam o acervo por **geração**: cada geração fica em `geracoes/<hash>/` (ZIP e
+última confirmação) e o arquivo/objeto `hash.txt` na base é o ponteiro para a geração vigente.
+Todo arquivo é escrito num temporário e movido atomicamente (no S3, o PUT de cada objeto é
+atômico), e o ponteiro é trocado por último: uma interrupção no meio da escrita (queda do
+processo, disco cheio) deixa vigente a geração anterior, completa.
+
+- **Várias instâncias no mesmo diretório ou bucket:** gerações são imutáveis e endereçadas pelo
+  hash, então instâncias que gravam a mesma geração escrevem o mesmo conteúdo; o ponteiro segue a
+  última troca. Cada instância valida o SHA-512 do ZIP ao carregar.
+- **Limpeza:** a cada commit são removidas as gerações que não são a vigente nem a anterior e que
+  não mudam há mais de 24 h, além de temporários abandonados há mais de 24 h — o prazo evita
+  apagar o commit em andamento de outra instância.
+- **Migração:** o layout da 0.0.1 (ZIP, hash e confirmação soltos na base) é lido como geração e
+  convertido no primeiro commit ou renovação, sem novo download.
+
 ### Rede
 
 ```yaml
