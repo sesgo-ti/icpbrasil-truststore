@@ -10,9 +10,11 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 ### Adicionado
 
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
+- Cache de revogação: downloads concorrentes da mesma CRL ou da mesma resposta OCSP são compartilhados (#13).
 
 ### Alterado
 
+- **Incompatível:** `icpbrasil-truststore.revocation.ocsp-cache-max-size` e `crl-cache-max-size` (entradas) foram substituídas por `ocsp-cache-max-bytes` (padrão 16 MiB) e `crl-cache-max-bytes` (padrão 256 MiB), com eviction por peso (#13).
 - `/certificate`: parâmetros validados antes da consulta (precedência 400 → 503 → 404); `ski` aceita octetos hexadecimais em maiúsculas ou minúsculas, de 1 a 64; `ski` ou `type` ausentes, vazios ou repetidos respondem 400 (#19).
 
 ### Corrigido

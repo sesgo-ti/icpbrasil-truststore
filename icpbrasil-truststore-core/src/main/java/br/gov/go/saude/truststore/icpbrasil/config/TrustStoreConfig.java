@@ -23,6 +23,9 @@ import java.util.List;
 @Slf4j
 public class TrustStoreConfig {
 
+    private static final long MIB = 1024L * 1024;
+    private static final long GIB = 1024 * MIB;
+
     // BouncyCastle é necessário para operações OCSP e CRL (assinaturas, parsing de extensões).
     // O registro deve ocorrer antes de qualquer uso, por isso fica no bloco estático da config.
     static {
@@ -389,14 +392,14 @@ public class TrustStoreConfig {
                     revocation.crlCacheTtlSeconds));
         }
 
-        if (revocation.ocspCacheMaxSize < 100 || revocation.ocspCacheMaxSize > 1_000_000) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache Max Size: Deve ser entre 100 e 1000000. Propriedade: 'icpbrasil-truststore.revocation.ocsp-cache-max-size' (Valor: '%d')",
-                    revocation.ocspCacheMaxSize));
+        if (revocation.ocspCacheMaxBytes < MIB || revocation.ocspCacheMaxBytes > GIB) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] OCSP Cache Max Bytes: Deve ser entre 1048576 (1 MiB) e 1073741824 (1 GiB). Propriedade: 'icpbrasil-truststore.revocation.ocsp-cache-max-bytes' (Valor: '%d')",
+                    revocation.ocspCacheMaxBytes));
         }
 
-        if (revocation.crlCacheMaxSize < 100 || revocation.crlCacheMaxSize > 100_000) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache Max Size: Deve ser entre 100 e 100000. Propriedade: 'icpbrasil-truststore.revocation.crl-cache-max-size' (Valor: '%d')",
-                    revocation.crlCacheMaxSize));
+        if (revocation.crlCacheMaxBytes < 16 * MIB || revocation.crlCacheMaxBytes > 4 * GIB) {
+            throw new IllegalStateException(String.format("[Erro de Configuração] CRL Cache Max Bytes: Deve ser entre 16777216 (16 MiB) e 4294967296 (4 GiB). Propriedade: 'icpbrasil-truststore.revocation.crl-cache-max-bytes' (Valor: '%d')",
+                    revocation.crlCacheMaxBytes));
         }
 
         log.debug("Configurações de revogação validadas com sucesso");
@@ -521,14 +524,15 @@ public class TrustStoreConfig {
         private long crlCacheTtlSeconds = 3600;
 
         /**
-         * Tamanho máximo do cache OCSP em número de entradas (padrão 10000, intervalo [100, 1000000]).
+         * Orçamento do cache OCSP em bytes de DER (padrão 16 MiB, intervalo [1 MiB, 1 GiB]).
          */
-        private long ocspCacheMaxSize = 10_000;
+        private long ocspCacheMaxBytes = 16 * MIB;
 
         /**
-         * Tamanho máximo do cache CRL em número de entradas (padrão 1000, intervalo [100, 100000]).
+         * Orçamento do cache CRL em bytes de DER (padrão 256 MiB, intervalo [16 MiB, 4 GiB]). A CRL
+         * decodificada ocupa mais que o DER; dimensione o heap com essa folga.
          */
-        private long crlCacheMaxSize = 1_000;
+        private long crlCacheMaxBytes = 256 * MIB;
     }
 
     /**

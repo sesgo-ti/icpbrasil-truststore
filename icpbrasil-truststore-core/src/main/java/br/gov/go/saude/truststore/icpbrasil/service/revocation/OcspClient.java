@@ -89,6 +89,8 @@ public class OcspClient {
     private final TrustStoreConfig.RevocationConfig config;
     private final CertificateHttpTransport transport;
     private final Clock clock;
+    /** Consultas concorrentes ao mesmo responder pelo mesmo certificado compartilham uma requisição. */
+    private final InFlightLoads<String, byte[]> requests = new InFlightLoads<>();
     private final DigestCalculatorProvider digestCalculators = createDigestCalculators();
 
     /**
@@ -166,11 +168,11 @@ public class OcspClient {
         }
 
         try {
-            byte[] responseBytes = retryPolicy.executeWithRetry(
+            byte[] responseBytes = requests.load(cacheKey + "|" + url, () -> retryPolicy.executeWithRetry(
                     "OCSP " + url,
                     config.getMaxRetries(),
                     config.getRetryIntervalSeconds() * 1000L,
-                    () -> sendRequest(cert, issuer, url));
+                    () -> sendRequest(cert, issuer, url)));
 
             ParsedResponse parsed = parseResponse(responseBytes, cert, issuer);
             if (parsed.cacheable()) {

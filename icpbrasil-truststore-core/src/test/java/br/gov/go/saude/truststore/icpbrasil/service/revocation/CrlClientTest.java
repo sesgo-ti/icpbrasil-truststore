@@ -50,6 +50,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -172,6 +176,32 @@ class CrlClientTest {
 
     @Test
     @SneakyThrows
+    @SuppressWarnings("unchecked")
+    void testLookupConcorrenteMesmaUrl_UmUnicoDownloadCompartilhado() {
+        byte[] crl = rootSigned(crlBuilder());
+        HttpResponse<byte[]> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(crl);
+        CompletableFuture<HttpResponse<byte[]>> pendente = new CompletableFuture<>();
+        doReturn(pendente).when(mockHttpClient).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<RevocationLookup> primeira = executor.submit(() -> client.lookup(leafCert, rootCert, CRL_URL));
+            Future<RevocationLookup> segunda = executor.submit(() -> client.lookup(leafCert, rootCert, CRL_URL));
+            Thread.sleep(300);
+            pendente.complete(response);
+
+            assertInstanceOf(RevocationStatus.Good.class, primeira.get(5, TimeUnit.SECONDS).status());
+            assertInstanceOf(RevocationStatus.Good.class, segunda.get(5, TimeUnit.SECONDS).status());
+            verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @SneakyThrows
     void testCheckSerialListadoRetornaRevokedECacheia() {
         byte[] crl = rootSigned(crlBuilder()
                 .addCRLEntry(leafCert.getSerialNumber(), yesterday(), CRLReason.keyCompromise));
@@ -220,7 +250,7 @@ class CrlClientTest {
         RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
 
         assertInstanceOf(RevocationStatus.Malformed.class, status);
-        verify(cache, never()).putCrl(anyString(), any());
+        verify(cache, never()).putCrl(anyString(), any(), anyInt());
     }
 
     @Test
@@ -305,7 +335,7 @@ class CrlClientTest {
         RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
 
         assertInstanceOf(RevocationStatus.Malformed.class, status);
-        verify(cache, never()).putCrl(anyString(), any());
+        verify(cache, never()).putCrl(anyString(), any(), anyInt());
     }
 
     @Test
@@ -519,7 +549,7 @@ class CrlClientTest {
         RevocationStatus status = client.check(leafCert, rootCert, CRL_URL);
 
         assertInstanceOf(RevocationStatus.Malformed.class, status);
-        verify(cache, never()).putCrl(anyString(), any());
+        verify(cache, never()).putCrl(anyString(), any(), anyInt());
     }
 
     @Test
@@ -579,7 +609,7 @@ class CrlClientTest {
     /** A CRL que o cliente guardou no cache após um resultado conclusivo. */
     private X509CRL cachedCrl() {
         ArgumentCaptor<X509CRL> captor = ArgumentCaptor.forClass(X509CRL.class);
-        verify(cache).putCrl(eq(CRL_URL), captor.capture());
+        verify(cache).putCrl(eq(CRL_URL), captor.capture(), anyInt());
         return captor.getValue();
     }
 

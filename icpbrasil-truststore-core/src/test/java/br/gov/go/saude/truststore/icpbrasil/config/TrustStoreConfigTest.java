@@ -55,4 +55,21 @@ class TrustStoreConfigTest {
 
         assertTrue(erro.getMessage().contains("icpbrasil-truststore.refresh-interval-hours"));
     }
+
+    @Test
+    void testValidateProperties_OrcamentosDeCacheDeRevogacao_DefaultsEmBytesEForaDaFaixaFalha() {
+        TrustStoreConfig config = new TrustStoreConfig();
+        config.getFilesystem().setBaseDir("target/test-config");
+        assertEquals(16L * 1024 * 1024, config.getRevocation().getOcspCacheMaxBytes());
+        assertEquals(256L * 1024 * 1024, config.getRevocation().getCrlCacheMaxBytes());
+
+        config.getRevocation().setCrlCacheMaxBytes(1024);
+        IllegalStateException crl = assertThrows(IllegalStateException.class, config::validateProperties);
+        assertTrue(crl.getMessage().contains("icpbrasil-truststore.revocation.crl-cache-max-bytes"));
+
+        config.getRevocation().setCrlCacheMaxBytes(256L * 1024 * 1024);
+        config.getRevocation().setOcspCacheMaxBytes(2L * 1024 * 1024 * 1024);
+        IllegalStateException ocsp = assertThrows(IllegalStateException.class, config::validateProperties);
+        assertTrue(ocsp.getMessage().contains("icpbrasil-truststore.revocation.ocsp-cache-max-bytes"));
+    }
 }
