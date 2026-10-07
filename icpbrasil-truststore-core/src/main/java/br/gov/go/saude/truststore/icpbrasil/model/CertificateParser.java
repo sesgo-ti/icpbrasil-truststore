@@ -10,6 +10,8 @@ import javax.naming.ldap.Rdn;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.cert.*;
 import java.security.cert.Certificate;
 import java.util.*;
@@ -17,6 +19,20 @@ import java.util.function.Function;
 
 @Slf4j
 public class CertificateParser {
+
+    /**
+     * Fingerprint SHA-256 do DER, em hexadecimal minúsculo sem separadores.
+     *
+     * @throws IllegalArgumentException se o certificado não puder ser codificado
+     */
+    public static String getFingerprintSha256(X509Certificate certificate) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()));
+        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException("Certificado não codificável: " + certificate.getSubjectX500Principal(), e);
+        }
+    }
+
     public static X509Certificate parse(InputStream inputStream) throws CertificateParsingException {
         if (inputStream == null) {
             log.error("Erro ao carregar certificado: InputStream é nulo");

@@ -1,19 +1,11 @@
 package br.gov.go.saude.truststore.icpbrasil.http;
 
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
-import java.security.KeyStore;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -21,27 +13,25 @@ import java.util.List;
  * <p>
  * Constrói um SSLContext com as CAs embutidas em {@code registries/certificates/} (ex: Let's Encrypt),
  * isolando as conexões de download do truststore padrão da JVM e do contexto SSL do consumidor.
- * <p>
- * O alias de cada âncora é {@code sha256-<fingerprint do DER>}: certificados distintos com o mesmo
- * CN (reemissões e cross-signs durante uma rotação) coexistem, e o carregamento independe da ordem.
- * O alias é só um rótulo do KeyStore, não um critério de confiança.
+ * A construção da confiança é delegada a {@link TlsTrust#dedicatedCa}.
  */
 @Slf4j
 public class TrustStoreManager {
 
-    private final CertificateProvider certificateProvider;
+    private final TlsTrust trust;
+    private final SSLContext sslContext;
 
-    private SSLContext sslContext;
-    private X509TrustManager trustManager;
-
+    /**
+     * @throws TrustStoreCreationException se o provedor não fornecer nenhum certificado
+     */
     public TrustStoreManager(CertificateProvider certificateProvider) {
-        this.certificateProvider = certificateProvider;
-        init();
-    }
-
-    private void init() {
-        trustManager = buildTrustManager();
-        sslContext = buildSslContext(trustManager);
+        List<X509Certificate> anchors = certificateProvider.getCertificates();
+        if (anchors.isEmpty()) {
+            throw new TrustStoreCreationException("TrustStore não pode ser criado sem certificados confiáveis", null);
+        }
+        this.trust = TlsTrust.dedicatedCa(anchors);
+        this.sslContext = trust.sslContext();
+        log.info("Download do acervo ITI confia em {}", trust.describe());
     }
 
     public SSLContext getSslContext() {
@@ -50,111 +40,11 @@ public class TrustStoreManager {
 
     /** Âncoras do TrustManager interno; certificados idênticos aparecem uma vez. */
     public X509Certificate[] getAcceptedIssuers() {
-        return trustManager.getAcceptedIssuers();
+        return trust.trustManager().getAcceptedIssuers();
     }
-
-    static String aliasOf(X509Certificate certificate) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded());
-            return "sha256-" + HexFormat.of().formatHex(digest);
-        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
-            throw new CertificateAdditionException("Falha ao calcular o fingerprint do certificado: "
-                    + certificate.getSubjectX500Principal(), e);
-        }
-    }
-
-    private X509TrustManager buildTrustManager() {
-        try {
-            log.info("Criando TrustManager interno com certificados embutidos");
-
-            KeyStore trustStore = createTrustStore();
-            addTrustedCertificates(trustStore);
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(trustStore);
-
-            return Arrays.stream(tmf.getTrustManagers())
-                    .filter(tm -> tm instanceof X509TrustManager)
-                    .map(tm -> (X509TrustManager) tm)
-                    .findFirst()
-                    .orElseThrow(() -> new TrustStoreCreationException("Nenhum X509TrustManager encontrado", null));
-
-        } catch (TrustStoreCreationException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Erro crítico ao criar TrustManager: {}", e.getMessage(), e);
-            throw new TrustStoreCreationException("Falha na criação do TrustManager", e);
-        }
-    }
-
-    private SSLContext buildSslContext(X509TrustManager trustManager) {
-        try {
-            log.info("Criando SSLContext interno com certificados embutidos");
-            SSLContext ctx = SSLContext.getInstance("TLS");
-            ctx.init(null, new TrustManager[]{trustManager}, null);
-            return ctx;
-        } catch (Exception e) {
-            log.error("Erro crítico ao criar SSLContext interno: {}", e.getMessage(), e);
-            throw new TrustStoreCreationException("Falha na criação do SSLContext interno", e);
-        }
-    }
-
-    private KeyStore createTrustStore() throws Exception {
-        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        trustStore.load(null, null);
-        return trustStore;
-    }
-
-    private void addTrustedCertificates(KeyStore trustStore) {
-        try {
-            List<X509Certificate> certificates = certificateProvider.getCertificates();
-
-            if (certificates.isEmpty()) {
-                log.error("Nenhum certificado confiável encontrado - TrustStore ficará vazio!");
-                throw new TrustStoreCreationException("TrustStore não pode ser criado sem certificados confiáveis", null);
-            }
-
-            for (X509Certificate certificate : certificates) {
-                addCertificateToTrustStore(trustStore, certificate);
-            }
-
-            log.info("Adicionados {} certificados confiáveis ao TrustStore interno", trustStore.size());
-
-        } catch (TrustStoreCreationException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Erro crítico ao carregar certificados confiáveis: {}", e.getMessage(), e);
-            throw new TrustStoreCreationException("Falha ao carregar certificados confiáveis", e);
-        }
-    }
-
-    private void addCertificateToTrustStore(KeyStore trustStore, X509Certificate certificate) {
-        try {
-            String alias = aliasOf(certificate);
-            if (trustStore.containsAlias(alias)) {
-                log.warn("Certificado confiável duplicado ignorado: {} ({})",
-                        certificate.getSubjectX500Principal().getName(), alias);
-                return;
-            }
-            trustStore.setCertificateEntry(alias, certificate);
-            log.debug("Certificado confiável adicionado: {} ({})", certificate.getSubjectX500Principal().getName(), alias);
-
-        } catch (Exception e) {
-            String subject = certificate.getSubjectX500Principal().getName();
-            log.error("Erro ao adicionar certificado confiável {} ao TrustStore: {}", subject, e.getMessage(), e);
-            throw new CertificateAdditionException("Falha ao adicionar certificado confiável: " + subject, e);
-        }
-    }
-
 
     public static class TrustStoreCreationException extends RuntimeException {
         public TrustStoreCreationException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
-
-    public static class CertificateAdditionException extends RuntimeException {
-        public CertificateAdditionException(String message, Throwable cause) {
             super(message, cause);
         }
     }

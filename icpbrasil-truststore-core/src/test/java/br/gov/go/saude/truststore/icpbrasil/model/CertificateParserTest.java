@@ -42,6 +42,12 @@ class CertificateParserTest {
     }
 
     @Test
+    void testGetFingerprintSha256_ValorDeReferenciaDoOpenssl() {
+        assertEquals("bbdc7e24ce9a6f0ef7f63947d46831829531df73e71cb3df4b94deaecdf2962f",
+                CertificateParser.getFingerprintSha256(authorityCertificate));
+    }
+
+    @Test
     void testGetSubjectCommonName() {
         assertEquals(TestCertificateFactory.CN_TITULAR_TESTE, CertificateParser.getSubjectCommonName(certificate));
     }
