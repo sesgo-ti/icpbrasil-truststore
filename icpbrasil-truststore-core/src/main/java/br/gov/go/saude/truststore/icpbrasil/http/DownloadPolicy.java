@@ -29,6 +29,8 @@ public class DownloadPolicy {
     // tratá-lo como literal cobre formas abreviadas como "1234", que a JVM expande para IPv4.
     private static final Pattern IPV4_LITERAL = Pattern.compile("[0-9.]+");
 
+    private static final String HOST_ACERVO_ITI = "acraiz.icpbrasil.gov.br";
+
     private final TrustStoreConfig.DownloadPolicyConfig config;
 
     public DownloadPolicy(TrustStoreConfig trustStoreConfig) {
@@ -37,6 +39,16 @@ public class DownloadPolicy {
 
     public DownloadPolicy(TrustStoreConfig.DownloadPolicyConfig config) {
         this.config = config;
+    }
+
+    /**
+     * Política do download do acervo: só o host do ITI, com bloqueio de destinos não públicos
+     * (barra também um DNS do ITI sequestrado para endereço interno).
+     */
+    public static DownloadPolicy acervoIti() {
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
+        config.setAllowedDomains(List.of(HOST_ACERVO_ITI));
+        return new DownloadPolicy(config);
     }
 
     /**

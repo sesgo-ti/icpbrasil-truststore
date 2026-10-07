@@ -26,6 +26,27 @@ class DownloadPolicyTest {
         policy = new DownloadPolicy(config);
     }
 
+    // --- acervoIti ---
+
+    @Test
+    void testAcervoIti_HostDoIti_Aceita() {
+        DownloadPolicy policy = DownloadPolicy.acervoIti();
+
+        assertDoesNotThrow(() -> policy.validateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/x.zip"));
+    }
+
+    @Test
+    void testAcervoIti_OutroHost_LancaDownloadPolicyException() {
+        assertThrows(DownloadPolicyException.class,
+                () -> DownloadPolicy.acervoIti().validateUrl("https://exemplo.com.br/x.zip"));
+    }
+
+    @Test
+    void testAcervoIti_IpPrivado_LancaDownloadPolicyException() {
+        assertThrows(DownloadPolicyException.class,
+                () -> DownloadPolicy.acervoIti().validateUrl("https://10.0.0.5/x.zip"));
+    }
+
     // --- validateUrl: esquemas ---
 
     @ParameterizedTest

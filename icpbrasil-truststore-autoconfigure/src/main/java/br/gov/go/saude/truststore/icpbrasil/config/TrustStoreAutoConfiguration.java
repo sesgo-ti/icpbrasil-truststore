@@ -156,7 +156,8 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnMissingBean
     public Downloader downloader(TrustStoreManager trustStoreManager, RetryPolicy retryPolicy,
                                  TrustStoreConfig trustStoreConfig) {
-        return new Downloader(trustStoreManager, retryPolicy, trustStoreConfig);
+        return new Downloader(Downloader.transporteAcervoIti(trustStoreManager.getSslContext(), trustStoreConfig),
+                retryPolicy, trustStoreConfig);
     }
 
     @Bean

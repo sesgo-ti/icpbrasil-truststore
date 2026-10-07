@@ -57,7 +57,9 @@ class DownloaderTest {
         TrustedCertsProvider trustedCertsProvider = new TrustedCertsProvider(docs);
         TrustStoreManager trustStoreManager = new TrustStoreManager(trustedCertsProvider);
         RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
-        downloader = new Downloader(trustStoreManager, retryPolicy, trustStoreConfig);
+        downloader = new Downloader(
+                Downloader.transporteAcervoIti(trustStoreManager.getSslContext(), trustStoreConfig),
+                retryPolicy, trustStoreConfig);
     }
 
     @SneakyThrows
