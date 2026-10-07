@@ -91,11 +91,20 @@ Visibilidade restrita ao repositório `icpbrasil-truststore`.
 
 ## Publicando uma nova versão
 
-A publicação no Maven Central é **automatizada por tag**: o workflow
-[release.yml](.github/workflows/release.yml) valida que a tag `vX.Y.Z` corresponde à
-versão dos POMs (sem `-SNAPSHOT`), compila e testa todos os módulos, assina com GPG e
-publica **parent POM + `core` + `autoconfigure`** (`-pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am`).
-O `rest` (fat jar) participa do build, mas não do reactor de publicação.
+A publicação é **automatizada por tag** no workflow [release.yml](.github/workflows/release.yml),
+em três jobs:
+
+1. **`verificar`** (sem secrets, `contents: read`): valida que a tag `vX.Y.Z` corresponde à
+   versão dos POMs (sem `-SNAPSHOT`), compila e testa todos os módulos, gera o SBOM, extrai as
+   notas da seção `[X.Y.Z]` do CHANGELOG (falha se ela não existir ou estiver vazia) e monta os
+   assets: o executável REST, o SBOM e o `SHA256SUMS`.
+2. **`publicar-central`** (environment `release`, com os secrets): assina com GPG e publica
+   **parent POM + `core` + `autoconfigure`**. O `rest` (fat jar) não vai ao Central.
+3. **`github-release`** (environment `release`, `contents: write`): cria a GitHub Release com as
+   notas e os assets, ou a atualiza se já existir.
+
+Todas as actions são fixadas por SHA completo, com a versão em comentário; o Dependabot
+(`github-actions`) propõe as atualizações.
 
 ### Pré-requisitos (uma única vez, já configurados)
 
@@ -103,6 +112,12 @@ O `rest` (fat jar) participa do build, mas não do reactor de publicação.
   [central.sonatype.com](https://central.sonatype.com) → Account → Generate User Token.
 - Namespace `br.gov.go.saude` **verificado** no Sonatype Central.
 - Chave GPG publicada nos dois keyservers (seção acima).
+- **Environment `release`** (Settings → Environments) com *required reviewers* (ao menos um
+  mantenedor além de quem cria a tag) e *deployment branches and tags* restrito a tags `v*`. Os
+  secrets de publicação podem ficar no environment em vez da organização, o que os tira do alcance
+  de qualquer outro workflow.
+- **Ruleset de tags `v*`** (Settings → Rules): criação restrita aos mantenedores, com
+  atualização e remoção bloqueadas.
 
 ### Passo a passo do release
 
@@ -111,7 +126,7 @@ O `rest` (fat jar) participa do build, mas não do reactor de publicação.
 git checkout main && git pull
 
 # 2. Atualize o CHANGELOG.md: mova o conteúdo de [Unreleased]
-#    para uma nova seção [X.Y.Z] com a data, e commite
+#    para uma nova seção [X.Y.Z] com a data — ela vira as notas da GitHub Release. Commite
 
 # 3. Fixe a versão de release (remove -SNAPSHOT em todos os módulos)
 ./mvnw versions:set -DnewVersion=X.Y.Z && ./mvnw versions:commit
@@ -124,13 +139,18 @@ git commit -am "chore: release X.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main vX.Y.Z
 
-# 6. Acompanhe o workflow em Actions; ao final ele cria o GitHub Release
-#    e o artefato fica disponível no Central em até ~30 min
+# 6. Acompanhe o workflow em Actions e aprove os jobs do environment `release`;
+#    ao final ele cria a GitHub Release e o artefato fica disponível no Central
+#    em até ~30 min
 
 # 7. Reabra o ciclo de desenvolvimento
 ./mvnw versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT && ./mvnw versions:commit
 git commit -am "chore: inicia desenvolvimento X.Y.(Z+1)-SNAPSHOT" && git push
 ```
+
+O workflow grava nos artefatos a data do commit da tag (`project.build.outputTimestamp`), de modo
+que qualquer rebuild do mesmo commit gera JARs idênticos; não é preciso editar essa data no
+`pom.xml`.
 
 ### Se o release falhar
 
@@ -138,8 +158,16 @@ git commit -am "chore: inicia desenvolvimento X.Y.(Z+1)-SNAPSHOT" && git push
   (`git push origin :refs/tags/vX.Y.Z`), refaça a partir do passo 4.
 - Falha **após** publicar no Central: a versão é imutável — publique um
   patch `X.Y.(Z+1)`. Nunca reutilize um número de versão.
+- Falha **só na GitHub Release** (Central já publicado): rode o workflow Release
+  manualmente (Actions → Release → Run workflow) informando a tag. Ele refaz `verificar` e
+  `github-release` sem republicar no Central; se a Release existir, atualiza notas e assets.
 
 ### Verificação pós-release
+
+```bash
+# Assets da GitHub Release
+gh release download vX.Y.Z -R sesgo-ti/icpbrasil-truststore && sha256sum -c SHA256SUMS
+```
 
 ```bash
 curl -s "https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore-autoconfigure/X.Y.Z" -o /dev/null -w '%{http_code}\n'

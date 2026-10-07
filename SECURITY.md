@@ -60,7 +60,8 @@ The trust chain (pinned TLS to ITI → SHA-512 validation → storage → in-mem
 Every CI run generates a CycloneDX SBOM of the distributed artifacts (`./mvnw package -Psbom`,
 aggregated in `target/bom.json`, covering `core`, `autoconfigure` and the REST executable, without
 test or `provided` dependencies) and scans it with [osv-scanner](https://github.com/google/osv-scanner)
-against the OSV database at scan time. The SBOM is kept as a CI artifact.
+against the OSV database at scan time. The SBOM is kept as a CI artifact and attached to each
+GitHub Release.
 
 - **Blocking criterion:** any known vulnerability in a distributed dependency fails the build.
 - **Triage** (target: the initial-assessment deadline above): upgrade the dependency — for

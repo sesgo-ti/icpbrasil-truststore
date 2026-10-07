@@ -89,6 +89,19 @@ O build é reproduzível: `project.build.outputTimestamp` fixa as datas gravadas
 workflow de release usa a data do commit da tag, de modo que o mesmo commit gera os mesmos JARs. O
 wrapper confere o SHA-256 da distribuição do Maven (`distributionSha256Sum`).
 
+### Artefatos da release
+
+Cada GitHub Release traz o executável REST, o SBOM CycloneDX (`*-sbom.cdx.json`) e o
+`SHA256SUMS`. Confira depois de baixar:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+As bibliotecas `core` e `autoconfigure` são publicadas no Maven Central assinadas com GPG (veja
+[MAINTAINERS.md](MAINTAINERS.md#chave-gpg-de-release)); os assets da GitHub Release não têm
+assinatura GPG própria — a integridade é dada pelo `SHA256SUMS` publicado na mesma Release.
+
 ### Execução
 
 ```bash

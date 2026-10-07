@@ -4,22 +4,35 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  # Recupera só a GitHub Release de uma versão já publicada, sem republicar no Maven Central
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag já publicada no Central (ex.: v0.0.2)'
+        required: true
 
-permissions:
-  contents: write
+permissions: {}
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
-  release:
-    name: Publicar no Maven Central e criar GitHub Release
+  verificar:
+    name: Verificar tag, build, notas e artefatos
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
 
       - name: Configurar JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -30,25 +43,64 @@ jobs:
       - name: Fixar a data dos artefatos na data do commit da tag
         run: echo "OUTPUT_TIMESTAMP=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
-      # Roda antes de qualquer credencial: tag diferente de v<versão dos POMs> ou versão SNAPSHOT aborta.
+      # Tag diferente de v<versão dos POMs> ou versão SNAPSHOT aborta antes de qualquer publicação.
       - name: Validar tag contra a versão do projeto
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version=$(./mvnw -B -q -ntp help:evaluate -Dexpression=project.version -DforceStdout)
           echo "Tag: $RELEASE_TAG | Versão Maven: $version"
           [[ "$version" != *-SNAPSHOT ]] || { echo "Versão SNAPSHOT não pode ser publicada"; exit 1; }
           [[ "$RELEASE_TAG" == "v$version" ]] || { echo "Tag $RELEASE_TAG não corresponde à versão $version"; exit 1; }
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Build e testes de todos os módulos (sem assinatura)
-        run: ./mvnw -B -ntp clean verify -Prelease -Dgpg.skip=true -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
+        run: ./mvnw -B -ntp clean verify -Prelease,sbom -Dgpg.skip=true -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
 
-      - name: Configurar credenciais do Central e chave GPG
-        uses: actions/setup-java@v4
+      - name: Extrair notas do CHANGELOG
+        run: scripts/release-notes.sh "$RELEASE_VERSION" > release-notes.md
+
+      # Executável REST (fora do Central), SBOM e checksums: os assets da GitHub Release
+      - name: Montar assets da GitHub Release
+        run: |
+          set -euo pipefail
+          mkdir dist
+          cp "icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-${RELEASE_VERSION}.jar" dist/
+          cp target/bom.json "dist/icpbrasil-truststore-${RELEASE_VERSION}-sbom.cdx.json"
+          (cd dist && sha256sum -- * > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - name: Guardar notas e assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-dist
+          path: |
+            release-notes.md
+            dist/
+          retention-days: 7
+
+  publicar-central:
+    name: Publicar no Maven Central
+    needs: verificar
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Exige aprovação dos revisores do environment (ver MAINTAINERS.md); só aqui há secrets.
+    environment: release
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Configurar JDK 21, credenciais do Central e chave GPG
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: maven
           # Gera o <server id="central"> no settings.xml do runner, com as
           # credenciais lidas das env vars declaradas abaixo no passo de deploy.
           # O id deve ser igual ao <publishingServerId> do pom.xml.
@@ -60,15 +112,46 @@ jobs:
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
+      # Mesma data do job verificar: o rebuild publicado no Central sai idêntico ao que ele testou.
+      - name: Fixar a data dos artefatos na data do commit da tag
+        run: echo "OUTPUT_TIMESTAMP=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Assinar e publicar parent, core e autoconfigure no Maven Central
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: ./mvnw -B -ntp -Prelease -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am deploy -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
+        run: ./mvnw -B -ntp -Prelease -DskipTests -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am deploy -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
 
-      - name: Criar GitHub Release
+  github-release:
+    name: Criar ou atualizar a GitHub Release
+    needs: [verificar, publicar-central]
+    # Também roda no workflow_dispatch, quando a publicação no Central é pulada
+    if: >-
+      always() && needs.verificar.result == 'success' &&
+      (needs.publicar-central.result == 'success' || needs.publicar-central.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Recuperar notas e assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-dist
+
+      # Idempotente: se a Release já existe, atualiza notas e substitui os assets.
+      - name: Publicar a GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-from-tag --verify-tag
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --notes-file release-notes.md
+            gh release upload "$RELEASE_TAG" dist/* -R "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/* -R "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TAG" --notes-file release-notes.md --verify-tag
+          fi
