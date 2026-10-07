@@ -1,9 +1,13 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.Test;
+
+import java.security.Security;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,5 +75,12 @@ class TrustStoreConfigTest {
         config.getRevocation().setOcspCacheMaxBytes(2L * 1024 * 1024 * 1024);
         IllegalStateException ocsp = assertThrows(IllegalStateException.class, config::validateProperties);
         assertTrue(ocsp.getMessage().contains("icpbrasil-truststore.revocation.ocsp-cache-max-bytes"));
+    }
+
+    @Test
+    void testTrustStoreConfig_Inicializacao_NaoRegistraBouncyCastleNaJvm() {
+        new TrustStoreConfig();
+
+        assertNull(Security.getProvider(BouncyCastleProvider.PROVIDER_NAME));
     }
 }

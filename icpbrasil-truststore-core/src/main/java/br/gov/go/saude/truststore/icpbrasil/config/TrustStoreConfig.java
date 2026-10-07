@@ -2,11 +2,9 @@ package br.gov.go.saude.truststore.icpbrasil.config;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.Security;
 import java.util.List;
 
 /**
@@ -25,14 +23,6 @@ public class TrustStoreConfig {
 
     private static final long MIB = 1024L * 1024;
     private static final long GIB = 1024 * MIB;
-
-    // BouncyCastle é necessário para operações OCSP e CRL (assinaturas, parsing de extensões).
-    // O registro deve ocorrer antes de qualquer uso, por isso fica no bloco estático da config.
-    static {
-        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
-            Security.addProvider(new BouncyCastleProvider());
-        }
-    }
 
     /**
      * URL do arquivo de certificados (Trust Store ICP-Brasil).

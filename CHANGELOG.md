@@ -18,6 +18,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ### Alterado
 
+- **Incompatível:** a biblioteca deixa de registrar o BouncyCastle na JVM (`Security.addProvider`); a verificação OCSP usa uma instância própria do provider. Aplicações que dependiam desse registro precisam fazê-lo por conta própria.
 - **Incompatível:** `icpbrasil-truststore.revocation.ocsp-cache-max-size` e `crl-cache-max-size` (entradas) foram substituídas por `ocsp-cache-max-bytes` (padrão 16 MiB) e `crl-cache-max-bytes` (padrão 256 MiB), com eviction por peso (#13).
 - **Incompatível:** `TrustStoreRepository` persiste por geração: `recuperarGeracao()` e `armazenarGeracao(zip, hash, confirmacao)` substituem `armazenarZip`/`armazenarHash`; filesystem e S3 gravam em `geracoes/<hash>/` e trocam o ponteiro `hash.txt` por último. O layout da 0.0.1 é lido e migrado sem novo download (#16).
 - `/certificate`: parâmetros validados antes da consulta (precedência 400 → 503 → 404); `ski` aceita octetos hexadecimais em maiúsculas ou minúsculas, de 1 a 64; `ski` ou `type` ausentes, vazios ou repetidos respondem 400 (#19).
