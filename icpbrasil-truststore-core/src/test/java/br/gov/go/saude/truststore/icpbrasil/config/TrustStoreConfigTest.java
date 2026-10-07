@@ -31,7 +31,6 @@ class TrustStoreConfigTest {
         assertEquals("ACcompactado.zip", config.getStorage().getTruststoreArchivePath());
         assertEquals("hash.txt", config.getStorage().getHashFilePath());
         assertEquals("ultima_confirmacao.txt", config.getStorage().getConfirmationFilePath());
-        assertEquals("classpath:registries/certificates", config.getTrustedCerts().getDir());
         assertEquals(2, config.getRefreshIntervalHours());
         assertEquals(72, config.getCacheTtlCriticalHours());
         assertEquals(168, config.getCacheTtlMaxHours());

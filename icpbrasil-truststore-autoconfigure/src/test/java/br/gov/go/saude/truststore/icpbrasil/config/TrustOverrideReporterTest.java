@@ -39,7 +39,6 @@ class TrustOverrideReporterTest {
             "icpbrasil-truststore.storage.hash-file-path=hash.txt",
             "icpbrasil-truststore.storage.confirmation-file-path=confirmacao.txt",
             "icpbrasil-truststore.filesystem.base-dir=target/test-truststore",
-            "icpbrasil-truststore.trusted-certs.dir=classpath:registries/certificates",
             "icpbrasil-truststore.bootstrap.enabled=false",
             "icpbrasil-truststore.scheduling.enabled=false",
     };

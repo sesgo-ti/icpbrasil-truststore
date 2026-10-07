@@ -34,6 +34,8 @@ buildNumber.properties
 *.p12
 *.pfx
 *.pem
+# Âncoras TLS públicas (raízes ISRG) embarcadas na biblioteca
+!icpbrasil-truststore-core/src/main/resources/tls/iti/*.pem
 *.key
 *.keystore
 *.truststore

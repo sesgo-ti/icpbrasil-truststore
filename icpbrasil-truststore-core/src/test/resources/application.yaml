@@ -46,6 +46,3 @@ icpbrasil-truststore:
     crl-cache-ttl-seconds: 3600
     ocsp-cache-max-bytes: 16777216
     crl-cache-max-bytes: 268435456
-
-  trusted-certs:
-    dir: "classpath:registries/certificates"

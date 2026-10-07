@@ -5,6 +5,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.ItiTlsAnchors;
 import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreBootstrap;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
@@ -16,15 +17,12 @@ import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.CacheTrustMaterialSource;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.CrlClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.OcspClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationCache;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -34,14 +32,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.ResourcePatternResolver;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Auto-configuração do icpbrasil-truststore.
@@ -108,52 +100,10 @@ public class TrustStoreAutoConfiguration {
         return new DownloadPolicy(trustStoreConfig);
     }
 
-    /**
-     * Lê os documentos JSON do diretório de certificados confiáveis usando o
-     * {@link ResourcePatternResolver} do Spring, que funciona corretamente em fat jars.
-     * Os bytes lidos são repassados ao {@link TrustedCertsProvider}, que não realiza I/O.
-     */
-    @Bean
-    @ConditionalOnMissingBean(name = "trustedCertsProvider")
-    CertificateProvider trustedCertsProvider(TrustStoreConfig config,
-                                              ResourcePatternResolver resolver) {
-        // Valida antes de usar para evitar NPE com mensagem opaca
-        TrustStoreConfig.TrustedCertsConfig trustedCerts = config.getTrustedCerts();
-        if (trustedCerts == null || trustedCerts.getDir() == null || trustedCerts.getDir().isBlank()) {
-            throw new IllegalStateException(
-                    "Propriedade 'icpbrasil-truststore.trusted-certs.dir' é obrigatória");
-        }
-        String dir = trustedCerts.getDir();
-        // classpath: e classpath*: são equivalentes para o usuário; normaliza para classpath*:
-        // para que o resolver busque em todos os JARs do classpath (necessário em fat jars)
-        String pattern;
-        if (dir.startsWith("classpath")) {
-            String semPrefixo = dir.substring(dir.indexOf(':') + 1);
-            pattern = "classpath*:" + semPrefixo + "/*.json";
-        } else {
-            pattern = "file:" + dir + "/*.json";
-        }
-        List<byte[]> docs = new ArrayList<>();
-        try {
-            for (Resource r : resolver.getResources(pattern)) {
-                try (InputStream in = r.getInputStream()) {
-                    docs.add(in.readAllBytes());
-                }
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("Falha ao ler certificados confiáveis de: " + dir, e);
-        }
-        if (docs.isEmpty()) {
-            throw new IllegalStateException("Nenhum certificado confiável (.json) encontrado em: " + dir);
-        }
-        return new TrustedCertsProvider(docs);
-    }
-
     @Bean
     @ConditionalOnMissingBean
-    public TrustStoreManager trustStoreManager(
-            @Qualifier("trustedCertsProvider") CertificateProvider certificateProvider) {
-        return new TrustStoreManager(certificateProvider);
+    public TrustStoreManager trustStoreManager() {
+        return new TrustStoreManager(TlsTrust.dedicatedCa(ItiTlsAnchors.load()));
     }
 
     @Bean

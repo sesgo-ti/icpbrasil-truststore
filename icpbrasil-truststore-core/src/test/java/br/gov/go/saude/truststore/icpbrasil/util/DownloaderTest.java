@@ -4,18 +4,13 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.ItiTlsAnchors;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,8 +23,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("integration")
 class DownloaderTest {
 
-    private static final Path PRODUCTION_REGISTRY = Path.of("src/main/resources/registries/certificates");
-
     private Downloader downloader;
     private TrustStoreConfig trustStoreConfig;
 
@@ -37,25 +30,7 @@ class DownloaderTest {
     void setUp() {
         trustStoreConfig = buildTrustStoreConfig();
 
-        // Registro de produção: o teste deve falhar se ele deixar de cobrir o TLS atual do ITI
-        List<byte[]> docs;
-        try (Stream<Path> files = Files.list(PRODUCTION_REGISTRY)) {
-            docs = files.filter(file -> file.toString().endsWith(".json"))
-                    .sorted()
-                    .map(file -> {
-                        try {
-                            return Files.readAllBytes(file);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException("Erro ao ler registro: " + file, e);
-                        }
-                    })
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Erro ao listar registro: " + PRODUCTION_REGISTRY, e);
-        }
-
-        TrustedCertsProvider trustedCertsProvider = new TrustedCertsProvider(docs);
-        TrustStoreManager trustStoreManager = new TrustStoreManager(trustedCertsProvider);
+        TrustStoreManager trustStoreManager = new TrustStoreManager(TlsTrust.dedicatedCa(ItiTlsAnchors.load()));
         RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
         downloader = new Downloader(
                 Downloader.transporteAcervoIti(trustStoreManager.getSslContext(), trustStoreConfig),

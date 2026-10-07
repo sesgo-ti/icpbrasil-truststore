@@ -78,12 +78,6 @@
       "description": "Diretório base do storage filesystem. Obrigatório: sem default."
     },
     {
-      "name": "icpbrasil-truststore.trusted-certs.dir",
-      "type": "java.lang.String",
-      "description": "Diretório (classpath: ou file:) com os JSONs das CAs embutidas usadas no TLS do download do ITI.",
-      "defaultValue": "classpath:registries/certificates"
-    },
-    {
       "name": "icpbrasil-truststore.network.download-timeout-seconds",
       "type": "java.lang.Integer",
       "description": "Prazo por tentativa de download do ITI, em segundos (30 a 300).",

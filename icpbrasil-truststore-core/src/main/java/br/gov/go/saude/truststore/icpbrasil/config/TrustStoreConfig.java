@@ -73,12 +73,6 @@ public class TrustStoreConfig {
     private FilesystemConfig filesystem = new FilesystemConfig();
 
     /**
-     * Diretório de Certificados Confiáveis Fixos.
-     * [Resultado]: Local onde o sistema busca certificados adicionais (JSON).
-     */
-    private TrustedCertsConfig trustedCerts = new TrustedCertsConfig();
-
-    /**
      * Configurações de verificação de revogação (OCSP e CRL).
      */
     private RevocationConfig revocation = new RevocationConfig();
@@ -134,17 +128,6 @@ public class TrustStoreConfig {
          * Sem default: cada aplicação define onde o acervo pode ser gravado.
          */
         private String baseDir;
-    }
-
-    /**
-     * Configurações de certificados confiáveis no filesystem
-     */
-    @Data
-    public static class TrustedCertsConfig {
-        /**
-         * Diretório contendo os arquivos JSON de certificados confiáveis (classpath ou disco).
-         */
-        private String dir = "classpath:registries/certificates";
     }
 
     /**
