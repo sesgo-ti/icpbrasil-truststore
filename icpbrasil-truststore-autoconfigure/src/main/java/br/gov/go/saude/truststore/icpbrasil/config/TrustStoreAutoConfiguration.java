@@ -5,7 +5,6 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
-import br.gov.go.saude.truststore.icpbrasil.http.tls.ItiTlsAnchors;
 import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreBootstrap;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
@@ -33,6 +32,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
+import java.time.Clock;
 import java.time.Duration;
 
 /**
@@ -103,7 +103,7 @@ public class TrustStoreAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public TrustStoreManager trustStoreManager() {
-        return new TrustStoreManager(TlsTrust.dedicatedCa(ItiTlsAnchors.load()));
+        return new TrustStoreManager(TlsTrust.pinnedRoots(Clock.systemUTC()));
     }
 
     @Bean

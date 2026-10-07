@@ -12,10 +12,12 @@ import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
+import java.time.Clock;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,5 +73,37 @@ class TlsTrustTest {
     @Test
     void testDescribe_JvmDefault_IndicaCacerts() {
         assertEquals("cacerts da JVM", TlsTrust.jvmDefault().describe());
+    }
+
+    @Test
+    void testPinnedRoots_AncorasSaoAsRaizesIsrg() {
+        TlsTrust trust = TlsTrust.pinnedRoots(Clock.systemUTC());
+
+        assertEquals(ItiTlsAnchors.load(), trust.anchors());
+        assertEquals(ItiTlsAnchors.load(), List.of(trust.trustManager().getAcceptedIssuers()));
+    }
+
+    @Test
+    void testPinnedRoots_TrustManager_MesmaInstanciaACadaChamada() {
+        TlsTrust trust = TlsTrust.pinnedRoots(Clock.systemUTC());
+
+        assertSame(trust.trustManager(), trust.trustManager());
+    }
+
+    @Test
+    void testDescribe_PinnedRoots_ListaAncorasEDominioAia() {
+        String descricao = TlsTrust.pinnedRoots(Clock.systemUTC()).describe();
+
+        assertTrue(descricao.contains("CN=ISRG Root X1"), descricao);
+        assertTrue(descricao.contains("CN=ISRG Root X2"), descricao);
+        assertTrue(descricao.contains("i.lencr.org"), descricao);
+    }
+
+    @Test
+    void testPinnedRoots_AncorasDivergentesDoTrustManager_LancaIllegalArgumentException() {
+        ItiTrustManager trustManager = ItiTrustManager.producao(Clock.systemUTC());
+        X509Certificate outra = TestBundleFactory.caCert("Outra", TestBundleFactory.newKeyPair());
+
+        assertThrows(IllegalArgumentException.class, () -> new TlsTrust.PinnedRoots(List.of(outra), trustManager));
     }
 }

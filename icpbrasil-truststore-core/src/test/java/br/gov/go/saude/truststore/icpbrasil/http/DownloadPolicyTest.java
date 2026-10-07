@@ -60,6 +60,47 @@ class DownloadPolicyTest {
         };
     }
 
+    // --- aiaLetsEncrypt ---
+
+    @Test
+    void testAiaLetsEncrypt_HostDoLetsEncrypt_Aceita() {
+        DownloadPolicy policy = aiaLetsEncryptResolvendoPara("23.215.0.136");
+
+        assertDoesNotThrow(() -> policy.validateUrl("http://ye1.i.lencr.org/"));
+    }
+
+    @Test
+    void testAiaLetsEncrypt_OutroHost_LancaDownloadPolicyException() {
+        DownloadPolicy policy = aiaLetsEncryptResolvendoPara("93.184.216.34");
+
+        assertThrows(DownloadPolicyException.class, () -> policy.validateUrl("http://atacante.example/ye1.crt"));
+    }
+
+    @Test
+    void testAiaLetsEncrypt_DominioQueApenasTerminaComONome_LancaDownloadPolicyException() {
+        DownloadPolicy policy = aiaLetsEncryptResolvendoPara("93.184.216.34");
+
+        assertThrows(DownloadPolicyException.class, () -> policy.validateUrl("http://ye1.atacantei.lencr.org.example/"));
+        assertThrows(DownloadPolicyException.class, () -> policy.validateUrl("http://xi.lencr.org/"));
+    }
+
+    @Test
+    void testAiaLetsEncrypt_IpLiteralLoopback_LancaDownloadPolicyException() {
+        assertThrows(DownloadPolicyException.class,
+                () -> DownloadPolicy.aiaLetsEncrypt().validateUrl("http://127.0.0.1:8080/int.crt"));
+    }
+
+    @SneakyThrows
+    private static DownloadPolicy aiaLetsEncryptResolvendoPara(String ip) {
+        InetAddress[] resolved = {InetAddress.getByName(ip)};
+        return new DownloadPolicy(DownloadPolicy.configAiaLetsEncrypt()) {
+            @Override
+            InetAddress[] resolve(String host) {
+                return resolved;
+            }
+        };
+    }
+
     // --- validateUrl: esquemas ---
 
     @ParameterizedTest

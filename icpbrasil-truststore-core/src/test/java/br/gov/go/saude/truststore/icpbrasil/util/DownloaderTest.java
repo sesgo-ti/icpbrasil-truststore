@@ -4,13 +4,13 @@ import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
-import br.gov.go.saude.truststore.icpbrasil.http.tls.ItiTlsAnchors;
 import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,7 +30,7 @@ class DownloaderTest {
     void setUp() {
         trustStoreConfig = buildTrustStoreConfig();
 
-        TrustStoreManager trustStoreManager = new TrustStoreManager(TlsTrust.dedicatedCa(ItiTlsAnchors.load()));
+        TrustStoreManager trustStoreManager = new TrustStoreManager(TlsTrust.pinnedRoots(Clock.systemUTC()));
         RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
         downloader = new Downloader(
                 Downloader.transporteAcervoIti(trustStoreManager.getSslContext(), trustStoreConfig),
