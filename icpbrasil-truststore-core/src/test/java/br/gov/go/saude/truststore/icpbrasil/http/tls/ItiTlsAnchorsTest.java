@@ -1,12 +1,16 @@
 package br.gov.go.saude.truststore.icpbrasil.http.tls;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,5 +40,18 @@ class ItiTlsAnchorsTest {
     void testLoad_RecursoAusente_LancaIllegalStateException() {
         assertThrows(IllegalStateException.class,
                 () -> ItiTlsAnchors.load(Map.of("tls/iti/inexistente.pem", "00"), ItiTlsAnchors.class.getClassLoader()));
+    }
+
+    @SneakyThrows
+    @Test
+    void testFingerprints_TodoPemDeProducao_TemConstante() {
+        Set<String> recursos;
+        try (Stream<Path> arquivos = Files.list(Path.of("src/main/resources/tls/iti"))) {
+            recursos = arquivos.map(a -> "tls/iti/" + a.getFileName())
+                    .filter(nome -> nome.endsWith(".pem"))
+                    .collect(Collectors.toSet());
+        }
+
+        assertEquals(ItiTlsAnchors.FINGERPRINTS.keySet(), recursos);
     }
 }
