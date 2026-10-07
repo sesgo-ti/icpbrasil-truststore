@@ -46,9 +46,14 @@ public class DownloadPolicy {
      * (barra também um DNS do ITI sequestrado para endereço interno).
      */
     public static DownloadPolicy acervoIti() {
+        return new DownloadPolicy(configAcervoIti());
+    }
+
+    /** Configuração da política do acervo; separada para que testes a exerçam com DNS simulado. */
+    static TrustStoreConfig.DownloadPolicyConfig configAcervoIti() {
         TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
         config.setAllowedDomains(List.of(HOST_ACERVO_ITI));
-        return new DownloadPolicy(config);
+        return config;
     }
 
     /**

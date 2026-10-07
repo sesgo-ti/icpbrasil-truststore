@@ -30,21 +30,33 @@ class DownloadPolicyTest {
 
     @Test
     void testAcervoIti_HostDoIti_Aceita() {
-        DownloadPolicy policy = DownloadPolicy.acervoIti();
+        DownloadPolicy policy = acervoItiResolvendoPara("200.198.1.1");
 
         assertDoesNotThrow(() -> policy.validateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/x.zip"));
     }
 
     @Test
     void testAcervoIti_OutroHost_LancaDownloadPolicyException() {
-        assertThrows(DownloadPolicyException.class,
-                () -> DownloadPolicy.acervoIti().validateUrl("https://exemplo.com.br/x.zip"));
+        DownloadPolicy policy = acervoItiResolvendoPara("93.184.216.34");
+
+        assertThrows(DownloadPolicyException.class, () -> policy.validateUrl("https://exemplo.com.br/x.zip"));
     }
 
     @Test
     void testAcervoIti_IpPrivado_LancaDownloadPolicyException() {
         assertThrows(DownloadPolicyException.class,
                 () -> DownloadPolicy.acervoIti().validateUrl("https://10.0.0.5/x.zip"));
+    }
+
+    @SneakyThrows
+    private static DownloadPolicy acervoItiResolvendoPara(String ip) {
+        InetAddress[] resolved = {InetAddress.getByName(ip)};
+        return new DownloadPolicy(DownloadPolicy.configAcervoIti()) {
+            @Override
+            InetAddress[] resolve(String host) {
+                return resolved;
+            }
+        };
     }
 
     // --- validateUrl: esquemas ---

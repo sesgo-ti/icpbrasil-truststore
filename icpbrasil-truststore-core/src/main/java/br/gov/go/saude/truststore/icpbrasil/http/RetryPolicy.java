@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  * <p>Oferece dois modos de uso:</p>
  * <ul>
  *   <li>{@link #executeWithRetry(String, Supplier)} — usa configuração de rede padrão
- *       e encapsula falhas em {@link IOException} (usado pelo {@code Downloader})</li>
+ *       e encapsula falhas em {@link IOException}</li>
  *   <li>{@link #executeWithRetry(String, int, long, Callable)} — aceita parâmetros
  *       explícitos e propaga checked exceptions (usado por {@code OcspClient} e {@code CrlClient})</li>
  * </ul>
