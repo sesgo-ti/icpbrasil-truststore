@@ -373,9 +373,11 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 | Download do acervo de ACs (repositório ITI) | Apenas CAs de `registries/certificates/` |
 | Conexão S3 sem `S3_CA_CERT_PATH` | JVM default truststore (`cacerts`) |
 | Conexão S3 com `S3_CA_CERT_PATH` | TrustManager dedicado com aquela CA |
-| Downloads de AIA CA Issuers, OCSP e CRL | JVM default truststore (`cacerts`) — sem `SSLContext` personalizado |
+| Downloads de AIA CA Issuers, OCSP e CRL | JVM default truststore (`cacerts`), declarado explicitamente via `TlsTrust.jvmDefault()` |
 
-> **Diferença importante:** Ao contrário do download do acervo ITI — que usa um `SSLContext` isolado com CAs próprias —, os downloads disparados por extensões de certificados X.509 (AIA CA Issuers, endpoints OCSP, CRL Distribution Points) **não possuem isolamento de `SSLContext`**. Esses endpoints são públicos, operados pelas próprias ACs, e a confiança no certificado TLS deles recai sobre a truststore padrão da JVM. A camada de segurança aplicada a esses downloads é o `DownloadPolicy` — um mecanismo distinto que atua na validação da URL de destino (bloqueio de SSRF, IPs privados, esquemas não-HTTP(S)) e no limite de tamanho da resposta antes de carregá-la em memória. Veja a seção [Política de download](#política-de-download-ssrf-e-limites-de-tamanho) para detalhes de configuração.
+> **Diferença importante:** Ao contrário do download do acervo ITI — que usa um `SSLContext` isolado com CAs próprias —, os downloads disparados por extensões de certificados X.509 (AIA CA Issuers, endpoints OCSP, CRL Distribution Points) **não possuem isolamento de `SSLContext`** (usam o `cacerts` da JVM). Esses endpoints são públicos, operados pelas próprias ACs, e a confiança no certificado TLS deles recai sobre a truststore padrão da JVM. A camada de segurança aplicada a esses downloads é o `DownloadPolicy` — um mecanismo distinto que atua na validação da URL de destino (bloqueio de SSRF, IPs privados, esquemas não-HTTP(S)) e no limite de tamanho da resposta antes de carregá-la em memória. Veja a seção [Política de download](#política-de-download-ssrf-e-limites-de-tamanho) para detalhes de configuração.
+
+A confiança de cada canal (acervo ITI, S3, AIA/OCSP/CRL) é registrada em log no início. Configuração nunca altera a confiança; só código da aplicação pode, ao declarar o próprio bean de `TrustStoreManager` ou de `TrustMaterialSource` — e a biblioteca emite um `WARN` quando isso acontece.
 
 **CAs embutidas em `registries/certificates/`:**
 

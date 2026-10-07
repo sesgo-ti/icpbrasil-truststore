@@ -51,6 +51,8 @@ grep -E "(WARN|ERROR).*(TrustStoreService|TrustStoreBootstrap|Cache)" app.log
 | INFO | `Executando atualização agendada do TrustStore` |
 | INFO | `O repositório local está sincronizado com a fonte ICP-Brasil` |
 | INFO | `Cache de certificados atualizado com {N} entradas (hash {H}, expira em {T}).` |
+| INFO | `Download do acervo ITI confia em …` / `AIA, OCSP e CRL: confia em …` / `S3: confia em …` |
+| WARN | `… substituído pela aplicação: a confiança em uso não é a padrão da biblioteca` |
 
 ---
 
