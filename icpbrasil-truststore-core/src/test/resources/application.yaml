@@ -3,8 +3,6 @@ spring:
     name: icpbrasil-truststore
 
 icpbrasil-truststore:
-  certificate-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
-  hash-url: "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
   network:
     download-timeout-seconds: 30
     max-retries: 3

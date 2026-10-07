@@ -457,7 +457,7 @@ class TrustStoreServiceTest {
     }
 
     private TrustStoreService criarServico(TrustStoreRepository repositorio) {
-        IcpBrasilCertificateProvider provider = new IcpBrasilCertificateProvider(config, downloader, repositorio);
+        IcpBrasilCertificateProvider provider = new IcpBrasilCertificateProvider(downloader, repositorio);
         return new TrustStoreService(repositorio, provider, config, cache, clock);
     }
 
@@ -491,8 +491,6 @@ class TrustStoreServiceTest {
 
     private static TrustStoreConfig buildConfig(Path baseDir) {
         TrustStoreConfig config = new TrustStoreConfig();
-        config.setCertificateUrl(ZIP_URL);
-        config.setHashUrl(HASH_URL);
         config.setCacheTtlCriticalHours(72);
         config.setCacheTtlMaxHours((int) TTL_MAX.toHours());
         config.setRefreshIntervalHours(2);

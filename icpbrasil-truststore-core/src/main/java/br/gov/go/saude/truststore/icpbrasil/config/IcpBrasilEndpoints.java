@@ -3,9 +3,8 @@ package br.gov.go.saude.truststore.icpbrasil.config;
 /**
  * Endereços oficiais do ITI para o acervo de Autoridades Certificadoras da ICP-Brasil.
  *
- * <p>São os defaults de {@code icpbrasil-truststore.certificate-url} e {@code hash-url}; uma
- * aplicação pode sobrescrevê-los (espelho interno, homologação) e o valor final passa pela mesma
- * validação em {@link TrustStoreConfig#validateProperties()}.</p>
+ * <p>Fonte única e fixa dos endereços: não há propriedade que os sobrescreva. Alterá-los exige
+ * uma nova versão da biblioteca.</p>
  */
 public final class IcpBrasilEndpoints {
 

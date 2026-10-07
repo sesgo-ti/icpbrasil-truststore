@@ -1,9 +1,11 @@
 package br.gov.go.saude.truststore.icpbrasil.service.provider;
 
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
+import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.RecoveryIcpBrasilResourceException;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
@@ -28,6 +30,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class IcpBrasilCertificateProviderTest {
@@ -66,7 +69,18 @@ class IcpBrasilCertificateProviderTest {
         config = buildConfig(baseDir);
         repository = new FilesystemTrustStoreRepository(config);
         downloader = mock(Downloader.class);
-        provider = new IcpBrasilCertificateProvider(config, downloader, repository);
+        provider = new IcpBrasilCertificateProvider(downloader, repository, ZIP_URL, HASH_URL);
+    }
+
+    @Test
+    @SneakyThrows
+    void testBaixarHashIcpBrasil_Producao_UsaEnderecoFixoDoIti() {
+        Downloader downloader = mock(Downloader.class);
+        when(downloader.downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL)).thenReturn("a".repeat(128) + "  ACcompactado.zip\n");
+
+        new IcpBrasilCertificateProvider(downloader, mock(TrustStoreRepository.class)).baixarHashIcpBrasil();
+
+        verify(downloader).downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL);
     }
 
     @Test
@@ -326,8 +340,6 @@ class IcpBrasilCertificateProviderTest {
 
     private static TrustStoreConfig buildConfig(Path baseDir) {
         TrustStoreConfig config = new TrustStoreConfig();
-        config.setCertificateUrl(ZIP_URL);
-        config.setHashUrl(HASH_URL);
 
         TrustStoreConfig.NetworkConfig network = new TrustStoreConfig.NetworkConfig();
         network.setDownloadTimeoutSeconds(30);

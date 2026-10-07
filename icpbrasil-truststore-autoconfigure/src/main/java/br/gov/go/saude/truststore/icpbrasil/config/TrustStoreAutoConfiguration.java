@@ -126,7 +126,7 @@ public class TrustStoreAutoConfiguration {
     public IcpBrasilCertificateProvider icpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig,
                                                                      Downloader downloader,
                                                                      TrustStoreRepository trustStoreRepository) {
-        return new IcpBrasilCertificateProvider(trustStoreConfig, downloader, trustStoreRepository);
+        return new IcpBrasilCertificateProvider(downloader, trustStoreRepository);
     }
 
     /**

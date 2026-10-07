@@ -1,5 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.util;
 
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
@@ -40,7 +41,7 @@ class DownloaderTest {
     @SneakyThrows
     @Test
     void testDownloadBytesRetornaConteudoNaoVazio() {
-        byte[] bytes = downloader.downloadBytes(trustStoreConfig.getCertificateUrl());
+        byte[] bytes = downloader.downloadBytes(IcpBrasilEndpoints.BUNDLE_ZIP_URL);
 
         assertTrue(bytes.length > 0);
         assertNotNull(bytes);
@@ -49,7 +50,7 @@ class DownloaderTest {
     @SneakyThrows
     @Test
     void testDownloadTextExtraiHash() {
-        String text = downloader.downloadText(trustStoreConfig.getHashUrl());
+        String text = downloader.downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL);
 
         assertNotNull(text);
         String[] parts = text.split("  ");
@@ -58,8 +59,6 @@ class DownloaderTest {
 
     private TrustStoreConfig buildTrustStoreConfig() {
         TrustStoreConfig config = new TrustStoreConfig();
-        config.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
-        config.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
 
         TrustStoreConfig.NetworkConfig network = new TrustStoreConfig.NetworkConfig();
         network.setDownloadTimeoutSeconds(60);

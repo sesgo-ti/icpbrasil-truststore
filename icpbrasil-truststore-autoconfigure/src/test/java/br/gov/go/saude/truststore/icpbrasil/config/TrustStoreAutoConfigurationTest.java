@@ -53,8 +53,6 @@ class TrustStoreAutoConfigurationTest {
 
     /** Conjunto explícito de propriedades (storage filesystem), independente dos defaults. */
     private static final String[] PROPS_MINIMAS = {
-            "icpbrasil-truststore.certificate-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip",
-            "icpbrasil-truststore.hash-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt",
             "icpbrasil-truststore.network.download-timeout-seconds=30",
             "icpbrasil-truststore.network.max-retries=3",
             "icpbrasil-truststore.network.retry-interval-seconds=10",
@@ -108,7 +106,6 @@ class TrustStoreAutoConfigurationTest {
                 .run(context -> {
                     assertNull(context.getStartupFailure());
                     TrustStoreConfig config = context.getBean(TrustStoreConfig.class);
-                    assertTrue(config.getCertificateUrl().startsWith("https://acraiz.icpbrasil.gov.br/"));
                     assertEquals(2, config.getRefreshIntervalHours());
                     assertEquals(72, config.getCacheTtlCriticalHours());
                     assertEquals(168, config.getCacheTtlMaxHours());
@@ -180,27 +177,6 @@ class TrustStoreAutoConfigurationTest {
         String nome = tipo.getName();
         assertFalse(nome.startsWith("software.amazon.") || nome.startsWith("org.springframework.boot.actuate."),
                 "Tipo opcional " + nome + " exposto na assinatura de " + metodo.getName());
-    }
-
-    @Test
-    void testContexto_CertificateUrlVazia_FalhaComMensagemDaPropriedade() {
-        runner.withPropertyValues(substituir(PROPS_MINIMAS, "icpbrasil-truststore.certificate-url="))
-                .run(context -> {
-                    assertNotNull(context.getStartupFailure());
-                    String causa = mensagemRaiz(context.getStartupFailure());
-                    assertTrue(causa.contains("icpbrasil-truststore.certificate-url"),
-                            "Mensagem deve apontar a propriedade inválida. Recebido: " + causa);
-                });
-    }
-
-    @Test
-    void testContexto_ComCertificateUrlHttp_FalhaExigindoHttps() {
-        runner.withPropertyValues(substituir(PROPS_MINIMAS,
-                        "icpbrasil-truststore.certificate-url=http://acraiz.icpbrasil.gov.br/x.zip"))
-                .run(context -> {
-                    assertNotNull(context.getStartupFailure());
-                    assertTrue(mensagemRaiz(context.getStartupFailure()).contains("HTTPS"));
-                });
     }
 
     @Test

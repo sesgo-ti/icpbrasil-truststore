@@ -1,5 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.controller;
 
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
@@ -123,8 +124,8 @@ class TrustStoreControllerHttpTest {
     @Test
     @Order(2)
     void testAposCarga_ServePemEDerSemCacheHttp_ReadinessUp() {
-        when(downloader.downloadText(config.getHashUrl())).thenReturn(hash + "  ACcompactado.zip\n");
-        when(downloader.downloadBytes(config.getCertificateUrl())).thenReturn(zip);
+        when(downloader.downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL)).thenReturn(hash + "  ACcompactado.zip\n");
+        when(downloader.downloadBytes(IcpBrasilEndpoints.BUNDLE_ZIP_URL)).thenReturn(zip);
         service.refresh();
         assertTrue(service.isCacheValid(), "pré-condição: acervo publicado");
 

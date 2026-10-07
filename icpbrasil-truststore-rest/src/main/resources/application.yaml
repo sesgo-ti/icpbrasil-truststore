@@ -27,9 +27,6 @@ management:
 
 # Configurações do TrustStore ICP-Brasil
 icpbrasil-truststore:
-  # As URLs do ITI (certificate-url e hash-url) vêm dos defaults da biblioteca (IcpBrasilEndpoints);
-  # defina-as aqui apenas para apontar a um espelho.
-
   # Configurações de Rede e Resiliência
   # [Resultado]: Controla o comportamento em caso de falha na conexão
   network:

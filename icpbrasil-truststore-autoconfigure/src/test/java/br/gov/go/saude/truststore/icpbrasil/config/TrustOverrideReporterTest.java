@@ -26,8 +26,6 @@ class TrustOverrideReporterTest {
     private static final String AVISO = "substituído pela aplicação";
 
     private static final String[] PROPS_MINIMAS = {
-            "icpbrasil-truststore.certificate-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip",
-            "icpbrasil-truststore.hash-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt",
             "icpbrasil-truststore.network.download-timeout-seconds=30",
             "icpbrasil-truststore.network.max-retries=3",
             "icpbrasil-truststore.network.retry-interval-seconds=10",
