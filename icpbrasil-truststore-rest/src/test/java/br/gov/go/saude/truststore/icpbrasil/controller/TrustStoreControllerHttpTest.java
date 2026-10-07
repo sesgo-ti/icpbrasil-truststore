@@ -4,6 +4,7 @@ import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.util.HashValidator;
@@ -18,7 +19,9 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -27,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,9 +55,17 @@ class TrustStoreControllerHttpTest {
     @TempDir
     static Path baseDir;
 
-    static X509Certificate root;
+    static final X509Certificate root = TestBundleFactory.caCert("Raiz A", TestBundleFactory.newKeyPair());
     static byte[] zip;
     static String hash;
+
+    @TestConfiguration
+    static class RaizSinteticaFixada {
+        @Bean
+        RaizesFixadas raizesFixadas() {
+            return RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root)));
+        }
+    }
 
     @MockitoBean
     Downloader downloader;
@@ -74,7 +86,6 @@ class TrustStoreControllerHttpTest {
 
     @BeforeAll
     static void generateBundle() {
-        root = TestBundleFactory.caCert("Raiz A", TestBundleFactory.newKeyPair());
         zip = TestBundleFactory.bundleOf(root);
         hash = HashValidator.computeSha512(zip);
     }

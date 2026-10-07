@@ -23,6 +23,9 @@ import java.util.Optional;
  * certificados parseados e o índice montado. A validade publicada ({@code expiresAt}) deriva
  * sempre do instante em que a geração foi confirmada junto ao ITI — nunca da hora em que o
  * arquivo foi lido ou validado — somado a {@code cache-ttl-max-hours}.</p>
+ *
+ * <p>Os dois caminhos de carga (repositório local e ITI) passam pelo filtro de {@link RaizesFixadas}:
+ * raízes fora da lista, e tudo que só encadeia até elas, não chegam ao {@link Cache}.</p>
  */
 @Slf4j
 public class TrustStoreService {
@@ -38,24 +41,29 @@ public class TrustStoreService {
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
     private final TrustStoreConfig trustStoreConfig;
     private final Cache cache;
+    private final RaizesFixadas raizesFixadas;
     private final Clock clock;
 
     public TrustStoreService(TrustStoreRepository trustStoreRepository,
                              IcpBrasilCertificateProvider icpBrasilCertificateProvider,
                              TrustStoreConfig trustStoreConfig,
-                             Cache cache) {
-        this(trustStoreRepository, icpBrasilCertificateProvider, trustStoreConfig, cache, Clock.systemUTC());
+                             Cache cache,
+                             RaizesFixadas raizesFixadas) {
+        this(trustStoreRepository, icpBrasilCertificateProvider, trustStoreConfig, cache, raizesFixadas,
+                Clock.systemUTC());
     }
 
     public TrustStoreService(TrustStoreRepository trustStoreRepository,
                              IcpBrasilCertificateProvider icpBrasilCertificateProvider,
                              TrustStoreConfig trustStoreConfig,
                              Cache cache,
+                             RaizesFixadas raizesFixadas,
                              Clock clock) {
         this.trustStoreRepository = trustStoreRepository;
         this.icpBrasilCertificateProvider = icpBrasilCertificateProvider;
         this.trustStoreConfig = trustStoreConfig;
         this.cache = cache;
+        this.raizesFixadas = Objects.requireNonNull(raizesFixadas, "raizesFixadas");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -95,6 +103,13 @@ public class TrustStoreService {
         if (!cache.isCacheValid()) {
             log.error("Acervo ICP-Brasil indisponível: nenhum snapshot válido após a sincronização");
         }
+        // A cada ciclo, não só na publicação: a renovação por hash não republica, e o alerta
+        // precisa persistir enquanto a lista fixada não for atualizada por uma release.
+        cache.getState()
+                .map(Cache.State::raizesNaoFixadas)
+                .filter(raizes -> !raizes.isEmpty())
+                .ifPresent(raizes -> log.error(
+                        "Raízes fora da lista fixada descartadas (requer conferência e release): {}", raizes));
     }
 
     private void carregarAcervoLocal(Instant now) {
@@ -121,7 +136,8 @@ public class TrustStoreService {
             String hash = normalizarHash(geracao.hash());
             byte[] zipData = geracao.zip();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hash);
-            cache.publish(icpBrasilCertificateProvider.parseCertificates(zipData), hash, confirmedAt, expiresAt);
+            RaizesFixadas.Resultado acervo = raizesFixadas.filtrar(icpBrasilCertificateProvider.parseCertificates(zipData));
+            cache.publish(acervo.certificados(), acervo.raizesDescartadas(), hash, confirmedAt, expiresAt);
             log.info("Acervo do repositório local publicado (confirmado em {})", confirmedAt);
         } catch (RuntimeException e) {
             log.warn("Falha ao carregar acervo do repositório local: {}", e.getMessage());
@@ -147,11 +163,11 @@ public class TrustStoreService {
                     + "baixando o bundle", hashRemoto);
             byte[] zipData = icpBrasilCertificateProvider.baixarZipIcpBrasil();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hashRemoto);
-            List<X509Certificate> certificates = icpBrasilCertificateProvider.parseCertificates(zipData);
+            RaizesFixadas.Resultado acervo = raizesFixadas.filtrar(icpBrasilCertificateProvider.parseCertificates(zipData));
 
             // Publicar antes de persistir: a validação já precedeu ambos, e uma geração que remove
             // uma AC deve valer imediatamente mesmo com o repositório indisponível.
-            cache.publish(certificates, hashRemoto, now, expiresAt);
+            cache.publish(acervo.certificados(), acervo.raizesDescartadas(), hashRemoto, now, expiresAt);
             persistir("acervo", () -> trustStoreRepository.armazenarGeracao(zipData, hashRemoto, now));
         } catch (RuntimeException e) {
             log.warn("Falha na sincronização com o ITI; snapshot atual mantido até o prazo original: {}",

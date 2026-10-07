@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.config;
 import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,6 +73,16 @@ class TrustOverrideReporterTest {
                     assertEquals(List.of("TrustMaterialSource"),
                             context.getBean(TrustOverrideReporter.class).substituidos());
                     assertTrue(output.getOut().contains("TrustMaterialSource " + AVISO), output.getOut());
+                });
+    }
+
+    @Test
+    void testInicializacao_RaizesFixadasDoConsumidor_AvisaEmWarn(CapturedOutput output) {
+        runner.withBean(RaizesFixadas.class, () -> RaizesFixadas.de(Set.of("ab".repeat(32))))
+                .run(context -> {
+                    assertEquals(List.of("RaizesFixadas"),
+                            context.getBean(TrustOverrideReporter.class).substituidos());
+                    assertTrue(output.getOut().contains("RaizesFixadas " + AVISO), output.getOut());
                 });
     }
 

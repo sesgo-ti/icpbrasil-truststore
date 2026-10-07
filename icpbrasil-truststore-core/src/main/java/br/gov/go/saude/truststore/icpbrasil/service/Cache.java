@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import lombok.extern.slf4j.Slf4j;
 
 import java.security.cert.X509Certificate;
@@ -46,8 +47,11 @@ public class Cache {
      * @param confirmedAt instante em que a geração foi confirmada como vigente junto ao ITI
      * @param expiresAt   instante a partir do qual o acervo deixa de ser servido
      * @param valid       {@code true} se o acervo ainda é servido no instante da consulta
+     * @param raizesNaoFixadas raízes descartadas por não constarem da lista fixada; imutável e
+     *                    vazia quando nenhuma foi descartada
      */
-    public record State(String hash, Instant confirmedAt, Instant expiresAt, boolean valid) {
+    public record State(String hash, Instant confirmedAt, Instant expiresAt, boolean valid,
+                        List<RaizDescartada> raizesNaoFixadas) {
     }
 
     /**
@@ -64,10 +68,11 @@ public class Cache {
      * @param index        SKI → candidato preferido (ver {@link #PREFERENCE})
      * @param candidates   SKI → todos os certificados com esse SKI, o preferido primeiro
      * @param certificates todos os certificados distintos da geração, na ordem recebida
+     * @param raizesNaoFixadas raízes descartadas na geração, fora de {@code index} e {@code certificates}
      */
     private record Snapshot(Map<String, X509Certificate> index, Map<String, List<X509Certificate>> candidates,
-                            List<X509Certificate> certificates, String hash,
-                            Instant confirmedAt, Instant expiresAt) {
+                            List<X509Certificate> certificates, List<RaizDescartada> raizesNaoFixadas,
+                            String hash, Instant confirmedAt, Instant expiresAt) {
     }
 
     /**
@@ -139,11 +144,21 @@ public class Cache {
      */
     synchronized void publish(List<X509Certificate> certificates, String hash,
                               Instant confirmedAt, Instant expiresAt) {
+        publish(certificates, List.of(), hash, confirmedAt, expiresAt);
+    }
+
+    /**
+     * Como {@link #publish(List, String, Instant, Instant)}, registrando no snapshot as raízes
+     * descartadas informadas, que não entram no índice e aparecem em {@link State#raizesNaoFixadas}.
+     */
+    synchronized void publish(List<X509Certificate> certificates, List<RaizDescartada> raizesNaoFixadas,
+                              String hash, Instant confirmedAt, Instant expiresAt) {
         List<X509Certificate> distinct = distinct(certificates);
         Map<String, List<X509Certificate>> candidates = candidatesBySki(distinct);
         Map<String, X509Certificate> index = new HashMap<>();
         candidates.forEach((ski, list) -> index.put(ski, list.getFirst()));
-        snapshot = new Snapshot(Map.copyOf(index), candidates, distinct, Objects.requireNonNull(hash, "hash"),
+        snapshot = new Snapshot(Map.copyOf(index), candidates, distinct,
+                List.copyOf(raizesNaoFixadas), Objects.requireNonNull(hash, "hash"),
                 Objects.requireNonNull(confirmedAt, "confirmedAt"),
                 Objects.requireNonNull(expiresAt, "expiresAt"));
         log.info("Cache de certificados atualizado com {} certificados e {} SKIs (hash {}, expira em {}).",
@@ -163,7 +178,8 @@ public class Cache {
         if (atual == null || !atual.hash().equals(hash)) {
             return false;
         }
-        snapshot = new Snapshot(atual.index(), atual.candidates(), atual.certificates(), hash, Objects.requireNonNull(confirmedAt, "confirmedAt"),
+        snapshot = new Snapshot(atual.index(), atual.candidates(), atual.certificates(),
+                atual.raizesNaoFixadas(), hash, Objects.requireNonNull(confirmedAt, "confirmedAt"),
                 Objects.requireNonNull(expiresAt, "expiresAt"));
         log.info("Validade do cache renovada até {} (hash {}).", expiresAt, hash);
         return true;
@@ -299,6 +315,7 @@ public class Cache {
             return Optional.empty();
         }
         boolean valid = clock.instant().isBefore(atual.expiresAt());
-        return Optional.of(new State(atual.hash(), atual.confirmedAt(), atual.expiresAt(), valid));
+        return Optional.of(new State(atual.hash(), atual.confirmedAt(), atual.expiresAt(), valid,
+                atual.raizesNaoFixadas()));
     }
 }

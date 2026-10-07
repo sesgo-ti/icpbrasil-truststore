@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestClock;
 import lombok.SneakyThrows;
@@ -85,6 +86,24 @@ class CacheTest {
         assertEquals(T0, state.confirmedAt());
         assertEquals(T0.plus(TTL), state.expiresAt());
         assertTrue(state.valid());
+    }
+
+    @Test
+    void testPublish_SemDescartadas_EstadoComListaVazia() {
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
+
+        assertEquals(List.of(), cache.getState().orElseThrow().raizesNaoFixadas());
+    }
+
+    @Test
+    void testPublishERenew_RaizesDescartadas_ExpostasEPreservadasNaRenovacao() {
+        RaizDescartada estranha = new RaizDescartada("CN=Estranha", "ab".repeat(32));
+        cache.publish(certsA, List.of(estranha), HASH_A, T0, T0.plus(TTL));
+        assertEquals(List.of(estranha), cache.getState().orElseThrow().raizesNaoFixadas());
+
+        assertTrue(cache.renew(HASH_A, T0.plusSeconds(60), T0.plus(TTL).plusSeconds(60)));
+
+        assertEquals(List.of(estranha), cache.getState().orElseThrow().raizesNaoFixadas());
     }
 
     @Test

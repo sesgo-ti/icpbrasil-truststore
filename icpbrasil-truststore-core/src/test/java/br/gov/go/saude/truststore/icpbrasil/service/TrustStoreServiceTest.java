@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.service;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
@@ -22,8 +23,10 @@ import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -40,6 +43,8 @@ class TrustStoreServiceTest {
     static X509Certificate rootA;
     static X509Certificate intermediateA;
     static X509Certificate rootB;
+    static X509Certificate rogueRoot;
+    static X509Certificate rogueIntermediate;
     static byte[] zipA;
     static byte[] zipB;
     static String hashA;
@@ -62,6 +67,10 @@ class TrustStoreServiceTest {
         intermediateA = TestBundleFactory.intermediateCaCert("Intermediaria A",
                 TestBundleFactory.newKeyPair(), rootA, rootAKp);
         rootB = TestBundleFactory.caCert("Raiz B", TestBundleFactory.newKeyPair());
+        KeyPair rogueKp = TestBundleFactory.newKeyPair();
+        rogueRoot = TestBundleFactory.caCert("Raiz Estranha", rogueKp);
+        rogueIntermediate = TestBundleFactory.intermediateCaCert("AC Estranha",
+                TestBundleFactory.newKeyPair(), rogueRoot, rogueKp);
         zipA = TestBundleFactory.bundleOf(rootA, intermediateA);
         zipB = TestBundleFactory.bundleOf(rootB);
         hashA = HashValidator.computeSha512(zipA);
@@ -456,9 +465,52 @@ class TrustStoreServiceTest {
         assertFalse(Files.exists(baseDir.resolve("ACcompactado.zip")));
     }
 
+    @Test
+    void testRefresh_ItiComRaizNaoFixada_PublicaSemARaizEDescendentes() {
+        byte[] zip = TestBundleFactory.bundleOf(rootA, intermediateA, rogueRoot, rogueIntermediate);
+        remoto(HashValidator.computeSha512(zip), zip);
+
+        service.refresh();
+
+        assertNull(cache.getCertificateBySki(ski(rogueRoot)));
+        assertNull(cache.getCertificateBySki(ski(rogueIntermediate)));
+        assertNotNull(cache.getCertificateBySki(ski(intermediateA)));
+        List<RaizDescartada> descartadas = cache.getState().orElseThrow().raizesNaoFixadas();
+        assertEquals(List.of(new RaizDescartada(rogueRoot.getSubjectX500Principal().getName(),
+                CertificateParser.getFingerprintSha256(rogueRoot))), descartadas);
+    }
+
+    @Test
+    void testRefresh_RepositorioLocalComRaizNaoFixada_PublicaSemARaiz() {
+        byte[] zip = TestBundleFactory.bundleOf(rootA, rogueRoot);
+        storage(zip, HashValidator.computeSha512(zip), T0);
+        remotoIndisponivel();
+
+        service.refresh();
+
+        assertNull(cache.getCertificateBySki(ski(rogueRoot)));
+        assertNotNull(cache.getCertificateBySki(ski(rootA)));
+        assertEquals(1, cache.getState().orElseThrow().raizesNaoFixadas().size());
+    }
+
+    @Test
+    void testRefresh_ReconfirmacaoPorHash_PreservaRaizesNaoFixadas() {
+        byte[] zip = TestBundleFactory.bundleOf(rootA, rogueRoot);
+        String hash = HashValidator.computeSha512(zip);
+        remoto(hash, zip);
+        service.refresh();
+        clock.set(T0.plus(Duration.ofHours(2)));
+
+        service.refresh();
+
+        assertEquals(1, cache.getState().orElseThrow().raizesNaoFixadas().size());
+    }
+
     private TrustStoreService criarServico(TrustStoreRepository repositorio) {
         IcpBrasilCertificateProvider provider = new IcpBrasilCertificateProvider(downloader, repositorio);
-        return new TrustStoreService(repositorio, provider, config, cache, clock);
+        RaizesFixadas fixadas = RaizesFixadas.de(Set.of(
+                CertificateParser.getFingerprintSha256(rootA), CertificateParser.getFingerprintSha256(rootB)));
+        return new TrustStoreService(repositorio, provider, config, cache, fixadas, clock);
     }
 
     /** Leituras reais; toda escrita falha como um disco cheio ou bucket inacessível. */
