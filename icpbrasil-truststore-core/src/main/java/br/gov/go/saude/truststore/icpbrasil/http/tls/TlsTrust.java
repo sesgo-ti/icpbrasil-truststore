@@ -137,7 +137,7 @@ public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.Dedicated
 
         @Override
         public String describe() {
-            return new DedicatedCa(anchors).describe() + "; intermediárias via AIA em i.lencr.org";
+            return new DedicatedCa(anchors).describe() + "; intermediárias via AIA";
         }
     }
 

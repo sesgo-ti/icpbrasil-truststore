@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.http.tls;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
+import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.IncompleteChainException;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,9 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public final class ItiTrustManager extends X509ExtendedTrustManager {
+
+    // A allowlist do AIA já restringe a origem; o teto limita o crescimento sob MITM repetido.
+    private static final int MAX_POOL = 64;
 
     private final List<X509Certificate> anchors;
     private final Set<TrustAnchor> trustAnchors;
@@ -143,10 +147,22 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
         } catch (CertificateException primeira) {
             // Revalida mesmo sem certificado novo: outra conexão pode ter completado o pool em paralelo.
             if (!buscarIntermediarias(chain[0])) {
+                registrarRecusa(chain[0], primeira);
                 throw primeira;
             }
-            verificacao.executar(delegate());
+            try {
+                verificacao.executar(delegate());
+            } catch (CertificateException segunda) {
+                segunda.addSuppressed(primeira);
+                registrarRecusa(chain[0], segunda);
+                throw segunda;
+            }
         }
+    }
+
+    private static void registrarRecusa(X509Certificate leaf, CertificateException motivo) {
+        log.warn("TLS do ITI recusado; CA Issuers da folha {}: {}",
+                CertificateParser.getCaIssuersUrls(leaf), motivo.getMessage());
     }
 
     /** @return {@code false} se a busca AIA não trouxe nenhuma intermediária */
@@ -158,12 +174,28 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
             cadeia = e.getPartialChain();
         }
         if (cadeia.size() <= 1) {
-            log.warn("TLS do ITI: a cadeia não fecha nas raízes fixadas e o AIA não trouxe intermediária para {}",
-                    leaf.getIssuerX500Principal());
             return false;
         }
-        pool.addAll(cadeia.subList(1, cadeia.size()));
+        adicionarAoPool(cadeia.subList(1, cadeia.size()));
         return true;
+    }
+
+    /** Descarta os vencidos e, com o pool cheio, recusa novos certificados (falha fechada). */
+    private synchronized void adicionarAoPool(List<X509Certificate> intermediarias) {
+        Instant agora = clock.instant();
+        pool.removeIf(c -> c.getNotAfter().toInstant().isBefore(agora));
+        for (X509Certificate intermediaria : intermediarias) {
+            if (pool.size() >= MAX_POOL) {
+                log.warn("Pool de intermediárias do TLS do ITI cheio ({}); ignorando {}",
+                        MAX_POOL, intermediaria.getSubjectX500Principal());
+                return;
+            }
+            pool.add(intermediaria);
+        }
+    }
+
+    int tamanhoDoPool() {
+        return pool.size();
     }
 
     private X509ExtendedTrustManager delegate() throws CertificateException {

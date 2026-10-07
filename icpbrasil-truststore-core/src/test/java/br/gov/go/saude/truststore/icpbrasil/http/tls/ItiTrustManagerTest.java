@@ -16,6 +16,7 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import javax.net.ssl.TrustManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -43,8 +45,10 @@ import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,6 +76,7 @@ class ItiTrustManagerTest {
     private final AtomicInteger requisicoesAia = new AtomicInteger();
 
     private X509Certificate root;
+    private KeyPair rootKeyPair;
     private KeyPair intermediarioKeyPair;
     private X509Certificate intermediario;
     private X509Certificate intermediarioDeOutraRaiz;
@@ -81,7 +86,7 @@ class ItiTrustManagerTest {
     @BeforeEach
     @SneakyThrows
     void setUp() {
-        KeyPair rootKeyPair = TestBundleFactory.newKeyPair();
+        rootKeyPair = TestBundleFactory.newKeyPair();
         root = TestBundleFactory.caCert("Raiz TLS Teste", rootKeyPair);
         intermediarioKeyPair = TestBundleFactory.newKeyPair();
         intermediario = TestBundleFactory.intermediateCaCert("Intermediaria TLS Teste", intermediarioKeyPair,
@@ -172,6 +177,59 @@ class ItiTrustManagerTest {
     }
 
     @Test
+    void testCheckServerTrusted_AiaComCertificadoQueNaoEncadeia_RelancaComAPrimeiraFalhaSuprimida() {
+        intermediarioServido = intermediarioDeOutraRaiz;
+        X509Certificate folha = folhaPara127().certificado();
+        ItiTrustManager trustManager = new ItiTrustManager(List.of(root), resolverPermissivo(), Clock.systemUTC());
+
+        CertificateException ex = assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
+
+        assertEquals(1, ex.getSuppressed().length);
+        assertTrue(ex.getSuppressed()[0] instanceof CertificateException, ex.getSuppressed()[0].toString());
+    }
+
+    @Test
+    @SneakyThrows
+    void testCheckServerTrusted_IntermediariaVencidaNoPool_DescartadaNaInsercao() {
+        Instant agora = Instant.now();
+        X509Certificate folha = folhaPara127().certificado();
+        X509Certificate venceLogo = intermediariaValidaAte(agora.plus(Duration.ofDays(1)));
+        X509Certificate venceDepois = intermediariaValidaAte(agora.plus(Duration.ofDays(30)));
+        CertificateChainResolver resolver = mock(CertificateChainResolver.class);
+        when(resolver.resolveChain(folha)).thenReturn(List.of(folha, venceLogo), List.of(folha, venceDepois));
+        RelogioAjustavel relogio = new RelogioAjustavel(agora);
+        ItiTrustManager trustManager = new ItiTrustManager(List.of(root), resolver, relogio);
+
+        assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
+        assertEquals(1, trustManager.tamanhoDoPool());
+        relogio.agora = agora.plus(Duration.ofDays(2));
+        assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
+
+        assertEquals(1, trustManager.tamanhoDoPool());
+    }
+
+    @Test
+    @SneakyThrows
+    void testCheckServerTrusted_AiaComMaisDe64Intermediarias_PoolLimitadoA64() {
+        X509Certificate folha = folhaPara127().certificado();
+        List<X509Certificate> cadeia = new ArrayList<>(List.of(folha));
+        for (int i = 0; i < 70; i++) {
+            cadeia.add(TestBundleFactory.intermediateCaCert("Intermediaria " + i, intermediarioKeyPair, root, rootKeyPair));
+        }
+        CertificateChainResolver resolver = mock(CertificateChainResolver.class);
+        when(resolver.resolveChain(folha)).thenReturn(cadeia);
+        ItiTrustManager trustManager = new ItiTrustManager(List.of(root), resolver, Clock.systemUTC());
+
+        assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
+
+        assertEquals(64, trustManager.tamanhoDoPool());
+    }
+
+    @Test
     @SneakyThrows
     void testCheckServerTrusted_CadeiaRealDoIti_ValidaComRelogioFixo() {
         ItiTrustManager trustManager = new ItiTrustManager(ItiTlsAnchors.load(), resolverDaCadeiaReal(),
@@ -223,6 +281,38 @@ class ItiTrustManagerTest {
     }
 
     private record Folha(X509Certificate certificado, KeyPair keyPair) {
+    }
+
+    private static final class RelogioAjustavel extends Clock {
+        private volatile Instant agora;
+
+        private RelogioAjustavel(Instant agora) {
+            this.agora = agora;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Instant instant() {
+            return agora;
+        }
+    }
+
+    @SneakyThrows
+    private X509Certificate intermediariaValidaAte(Instant notAfter) {
+        X500Name subject = new X500Name("CN=Intermediaria " + SERIAL.incrementAndGet() + ", O=Test, C=BR");
+        X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(TestCertificateFactory.issuerNameOf(root),
+                BigInteger.valueOf(SERIAL.incrementAndGet()), Date.from(Instant.now().minus(Duration.ofDays(1))),
+                Date.from(notAfter), subject, intermediarioKeyPair.getPublic());
+        return TestCertificateFactory.sign(builder, rootKeyPair);
     }
 
     private Folha folhaPara127() {

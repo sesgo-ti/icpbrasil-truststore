@@ -91,12 +91,12 @@ class TlsTrustTest {
     }
 
     @Test
-    void testDescribe_PinnedRoots_ListaAncorasEDominioAia() {
+    void testDescribe_PinnedRoots_ListaAncorasEBuscaAia() {
         String descricao = TlsTrust.pinnedRoots(Clock.systemUTC()).describe();
 
         assertTrue(descricao.contains("CN=ISRG Root X1"), descricao);
         assertTrue(descricao.contains("CN=ISRG Root X2"), descricao);
-        assertTrue(descricao.contains("i.lencr.org"), descricao);
+        assertTrue(descricao.endsWith("; intermediárias via AIA"), descricao);
     }
 
     @Test
