@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Raízes ICP-Brasil aceitas como âncora, fixadas por fingerprint SHA-256.
@@ -28,6 +29,8 @@ public final class RaizesFixadas {
             "1406710058180fa4081aab3f246f1702429c552a11fa3143b84c88cb3ab8e5e7", // v11
             "d8478e37ce19c690cf657381e68fe600e4e1a042536830f06847e03e554c4b01"); // v12
 
+    private static final Pattern FORMATO_FINGERPRINT = Pattern.compile("[0-9a-f]{64}");
+
     private final Set<String> fingerprints;
 
     private RaizesFixadas(Set<String> fingerprints) {
@@ -43,8 +46,16 @@ public final class RaizesFixadas {
      * Lista própria de raízes, para testes e código do consumidor.
      *
      * @param fingerprintsSha256 SHA-256 do DER em hexadecimal minúsculo sem separadores
+     * @throws IllegalArgumentException se algum fingerprint estiver fora desse formato, pois nunca
+     *                                  coincidiria com um certificado e descartaria a raiz em silêncio
      */
     public static RaizesFixadas de(Set<String> fingerprintsSha256) {
+        for (String fingerprint : fingerprintsSha256) {
+            if (fingerprint == null || !FORMATO_FINGERPRINT.matcher(fingerprint).matches()) {
+                throw new IllegalArgumentException(
+                        "Fingerprint SHA-256 deve ter 64 dígitos hexadecimais minúsculos: " + fingerprint);
+            }
+        }
         return new RaizesFixadas(fingerprintsSha256);
     }
 
@@ -89,15 +100,22 @@ public final class RaizesFixadas {
     }
 
     private static boolean emitiu(X509Certificate emissor, X509Certificate certificate) {
-        if (!emissor.getSubjectX500Principal().equals(certificate.getIssuerX500Principal())) {
+        if (!emissor.getSubjectX500Principal().equals(certificate.getIssuerX500Principal())
+                || !podeEmitir(emissor)) {
             return false;
         }
         try {
             certificate.verify(emissor.getPublicKey());
             return true;
-        } catch (GeneralSecurityException e) {
+        } catch (GeneralSecurityException | RuntimeException e) {
             return false;
         }
+    }
+
+    /** Emissor precisa ser AC; a validade temporal fica para a validação PKIX. */
+    private static boolean podeEmitir(X509Certificate emissor) {
+        boolean[] keyUsage = emissor.getKeyUsage();
+        return emissor.getBasicConstraints() >= 0 && (keyUsage == null || (keyUsage.length > 5 && keyUsage[5]));
     }
 
     /**

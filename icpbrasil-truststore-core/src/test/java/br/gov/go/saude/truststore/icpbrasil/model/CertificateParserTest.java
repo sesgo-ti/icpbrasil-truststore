@@ -262,4 +262,18 @@ class CertificateParserTest {
         assertThrows(NoSuchAlgorithmException.class, () -> v7.verify(v7.getPublicKey()));
         assertTrue(CertificateParser.isSelfSignedRoot(v7));
     }
+
+    @Test
+    @SneakyThrows
+    void testIsSelfSignedRoot_AkiSemSki_FalseSemLancar() {
+        assertFalse(CertificateParser.isSelfSignedRoot(autoemitidoSoComAki()));
+    }
+
+    static X509Certificate autoemitidoSoComAki() {
+        KeyPair keyPair = TestBundleFactory.newKeyPair();
+        X500Name subject = new X500Name("CN=Raiz Sem SKI, O=Test, C=BR");
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(subject, subject, 79, keyPair);
+        TestCertificateFactory.addAki(builder, keyPair);
+        return TestCertificateFactory.sign(builder, keyPair);
+    }
 }

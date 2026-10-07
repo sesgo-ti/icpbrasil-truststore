@@ -519,18 +519,38 @@ public class CertificateParser {
         if (!certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal())) {
             return false;
         }
-        // Checa a presença antes: getAuthorityKeyIdentifier registra ERROR quando a extensão falta.
-        if (certificate.getExtensionValue(Extension.authorityKeyIdentifier.getId()) != null
-                && !getAuthorityKeyIdentifier(certificate).equals(getSubjectKeyIdentifier(certificate))) {
-            return false;
+        // Lê as extensões sem os getters públicos: eles lançam (e registram ERROR) quando a
+        // extensão falta ou está malformada, e um predicado não pode derrubar quem o chama.
+        if (certificate.getExtensionValue(Extension.authorityKeyIdentifier.getId()) != null) {
+            byte[] aki = rawKeyIdentifier(certificate, Extension.authorityKeyIdentifier.getId());
+            byte[] ski = rawKeyIdentifier(certificate, Extension.subjectKeyIdentifier.getId());
+            if (aki == null || ski == null || !Arrays.equals(aki, ski)) {
+                return false;
+            }
         }
         try {
             certificate.verify(certificate.getPublicKey());
             return true;
         } catch (NoSuchAlgorithmException algoritmoNaoSuportado) {
             return true;
-        } catch (GeneralSecurityException assinaturaInvalida) {
+        } catch (GeneralSecurityException | RuntimeException assinaturaInvalidaOuProviderComFalha) {
             return false;
+        }
+    }
+
+    /** keyIdentifier do SKI ou AKI; {@code null} se a extensão faltar, não tiver keyIdentifier ou for ilegível. */
+    private static byte[] rawKeyIdentifier(X509Certificate certificate, String oid) {
+        try {
+            byte[] value = certificate.getExtensionValue(oid);
+            if (value == null) {
+                return null;
+            }
+            byte[] octets = ASN1OctetString.getInstance(value).getOctets();
+            return oid.equals(Extension.authorityKeyIdentifier.getId())
+                    ? AuthorityKeyIdentifier.getInstance(octets).getKeyIdentifier()
+                    : SubjectKeyIdentifier.getInstance(octets).getKeyIdentifier();
+        } catch (RuntimeException ilegivel) {
+            return null;
         }
     }
 

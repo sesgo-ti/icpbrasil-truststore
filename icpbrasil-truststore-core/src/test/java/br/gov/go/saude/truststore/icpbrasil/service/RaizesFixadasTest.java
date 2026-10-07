@@ -3,8 +3,14 @@ package br.gov.go.saude.truststore.icpbrasil.service;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
+import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RaizesFixadasTest {
@@ -77,6 +84,27 @@ class RaizesFixadasTest {
     }
 
     @Test
+    @SneakyThrows
+    void testFiltrar_AutoemitidoDeAlgoritmoDesconhecidoForaDaLista_NaoViraAncora() {
+        X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
+        RaizesFixadas fixadas = RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root)));
+
+        RaizesFixadas.Resultado resultado = fixadas.filtrar(List.of(v7, root, intermediate));
+
+        assertEquals(List.of(root, intermediate), resultado.certificados());
+        assertEquals(List.of(new RaizDescartada(v7.getSubjectX500Principal().getName(),
+                CertificateParser.getFingerprintSha256(v7))), resultado.raizesDescartadas());
+    }
+
+    @Test
+    void testDe_FingerprintForaDoFormato_LancaIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> RaizesFixadas.de(Set.of("AB".repeat(32))));
+        assertThrows(IllegalArgumentException.class, () -> RaizesFixadas.de(Set.of("ab:".repeat(31) + "ab")));
+        assertThrows(IllegalArgumentException.class, () -> RaizesFixadas.de(Set.of("ab".repeat(31))));
+        assertThrows(IllegalArgumentException.class, () -> RaizesFixadas.de(Set.of("ab".repeat(32), "")));
+    }
+
+    @Test
     void testProducao_SeisRaizesVigentes() {
         assertEquals(Set.of(
                 "caa53fc6091c6951887c976e378f6ef89aa6377c55d97b6475422b71ed7e9b17",
@@ -94,5 +122,46 @@ class RaizesFixadasTest {
         X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
 
         assertTrue(RaizesFixadas.producao().fingerprints().contains(CertificateParser.getFingerprintSha256(v7)));
+    }
+
+    @Test
+    void testFiltrar_AutoemitidoComAkiSemSki_DescartaSemLancar() {
+        KeyPair kp = TestBundleFactory.newKeyPair();
+        X500Name subject = new X500Name("CN=Raiz Sem SKI, O=Test, C=BR");
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(subject, subject, 80, kp);
+        TestCertificateFactory.addAki(builder, kp);
+        X509Certificate malformado = TestCertificateFactory.sign(builder, kp);
+        RaizesFixadas fixadas = RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root)));
+
+        assertEquals(List.of(root, intermediate),
+                fixadas.filtrar(List.of(malformado, root, intermediate)).certificados());
+    }
+
+    @Test
+    void testFiltrar_FilhoAssinadoPorCertificadoFinal_Descarta() {
+        KeyPair leafKp = TestBundleFactory.newKeyPair();
+        X509Certificate leaf = TestCertificateFactory.generateLeafCert(leafKp, rootKp, root);
+        X509Certificate filho = TestBundleFactory.intermediateCaCert("Filho do Final", TestBundleFactory.newKeyPair(), leaf, leafKp);
+        RaizesFixadas fixadas = RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root)));
+
+        assertEquals(List.of(root, leaf), fixadas.filtrar(List.of(root, leaf, filho)).certificados());
+    }
+
+    @Test
+    @SneakyThrows
+    void testFiltrar_FilhoAssinadoPorAcSemKeyCertSign_Descarta() {
+        KeyPair acKp = TestBundleFactory.newKeyPair();
+        X500Name issuer = TestCertificateFactory.issuerNameOf(root);
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(
+                issuer, new X500Name("CN=AC Sem KeyCertSign, O=Test, C=BR"), 81, acKp);
+        builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
+        builder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature));
+        TestCertificateFactory.addSki(builder, acKp);
+        TestCertificateFactory.addAki(builder, rootKp);
+        X509Certificate ac = TestCertificateFactory.sign(builder, rootKp);
+        X509Certificate filho = TestBundleFactory.intermediateCaCert("Filho", TestBundleFactory.newKeyPair(), ac, acKp);
+        RaizesFixadas fixadas = RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root)));
+
+        assertEquals(List.of(root, ac), fixadas.filtrar(List.of(root, ac, filho)).certificados());
     }
 }
