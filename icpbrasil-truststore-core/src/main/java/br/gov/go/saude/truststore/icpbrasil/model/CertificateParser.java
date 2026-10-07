@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.model;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.*;
+import org.bouncycastle.asn1.x509.Extension;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -10,6 +11,7 @@ import javax.naming.ldap.Rdn;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.*;
@@ -502,6 +504,32 @@ public class CertificateParser {
             certificate.verify(certificate.getPublicKey());
             return true;
         } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Indica se o certificado é uma raiz: subject igual ao issuer, AKI ausente ou igual ao
+     * próprio SKI e assinatura que confere com a própria chave. Quando a JVM não suporta o
+     * algoritmo da assinatura (Raiz v7, curva E-521), a verificação é impossível e o
+     * certificado é aceito como raiz pelos demais critérios; confiança continua sendo decidida
+     * pelas âncoras de quem chama (ex.: {@code RaizesFixadas}, PKIX).
+     */
+    public static boolean isSelfSignedRoot(X509Certificate certificate) {
+        if (!certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal())) {
+            return false;
+        }
+        // Checa a presença antes: getAuthorityKeyIdentifier registra ERROR quando a extensão falta.
+        if (certificate.getExtensionValue(Extension.authorityKeyIdentifier.getId()) != null
+                && !getAuthorityKeyIdentifier(certificate).equals(getSubjectKeyIdentifier(certificate))) {
+            return false;
+        }
+        try {
+            certificate.verify(certificate.getPublicKey());
+            return true;
+        } catch (NoSuchAlgorithmException algoritmoNaoSuportado) {
+            return true;
+        } catch (GeneralSecurityException assinaturaInvalida) {
             return false;
         }
     }
