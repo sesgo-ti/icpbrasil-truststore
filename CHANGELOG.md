@@ -12,6 +12,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
 - Cache de revogação: downloads concorrentes da mesma CRL ou da mesma resposta OCSP são compartilhados (#13).
 - SBOM CycloneDX (`-Psbom`) e análise de dependências com osv-scanner no CI; exceções temporárias, com responsável e validade, em `osv-scanner.toml` (#17).
+- `META-INF/LICENSE` nos JARs binário e de sources de `core` e `autoconfigure` (#22).
 - Build reproduzível: `project.build.outputTimestamp` fixa as datas gravadas nos JARs, e o workflow de release usa a data do commit da tag; checksum da distribuição do Maven no wrapper (#15).
 
 ### Alterado
