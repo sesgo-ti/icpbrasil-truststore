@@ -1,35 +1,53 @@
 # Disponibilizar o serviço Trust Store
 
 ## Objetivo
-Descrever o procedimento para disponibilizar o serviço Trust Store, fornecedor dos certificados confiáveis das Autoridades Certificadoras (ACs) que compõem o ecossistema ICP-Brasil.
+
+Colocar no ar o serviço REST (`icpbrasil-truststore-rest`), que mantém o acervo de Autoridades
+Certificadoras vigentes da ICP-Brasil e o serve por SKI.
 
 ## Pré-requisitos
-- JDK 21
-- Acesso ao MinIO (credenciais de adição e leitura de objetos em um bucket específico).
-- Acesso ao Vault (credenciais de leitura de segredos).
+
+- JDK 21.
+- Saída HTTPS para `acraiz.icpbrasil.gov.br` (download do acervo). Não é preciso configurar
+  truststore na JVM: esse download usa um `SSLContext` próprio, com as âncoras embutidas (veja
+  [gestão das âncoras TLS](manual-gestao-certificados-confiaveis.md)).
+- Armazenamento persistente para o acervo: um diretório local ou um bucket S3-compatível
+  (AWS S3, MinIO etc.) com permissão de leitura, escrita, listagem e remoção de objetos.
 
 ## Procedimento
 
-1. **Configure o projeto**
-    No arquivo [application.yaml](../src/main/resources/application.yaml), configure as propriedades de acesso ao MinIO e ao Vault.
-
-2. **Executar os testes automatizados**
-    Execute os testes automatizados para garantir o bom funcionamento do serviço e a correta integração com o MinIO e o Vault:
-    
-    ```bash
-    mvn clean test
-    ```
-   
-3. **Construir o artefato**
-    Construa o artefato JAR do serviço:
+1. **Obter o executável.** Baixe `icpbrasil-truststore-rest-<versão>.jar` e o `SHA256SUMS` da
+   [GitHub Release](https://github.com/sesgo-ti/icpbrasil-truststore/releases) e confira:
 
     ```bash
-    mvn clean package
+    sha256sum -c SHA256SUMS --ignore-missing
     ```
-   
-4. **Executar a aplicação**
-    Antes de executar é preciso criar o truststore customizado da aplicação contendo o certificado SSL do Vault, conforme descrito no [Manual de Configuração do Certificado Vault](manual-configuracao-certificado-vault.md).
+
+    Ou construa a partir do código (o build é reproduzível: o mesmo commit gera o mesmo JAR):
 
     ```bash
-    java -Djavax.net.ssl.trustStore=path/to/mytruststore.jks -Djavax.net.ssl.trustStorePassword=changeit -jar icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar
+    ./mvnw clean verify
     ```
+
+2. **Configurar o armazenamento.** Filesystem (padrão):
+
+    ```bash
+    java -jar icpbrasil-truststore-rest-<versão>.jar \
+      --icpbrasil-truststore.filesystem.base-dir=/data/truststore
+    ```
+
+    S3-compatível: defina `icpbrasil-truststore.storage.type=s3` e as variáveis `S3_ENDPOINT`,
+    `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` e, só para endpoint com CA própria,
+    `S3_CA_CERT_PATH` (veja o [README](../README.md#armazenamento-s3-compatível)). Várias
+    instâncias podem compartilhar o mesmo diretório ou bucket (veja
+    [layout do armazenamento](../README.md#layout-do-armazenamento)).
+
+3. **Verificar.** A readiness só fica `UP` quando há acervo vigente:
+
+    ```bash
+    curl http://localhost:8080/actuator/health/readiness
+    curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
+    ```
+
+    Estados do cache, logs e alertas: [manual de monitoramento](manual-monitoramento.md).
+    Endpoints e parâmetros: [modo microserviço](exemplo-integracao-microservico.md).

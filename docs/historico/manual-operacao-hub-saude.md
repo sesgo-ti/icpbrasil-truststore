@@ -1,5 +1,11 @@
 # Manual de Operação do HubSaúde
 
+> **Material histórico — rascunho de outro sistema.** Este modelo descreve o HubSaúde, não os
+> procedimentos suportados por esta biblioteca, e está incompleto. Para operar o Trust Store, use
+> [disponibilizar o serviço](../manual-disponibilizacao-trust-store.md),
+> [monitoramento](../manual-monitoramento.md) e
+> [gestão das âncoras TLS](../manual-gestao-certificados-confiaveis.md).
+
 ## 1. Informações Introdutórias
 
 - **Nome do Sistema: HubSaúde
@@ -38,21 +44,16 @@
 ## 4. Procedimentos de Operação
 
 ### 4.1 Inicialização
-- Subir o serviço HashiCorp Vault (Cofre)
-  - [Primeiro passos](https://developer.hashicorp.com/vault/tutorials/get-started)
-  - [Instalar](https://developer.hashicorp.com/vault/install)
-  - [Documentação de Configuração](http://developer.hashicorp.com/vault/docs/configuration)
 - [Passo 1: ...]
 - [Passo 2: ...]
 
 ### 4.2 Procedimentos Normais de Uso
-- [Manual de Gestão de Certificados Confiáveis](manual-gestao-certificados-confiaveis.md)
-- [Manual de Configuração do Certificado Vault](manual-configuracao-certificado-vault.md)
+- [Manual de Gestão de Certificados Confiáveis](../manual-gestao-certificados-confiaveis.md)
 - [Exemplo de entrada de dados]
 - [Exemplo de saída de dados]
 
 ### 4.3 Monitoramento e Controle
-- [Manual de Monitoramento — Trust Store ICP-Brasil](manual-monitoramento.md)
+- [Manual de Monitoramento — Trust Store ICP-Brasil](../manual-monitoramento.md)
 
 ---
 
