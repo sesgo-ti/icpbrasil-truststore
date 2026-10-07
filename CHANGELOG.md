@@ -11,6 +11,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
 - Cache de revogação: downloads concorrentes da mesma CRL ou da mesma resposta OCSP são compartilhados (#13).
+- Build reproduzível (`project.build.outputTimestamp`) verificado no CI por dois builds limpos, e checksum da distribuição do Maven no wrapper (#15).
 
 ### Alterado
 
