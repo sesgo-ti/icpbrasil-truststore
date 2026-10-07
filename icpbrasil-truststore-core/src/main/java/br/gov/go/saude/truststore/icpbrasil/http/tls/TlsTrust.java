@@ -37,9 +37,10 @@ public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.Dedicated
         return new DedicatedCa(List.copyOf(new LinkedHashSet<>(anchors)));
     }
 
+    /** Cria um novo {@link X509TrustManager} a cada chamada; o chamador pode guardá-lo e reutilizá-lo. */
     X509TrustManager trustManager();
 
-    /** Âncoras da confiança dedicada; vazio para {@link JvmDefault}. */
+    /** Âncoras da confiança dedicada, sem duplicatas e em ordem de inserção; vazio para {@link JvmDefault}. */
     List<X509Certificate> anchors();
 
     /** Texto para log: em quem o canal confia, com fingerprint SHA-256 de cada âncora. */
@@ -56,6 +57,7 @@ public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.Dedicated
         }
     }
 
+    /** Confiança nos certificados raiz da JVM; não possui âncoras próprias. */
     record JvmDefault() implements TlsTrust {
         @Override
         public X509TrustManager trustManager() {
@@ -73,6 +75,7 @@ public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.Dedicated
         }
     }
 
+    /** Confiança restrita às âncoras informadas; exige ao menos uma e não consulta o cacerts. */
     record DedicatedCa(List<X509Certificate> anchors) implements TlsTrust {
         public DedicatedCa {
             if (anchors.isEmpty()) {
