@@ -2,6 +2,7 @@ package br.gov.go.saude.truststore.icpbrasil.http.tls;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
@@ -20,6 +21,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -59,7 +61,11 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -213,6 +219,19 @@ class ItiTrustManagerTest {
 
     @Test
     @SneakyThrows
+    void testCheckServerTrusted_ResolverLancaRuntimeException_LancaCertificateException() {
+        X509Certificate folha = folhaPara127().certificado();
+        CertificateChainResolver resolver = mock(CertificateChainResolver.class);
+        when(resolver.resolveChain(folha)).thenThrow(new IllegalStateException("falha inesperada"));
+        ItiTrustManager trustManager = new ItiTrustManager(List.of(root), resolver, Clock.systemUTC());
+
+        assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
+        assertEquals(0, trustManager.tamanhoDoPool());
+    }
+
+    @Test
+    @SneakyThrows
     void testCheckServerTrusted_AiaComMaisDe64Intermediarias_PoolLimitadoA64() {
         X509Certificate folha = folhaPara127().certificado();
         List<X509Certificate> cadeia = new ArrayList<>(List.of(folha));
@@ -227,6 +246,49 @@ class ItiTrustManagerTest {
                 () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
 
         assertEquals(64, trustManager.tamanhoDoPool());
+    }
+
+    @Test
+    @SneakyThrows
+    void testHandshake_PoolCheioDeIntermediariasInuteis_EsvaziaEConecta() {
+        X509Certificate lixo = folhaPara127().certificado();
+        List<X509Certificate> cadeiaInutil = new ArrayList<>(List.of(lixo));
+        for (int i = 0; i < 64; i++) {
+            cadeiaInutil.add(TestBundleFactory.intermediateCaCert("Inutil " + i, intermediarioKeyPair, root, rootKeyPair));
+        }
+        Folha folha = folhaPara127();
+        CertificateChainResolver resolver = mock(CertificateChainResolver.class);
+        when(resolver.resolveChain(lixo)).thenReturn(cadeiaInutil);
+        when(resolver.resolveChain(folha.certificado())).thenReturn(List.of(folha.certificado(), intermediario));
+        ItiTrustManager trustManager = new ItiTrustManager(List.of(root), resolver, Clock.systemUTC());
+        assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{lixo}, "ECDHE_RSA"));
+        assertEquals(64, trustManager.tamanhoDoPool());
+
+        assertEquals(200, get(trustManager, iniciarHttps(folha) + "/ok").statusCode());
+        assertEquals(1, trustManager.tamanhoDoPool());
+    }
+
+    @Test
+    void testSanitizarParaLog_CaracteresDeControle_SubstituidosPorInterrogacao() {
+        assertEquals("http://x/?? WARN forjado?fim",
+                ItiTrustManager.sanitizarParaLog("http://x/\r\n WARN forjado\u2028fim", 200));
+    }
+
+    @Test
+    void testSanitizarParaLog_ControleC1_SubstituidoPorInterrogacao() {
+        assertEquals("a?b", ItiTrustManager.sanitizarParaLog("a\u0085b", 200));
+    }
+
+    @Test
+    void testSanitizarParaLog_AcimaDoLimite_Trunca() {
+        assertEquals("abc...", ItiTrustManager.sanitizarParaLog("abcdef", 3));
+        assertEquals("abc", ItiTrustManager.sanitizarParaLog("abc", 3));
+    }
+
+    @Test
+    void testSanitizarParaLog_Nulo_RetornaTextoNull() {
+        assertEquals("null", ItiTrustManager.sanitizarParaLog(null, 10));
     }
 
     @Test
@@ -278,6 +340,29 @@ class ItiTrustManagerTest {
         ItiTrustManager trustManager = ItiTrustManager.producao(Clock.systemUTC());
 
         assertEquals(ItiTlsAnchors.load(), List.of(trustManager.getAcceptedIssuers()));
+    }
+
+    @Test
+    @SneakyThrows
+    void testProducao_BuscaAiaPelaPoliticaDoLetsEncrypt() {
+        X509Certificate folha = folhaPara127().certificado();
+        DownloadPolicy politica = mock(DownloadPolicy.class);
+        doThrow(new DownloadPolicyException("recusada")).when(politica).validateUrl(anyString());
+        ItiTrustManager trustManager = producaoCom(politica);
+
+        assertThrows(CertificateException.class,
+                () -> trustManager.checkServerTrusted(new X509Certificate[]{folha}, "ECDHE_RSA"));
+
+        verify(politica).validateUrl(aiaUrl);
+        assertEquals(0, requisicoesAia.get());
+    }
+
+    /** {@link ItiTrustManager#producao} com {@link DownloadPolicy#aiaLetsEncrypt()} devolvendo {@code politica}. */
+    private static ItiTrustManager producaoCom(DownloadPolicy politica) {
+        try (MockedStatic<DownloadPolicy> fabrica = mockStatic(DownloadPolicy.class)) {
+            fabrica.when(DownloadPolicy::aiaLetsEncrypt).thenReturn(politica);
+            return ItiTrustManager.producao(Clock.systemUTC());
+        }
     }
 
     private record Folha(X509Certificate certificado, KeyPair keyPair) {

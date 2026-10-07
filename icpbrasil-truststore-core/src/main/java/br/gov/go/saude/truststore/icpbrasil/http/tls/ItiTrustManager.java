@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -46,8 +47,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public final class ItiTrustManager extends X509ExtendedTrustManager {
 
-    // A allowlist do AIA já restringe a origem; o teto limita o crescimento sob MITM repetido.
+    // O pool é só cache sem confiança: cheio, é esvaziado em vez de recusar novos certificados. Assim,
+    // um MITM que o encha de intermediárias inúteis custa uma busca AIA extra, não um bloqueio duradouro.
     private static final int MAX_POOL = 64;
+    private static final int MAX_LOG_URL = 200;
+    private static final int MAX_LOG_MOTIVO = 500;
+    private static final Pattern CONTROLE = Pattern.compile("[\\p{Cc}\\u2028\\u2029]");
 
     private final List<X509Certificate> anchors;
     private final Set<TrustAnchor> trustAnchors;
@@ -160,18 +165,34 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
         }
     }
 
+    // URLs e mensagem podem vir do certificado de um MITM: sem isso, CR/LF forjariam linhas no log.
     private static void registrarRecusa(X509Certificate leaf, CertificateException motivo) {
+        List<String> urls = CertificateParser.getCaIssuersUrls(leaf).stream()
+                .map(url -> sanitizarParaLog(url, MAX_LOG_URL))
+                .toList();
         log.warn("TLS do ITI recusado; CA Issuers da folha {}: {}",
-                CertificateParser.getCaIssuersUrls(leaf), motivo.getMessage());
+                urls, sanitizarParaLog(motivo.getMessage(), MAX_LOG_MOTIVO));
     }
 
-    /** @return {@code false} se a busca AIA não trouxe nenhuma intermediária */
+    /** Troca controles C0/C1 (inclusive CR/LF e NEL) e separadores de linha Unicode por {@code ?} e trunca. */
+    static String sanitizarParaLog(String valor, int tamanhoMaximo) {
+        if (valor == null) {
+            return "null";
+        }
+        String limpo = CONTROLE.matcher(valor).replaceAll("?");
+        return limpo.length() <= tamanhoMaximo ? limpo : limpo.substring(0, tamanhoMaximo) + "...";
+    }
+
+    /** @return {@code false} se a busca AIA falhou ou não trouxe nenhuma intermediária */
     private boolean buscarIntermediarias(X509Certificate leaf) {
         List<X509Certificate> cadeia;
         try {
             cadeia = resolver.resolveChain(leaf);
         } catch (IncompleteChainException e) {
             cadeia = e.getPartialChain();
+        } catch (RuntimeException e) {
+            // Falha inesperada vira recusa comum: o handshake falha com CertificateException e a recusa é registrada.
+            return false;
         }
         if (cadeia.size() <= 1) {
             return false;
@@ -180,18 +201,19 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
         return true;
     }
 
-    /** Descarta os vencidos e, com o pool cheio, recusa novos certificados (falha fechada). */
+    /**
+     * Descarta os vencidos; se os novos não couberem, esvazia o pool antes de inseri-los, para que a
+     * cadeia recém-buscada entre inteira. Acima do teto, ficam os mais próximos da folha.
+     */
     private synchronized void adicionarAoPool(List<X509Certificate> intermediarias) {
         Instant agora = clock.instant();
         pool.removeIf(c -> c.getNotAfter().toInstant().isBefore(agora));
-        for (X509Certificate intermediaria : intermediarias) {
-            if (pool.size() >= MAX_POOL) {
-                log.warn("Pool de intermediárias do TLS do ITI cheio ({}); ignorando {}",
-                        MAX_POOL, intermediaria.getSubjectX500Principal());
-                return;
-            }
-            pool.add(intermediaria);
+        List<X509Certificate> novas = intermediarias.stream().filter(c -> !pool.contains(c)).toList();
+        if (pool.size() + novas.size() > MAX_POOL) {
+            log.warn("Pool de intermediárias do TLS do ITI cheio ({}); esvaziado", MAX_POOL);
+            pool.clear();
         }
+        pool.addAll(novas.subList(0, Math.min(novas.size(), MAX_POOL)));
     }
 
     int tamanhoDoPool() {
