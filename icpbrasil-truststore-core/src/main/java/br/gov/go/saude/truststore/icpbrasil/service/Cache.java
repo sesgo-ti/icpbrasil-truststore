@@ -81,7 +81,7 @@ public class Cache {
      * o menor fingerprint SHA-256, só para que a escolha não dependa da ordem recebida.
      */
     static final Comparator<X509Certificate> PREFERENCE =
-            Comparator.comparing((X509Certificate certificate) -> !CertificateParser.isSelfSigned(certificate))
+            Comparator.comparing((X509Certificate certificate) -> !CertificateParser.isSelfSignedRoot(certificate))
                     .thenComparing(X509Certificate::getNotAfter, Comparator.reverseOrder())
                     .thenComparing(CertificateParser::getFingerprintSha256);
 
@@ -275,9 +275,9 @@ public class Cache {
     }
 
     /**
-     * Retorna os certificados raiz (auto-assinados) indexados por SKI.
-     * Um certificado é considerado raiz quando subject e issuer são iguais
-     * e a assinatura é verificável com a própria chave pública.
+     * Retorna os certificados raiz indexados por SKI. O critério é o de
+     * {@link CertificateParser#isSelfSignedRoot}: autoemitido, com AKI ausente ou igual ao SKI,
+     * e autoassinatura válida ou de algoritmo que a JVM não verifica.
      *
      * @return Mapa SKI → X509Certificate contendo apenas certificados raiz; vazio se não há
      *         acervo vigente
@@ -289,7 +289,7 @@ public class Cache {
             return roots;
         }
         for (Map.Entry<String, X509Certificate> entry : atual.index().entrySet()) {
-            if (CertificateParser.isSelfSigned(entry.getValue())) {
+            if (CertificateParser.isSelfSignedRoot(entry.getValue())) {
                 roots.put(entry.getKey(), entry.getValue());
             }
         }

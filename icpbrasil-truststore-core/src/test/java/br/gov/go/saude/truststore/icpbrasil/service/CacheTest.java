@@ -1,5 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
+import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
@@ -61,6 +62,15 @@ class CacheTest {
     void setUp() {
         clock = new TestClock(T0);
         cache = new Cache(clock);
+    }
+
+    @Test
+    @SneakyThrows
+    void testGetRootCertificates_RaizV7_ClassificadaComoRaiz() {
+        X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
+        cache.publish(List.of(v7), HASH_A, T0, T0.plus(TTL));
+
+        assertTrue(cache.getRootCertificates().containsValue(v7));
     }
 
     @Test

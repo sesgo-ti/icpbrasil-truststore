@@ -85,7 +85,7 @@ public class CertificateChainResolver {
         chain.add(current);
 
         for (int i = 0; i < MAX_CHAIN_DEPTH; i++) {
-            if (CertificateParser.isSelfSigned(current)) {
+            if (CertificateParser.isSelfSignedRoot(current)) {
                 return List.copyOf(chain);
             }
 
@@ -157,7 +157,7 @@ public class CertificateChainResolver {
         return candidates.stream()
                 .filter(candidate -> candidate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal()))
                 .filter(candidate -> verifySignature(certificate, candidate))
-                .min(Comparator.comparing((X509Certificate candidate) -> !CertificateParser.isSelfSigned(candidate)))
+                .min(Comparator.comparing((X509Certificate candidate) -> !CertificateParser.isSelfSignedRoot(candidate)))
                 .orElse(null);
     }
 
