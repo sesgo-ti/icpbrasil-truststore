@@ -224,6 +224,8 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
         try {
             Instant agora = clock.instant();
             PKIXBuilderParameters params = new PKIXBuilderParameters(trustAnchors, new X509CertSelector());
+            // Sem revogação: ligá-la exigiria propriedades globais da JVM e downloads fora da
+            // DownloadPolicy, e o Let's Encrypt não oferece OCSP.
             params.setRevocationEnabled(false);
             params.setDate(Date.from(agora));
             List<X509Certificate> vigentes = pool.stream()
