@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,8 +51,23 @@ class RaizesFixadasIntegrationTest {
     void testAcervoReal_TodasAsRaizesFixadas() {
         RaizesFixadas.Resultado resultado = RaizesFixadas.producao().filtrar(acervo);
 
-        AlertaIcp.registrarRaizesDescartadas(resultado.raizesDescartadas());
+        AlertaIcp.registrarRaizesDescartadas(resultado.raizesDescartadas(), acervo);
         assertTrue(resultado.raizesDescartadas().isEmpty(), resultado.raizesDescartadas().toString());
+    }
+
+    @Test
+    void testAcervoReal_TodasAsRaizesFixadasPresentes() {
+        Set<String> presentes = acervo.stream()
+                .filter(CertificateParser::isSelfSignedRoot)
+                .map(CertificateParser::getFingerprintSha256)
+                .collect(Collectors.toSet());
+        List<String> ausentes = RaizesFixadas.producao().fingerprints().stream()
+                .filter(fingerprint -> !presentes.contains(fingerprint))
+                .sorted()
+                .toList();
+
+        AlertaIcp.registrarRaizesAusentes(ausentes);
+        assertTrue(ausentes.isEmpty(), "raízes fixadas ausentes do acervo: " + ausentes);
     }
 
     @Test
