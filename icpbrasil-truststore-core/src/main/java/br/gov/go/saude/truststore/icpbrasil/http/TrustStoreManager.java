@@ -1,6 +1,5 @@
 package br.gov.go.saude.truststore.icpbrasil.http;
 
-import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
 import lombok.extern.slf4j.Slf4j;
 
@@ -9,8 +8,12 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import java.security.KeyStore;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -18,6 +21,10 @@ import java.util.List;
  * <p>
  * Constrói um SSLContext com as CAs embutidas em {@code registries/certificates/} (ex: Let's Encrypt),
  * isolando as conexões de download do truststore padrão da JVM e do contexto SSL do consumidor.
+ * <p>
+ * O alias de cada âncora é {@code sha256-<fingerprint do DER>}: certificados distintos com o mesmo
+ * CN (reemissões e cross-signs durante uma rotação) coexistem, e o carregamento independe da ordem.
+ * O alias é só um rótulo do KeyStore, não um critério de confiança.
  */
 @Slf4j
 public class TrustStoreManager {
@@ -25,6 +32,7 @@ public class TrustStoreManager {
     private final CertificateProvider certificateProvider;
 
     private SSLContext sslContext;
+    private X509TrustManager trustManager;
 
     public TrustStoreManager(CertificateProvider certificateProvider) {
         this.certificateProvider = certificateProvider;
@@ -32,12 +40,27 @@ public class TrustStoreManager {
     }
 
     private void init() {
-        X509TrustManager trustManager = buildTrustManager();
+        trustManager = buildTrustManager();
         sslContext = buildSslContext(trustManager);
     }
 
     public SSLContext getSslContext() {
         return sslContext;
+    }
+
+    /** Âncoras do TrustManager interno; certificados idênticos aparecem uma vez. */
+    public X509Certificate[] getAcceptedIssuers() {
+        return trustManager.getAcceptedIssuers();
+    }
+
+    static String aliasOf(X509Certificate certificate) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded());
+            return "sha256-" + HexFormat.of().formatHex(digest);
+        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
+            throw new CertificateAdditionException("Falha ao calcular o fingerprint do certificado: "
+                    + certificate.getSubjectX500Principal(), e);
+        }
     }
 
     private X509TrustManager buildTrustManager() {
@@ -95,7 +118,7 @@ public class TrustStoreManager {
                 addCertificateToTrustStore(trustStore, certificate);
             }
 
-            log.info("Adicionados {} certificados confiáveis ao TrustStore interno", certificates.size());
+            log.info("Adicionados {} certificados confiáveis ao TrustStore interno", trustStore.size());
 
         } catch (TrustStoreCreationException e) {
             throw e;
@@ -107,9 +130,14 @@ public class TrustStoreManager {
 
     private void addCertificateToTrustStore(KeyStore trustStore, X509Certificate certificate) {
         try {
-            String certName = extractCertName(certificate);
-            trustStore.setCertificateEntry(certName, certificate);
-            log.debug("Certificado confiável adicionado: {}", certName);
+            String alias = aliasOf(certificate);
+            if (trustStore.containsAlias(alias)) {
+                log.warn("Certificado confiável duplicado ignorado: {} ({})",
+                        certificate.getSubjectX500Principal().getName(), alias);
+                return;
+            }
+            trustStore.setCertificateEntry(alias, certificate);
+            log.debug("Certificado confiável adicionado: {} ({})", certificate.getSubjectX500Principal().getName(), alias);
 
         } catch (Exception e) {
             String subject = certificate.getSubjectX500Principal().getName();
@@ -118,29 +146,6 @@ public class TrustStoreManager {
         }
     }
 
-    private String extractCertName(X509Certificate certificate) {
-        String subjectCN = CertificateParser.getSubjectCommonName(certificate);
-
-        if (subjectCN != null && !subjectCN.isBlank()) {
-            return sanitizeCertificateName(subjectCN);
-        }
-
-        return "cert-" + certificate.getSerialNumber();
-    }
-
-    private String sanitizeCertificateName(String name) {
-        String cleanName = name.replaceAll("[^a-zA-Z0-9.-]", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("^-|-$", "")
-                .toLowerCase();
-
-        if (cleanName.length() > 50) {
-            cleanName = cleanName.substring(0, 50);
-            cleanName = cleanName.replaceAll("-$", "");
-        }
-
-        return cleanName;
-    }
 
     public static class TrustStoreCreationException extends RuntimeException {
         public TrustStoreCreationException(String message, Throwable cause) {
