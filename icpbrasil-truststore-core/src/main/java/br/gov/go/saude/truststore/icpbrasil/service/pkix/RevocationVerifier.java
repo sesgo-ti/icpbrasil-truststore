@@ -41,9 +41,11 @@ import java.util.Set;
  * conexões por conta própria: o download de CRL exige a propriedade global
  * {@code com.sun.security.enableCRLDP} e a consulta OCSP só ocorre sem resposta pré-fornecida.</p>
  *
- * <p>Uma evidência aceita pela biblioteca e rejeitada pelo JDK é tratada como
- * {@link RevocationStatus.Malformed}: a divergência é registrada e o certificado fica
- * indeterminado, nunca aprovado.</p>
+ * <p>As duas camadas consideram o certificado revogado só a partir da data de revogação, e o
+ * resultado exige que concordem: não revogado nas duas, ou revogado nas duas (com data e motivo
+ * do JDK). Uma evidência aceita pela biblioteca e rejeitada pelo JDK, ou com vereditos
+ * diferentes nas duas camadas, é tratada como {@link RevocationStatus.Malformed}: a divergência
+ * é registrada em {@code WARN} e o certificado fica indeterminado, nunca aprovado.</p>
  */
 @Slf4j
 final class RevocationVerifier {
@@ -83,16 +85,25 @@ final class RevocationVerifier {
                 return new Outcome.Undetermined(certificate, lookup.status());
             }
 
+            boolean revokedByLibrary = lookup.status() instanceof RevocationStatus.Revoked;
+            String source = sourceOf(lookup.status());
+            String serialHex = certificate.getSerialNumber().toString(16);
             switch (verifyWithJdk(certificate, issuer, lookup.evidence(), at)) {
-                case Verdict.Clear ignored -> evidence.add(lookup.evidence());
-                case Verdict.Revoked revoked -> {
+                case Verdict.Clear ignored when !revokedByLibrary -> evidence.add(lookup.evidence());
+                case Verdict.Revoked revoked when revokedByLibrary -> {
                     return new Outcome.Revoked(certificate, revoked.revokedAt(), revoked.reason(), lookup.evidence());
                 }
                 case Verdict.Rejected rejected -> {
                     log.warn("Evidência {} aceita pela biblioteca foi rejeitada pelo verificador PKIX do JDK "
-                                    + "para o certificado serial {}: {}",
-                            sourceOf(lookup.status()), certificate.getSerialNumber().toString(16), rejected.detail());
-                    return new Outcome.Undetermined(certificate, new RevocationStatus.Malformed(sourceOf(lookup.status())));
+                                    + "para o certificado serial {}: {}", source, serialHex, rejected.detail());
+                    return new Outcome.Undetermined(certificate, new RevocationStatus.Malformed(source));
+                }
+                case Verdict jdk -> {
+                    log.warn("Veredito de revogação diverge entre a biblioteca ({}) e o verificador PKIX do JDK ({}) "
+                                    + "para o certificado serial {} com evidência {}",
+                            revokedByLibrary ? "revogado" : "não revogado",
+                            jdk instanceof Verdict.Revoked ? "revogado" : "não revogado", serialHex, source);
+                    return new Outcome.Undetermined(certificate, new RevocationStatus.Malformed(source));
                 }
             }
         }

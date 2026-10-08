@@ -69,6 +69,9 @@ import java.util.Set;
  * Diferentemente do DSS, a extensão ETSI {@code valassured-ST-certs} não dispensa a verificação,
  * por não ter uso conhecido na ICP-Brasil.</p>
  *
+ * <p>Status {@code revoked} com {@code revocationTime} posterior ao instante da verificação ainda
+ * não revoga: o resultado é {@code Good}, com aviso no log (ver {@link RevocationService}).</p>
+ *
  * <p>Qualquer violação resulta em {@code Malformed}: a resposta existe, mas não serve como
  * evidência para este certificado neste instante. Respostas em cache passam pelas mesmas
  * verificações a cada uso, inclusive a do responder delegado; a entrada que deixa de passar é
@@ -329,7 +332,16 @@ public class OcspClient {
             CertificateStatus status = singleResp.getCertStatus();
             if (status == CertificateStatus.GOOD) {
                 return new ParsedResponse(new RevocationStatus.Good("OCSP", responseBytes), cacheable);
-            } else if (status instanceof RevokedStatus) {
+            } else if (status instanceof RevokedStatus revoked) {
+                Instant revokedAt = revoked.getRevocationTime().toInstant();
+                if (revokedAt.isAfter(now)) {
+                    log.warn("Resposta OCSP de {}: evidência com data de revogação futura para o certificado " +
+                                    "serial {} (revogação em {}, {} após o instante da verificação); " +
+                                    "tratada como não revogada até essa data",
+                            LogSanitizer.sanitizar(context.url(), MAX_LOG_URL), serialHex, revokedAt,
+                            Duration.between(now, revokedAt));
+                    return new ParsedResponse(new RevocationStatus.Good("OCSP", responseBytes), cacheable);
+                }
                 return new ParsedResponse(new RevocationStatus.Revoked("OCSP"), cacheable);
             } else if (status instanceof UnknownStatus) {
                 log.warn("OCSP retornou status unknown para certificado serial {} — " +

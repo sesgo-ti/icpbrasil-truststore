@@ -7,6 +7,7 @@ import br.gov.go.saude.truststore.icpbrasil.model.ValidationResult;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.IncompleteChainException;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService;
+import br.gov.go.saude.truststore.icpbrasil.support.LogCapture;
 import br.gov.go.saude.truststore.icpbrasil.support.TestChain;
 import lombok.SneakyThrows;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
@@ -254,6 +255,44 @@ class PkixCertificateValidatorTest {
                 .thenReturn(crlGood(outra.intermediateCrl(NOW, Map.of())));
 
         ValidationResult result = validator.validate(chain.leaf());
+
+        assertEquals(new RevocationStatus.Malformed("CRL"),
+                assertInstanceOf(ValidationResult.RevocationUndetermined.class, result).status());
+    }
+
+    @Test
+    void testValidate_BibliotecaRevokedEJdkAceita_UndeterminedMalformedComAviso() {
+        byte[] good = chain.intermediateOcsp(NOW, CertificateStatus.GOOD);
+        when(revocation.lookup(chain.leaf(), chain.intermediate()))
+                .thenReturn(new RevocationLookup(new RevocationStatus.Revoked("OCSP"),
+                        new RevocationEvidence.OcspResponse(good)));
+
+        ValidationResult result;
+        try (LogCapture warnings = LogCapture.warningsOf(RevocationVerifier.class)) {
+            result = validator.validate(chain.leaf());
+
+            assertTrue(warnings.contains("biblioteca (revogado) e o verificador PKIX do JDK (não revogado)"), warnings.messages().toString());
+            assertTrue(warnings.contains("com evidência OCSP"), warnings.messages().toString());
+        }
+
+        ValidationResult.RevocationUndetermined undetermined =
+                assertInstanceOf(ValidationResult.RevocationUndetermined.class, result);
+        assertEquals(chain.leaf(), undetermined.certificate());
+        assertEquals(new RevocationStatus.Malformed("OCSP"), undetermined.status());
+    }
+
+    @Test
+    void testValidate_BibliotecaGoodEJdkRevoked_UndeterminedMalformedComAviso() {
+        byte[] crl = chain.intermediateCrl(NOW, Map.of(chain.leaf().getSerialNumber(), NOW.minus(Duration.ofHours(2))));
+        when(revocation.lookup(chain.leaf(), chain.intermediate())).thenReturn(crlGood(crl));
+
+        ValidationResult result;
+        try (LogCapture warnings = LogCapture.warningsOf(RevocationVerifier.class)) {
+            result = validator.validate(chain.leaf());
+
+            assertTrue(warnings.contains("biblioteca (não revogado) e o verificador PKIX do JDK (revogado)"), warnings.messages().toString());
+            assertTrue(warnings.contains("com evidência CRL"), warnings.messages().toString());
+        }
 
         assertEquals(new RevocationStatus.Malformed("CRL"),
                 assertInstanceOf(ValidationResult.RevocationUndetermined.class, result).status());

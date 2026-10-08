@@ -252,6 +252,21 @@ class RevocationServiceTest {
     }
 
     @Test
+    void testLookup_DelegadoComEntradaDeDataFuturaNaCrlDaAc_AceitoEGoodPorOcsp() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+        responses.put("/intermediate.crl", chain.intermediateCrl(now, Map.of(
+                responder.certificate().getSerialNumber(), now.plus(5, ChronoUnit.MINUTES))));
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertEquals("OCSP", assertInstanceOf(RevocationStatus.Good.class, lookup.status()).source());
+        assertInstanceOf(RevocationEvidence.OcspResponse.class, lookup.evidence());
+    }
+
+    @Test
     void testLookup_DelegadoSemOcspNoCheckRevogadoNaCrlDaAc_StatusDaFolhaVemDaCrl() {
         TestChain chain = realChain();
         TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null));

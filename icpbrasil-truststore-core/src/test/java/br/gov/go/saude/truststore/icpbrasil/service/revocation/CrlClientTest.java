@@ -7,6 +7,8 @@ import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
+import br.gov.go.saude.truststore.icpbrasil.support.LogCapture;
+import br.gov.go.saude.truststore.icpbrasil.support.TestClock;
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -44,6 +46,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -226,6 +229,56 @@ class CrlClientTest {
         RevocationEvidence.Crl evidence = assertInstanceOf(RevocationEvidence.Crl.class, lookup.evidence());
         assertArrayEquals(crl, evidence.crl().getEncoded());
         assertSame(evidence.crl(), cachedCrl(), "a evidência é a mesma instância guardada no cache");
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookup_EntradaComDataFutura_GoodComEvidenciaEAviso() {
+        byte[] crl = rootSigned(crlBuilder().addCRLEntry(leafCert.getSerialNumber(),
+                Date.from(now.plus(5, ChronoUnit.MINUTES)), CRLReason.keyCompromise));
+        mockHttpResponse(crl);
+
+        RevocationLookup lookup;
+        try (LogCapture warnings = LogCapture.warningsOf(CrlClient.class)) {
+            lookup = client.lookup(leafCert, rootCert, CRL_URL);
+
+            assertTrue(warnings.contains("evidência com data de revogação futura"), warnings.messages().toString());
+            assertTrue(warnings.contains(CRL_URL), warnings.messages().toString());
+        }
+
+        RevocationStatus.Good good = assertInstanceOf(RevocationStatus.Good.class, lookup.status());
+        assertArrayEquals(crl, good.responseDer());
+        assertArrayEquals(crl, assertInstanceOf(RevocationEvidence.Crl.class, lookup.evidence()).crl().getEncoded());
+        assertArrayEquals(crl, cachedCrl().getEncoded());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookup_EntradaNoProprioInstante_Revoked() {
+        mockHttpResponse(rootSigned(crlBuilder()
+                .addCRLEntry(leafCert.getSerialNumber(), Date.from(now), CRLReason.keyCompromise)));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, CRL_URL);
+
+        assertInstanceOf(RevocationStatus.Revoked.class, lookup.status());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookup_CrlEmCacheComDataDeRevogacaoFutura_VereditoAcompanhaORelogio() {
+        TestClock clock = new TestClock(now);
+        CrlClient comCacheReal = new CrlClient(new RevocationCache(new TrustStoreConfig()), retryPolicy,
+                new TrustStoreConfig.RevocationConfig(), mockHttpClient, downloadPolicy, clock);
+        mockHttpResponse(rootSigned(crlBuilder().addCRLEntry(leafCert.getSerialNumber(),
+                Date.from(now.plus(5, ChronoUnit.MINUTES)), CRLReason.keyCompromise)));
+
+        RevocationLookup antes = comCacheReal.lookup(leafCert, rootCert, CRL_URL);
+        clock.advance(Duration.ofMinutes(10));
+        RevocationLookup depois = comCacheReal.lookup(leafCert, rootCert, CRL_URL);
+
+        assertInstanceOf(RevocationStatus.Good.class, antes.status());
+        assertInstanceOf(RevocationStatus.Revoked.class, depois.status());
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test

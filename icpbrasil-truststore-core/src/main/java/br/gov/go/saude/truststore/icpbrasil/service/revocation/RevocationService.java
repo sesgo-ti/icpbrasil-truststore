@@ -26,6 +26,11 @@ import java.util.Map;
  * {@code id-pkix-ocsp-nocheck}: só a LCR da AC emissora do responder é consultada, evidência
  * independente da resposta em análise e que não dispara nova verificação de responder.</p>
  *
+ * <p>O certificado é revogado a partir da data de revogação declarada na evidência, como no JDK e
+ * no DSS: {@code Revoked} só quando essa data é igual ou anterior ao instante da consulta; com
+ * data posterior o resultado é {@code Good}, com aviso no log. O cache guarda a evidência, e não
+ * o veredito, de modo que o resultado muda quando a data chega.</p>
+ *
  * <p>Nota: o HttpClient dos clients OCSP/CRL usa o trust store da JVM: as URLs de OCSP/CRL do
  * acervo são {@code http://}; a integridade vem da assinatura da resposta.</p>
  */

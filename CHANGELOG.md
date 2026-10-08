@@ -29,6 +29,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - Workflow de release em jobs separados: verificação sem secrets e publicação no environment protegido `release`; actions fixadas por SHA; recuperação da GitHub Release sem republicar no Central (#21, #14).
 - Spring Boot 3.5.16, BouncyCastle 1.86, AWS SDK 2.55.8, commons-codec 1.22.1 e commons-compress 1.28.0 (#17).
 - Manuais: procedimento suportado de gestão das âncoras TLS e de disponibilização do serviço; o rascunho do HubSaúde foi removido (#12).
+- **Incompatível:** revogação: o certificado passa a ser revogado só a partir da data de revogação, como no JDK e no DSS. Resposta OCSP `revoked` ou entrada de CRL com data posterior ao instante da consulta resulta em `Good` (com a evidência) e um aviso no log, e não mais em `Revoked`; muda o resultado para quem usa o `RevocationService` diretamente. A evidência continua em cache e o veredito muda sozinho quando a data chega. No `PkixCertificateValidator`, vereditos diferentes entre a biblioteca e o verificador do JDK resultam em `RevocationUndetermined` com `Malformed` e aviso no log.
 
 ### Corrigido
 
