@@ -7,6 +7,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
+import br.gov.go.saude.truststore.icpbrasil.support.LogCapture;
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.DERNull;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
@@ -48,9 +49,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -367,7 +370,7 @@ class OcspClientTest {
 
     @Test
     @SneakyThrows
-    void testCheckDelegadoValidoRetornaGood() {
+    void testCheckDelegadoSemOcspNoCheckSemVerificacaoDoRespondedorRetornaMalformed() {
         KeyPair delegadoKeyPair = kpg.generateKeyPair();
         X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
                 now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
@@ -376,7 +379,8 @@ class OcspClientTest {
 
         RevocationStatus status = client.check(leafCert, rootCert, OCSP_URL);
 
-        assertInstanceOf(RevocationStatus.Good.class, status);
+        assertInstanceOf(RevocationStatus.Malformed.class, status);
+        verify(cache, never()).putOcsp(anyString(), any());
     }
 
     @Test
@@ -384,7 +388,7 @@ class OcspClientTest {
     void testCheckDelegadoIdentificadoByKeyRetornaGood() {
         KeyPair delegadoKeyPair = kpg.generateKeyPair();
         X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
-                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning(), ocspNoCheck());
         mockHttpResponse(ocspResponse(byKey(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
                 single(leafCertId(), CertificateStatus.GOOD)));
 
@@ -560,6 +564,192 @@ class OcspClientTest {
         assertNotEquals(chaves.getAllValues().get(0), chaves.getAllValues().get(1));
     }
 
+    // --- Revogação do responder delegado ---
+
+    @Test
+    @SneakyThrows
+    void testLookupDelegadoComOcspNoCheckNaoVerificaRevogacaoDoRespondedor() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning(), ocspNoCheck());
+        mockHttpResponse(ocspResponse(byName(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
+                single(leafCertId(), CertificateStatus.GOOD)));
+        ResponderRevocationCheck responderCheck = mock(ResponderRevocationCheck.class);
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL, responderCheck);
+
+        assertInstanceOf(RevocationStatus.Good.class, lookup.status());
+        verifyNoInteractions(responderCheck);
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupDelegadoSemOcspNoCheckNaoRevogadoRetornaGood() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        byte[] resposta = ocspResponse(byName(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
+                single(leafCertId(), CertificateStatus.GOOD));
+        mockHttpResponse(resposta);
+        ResponderRevocationCheck responderCheck = mock(ResponderRevocationCheck.class);
+        when(responderCheck.check(delegado, rootCert)).thenReturn(new RevocationStatus.Good("CRL", new byte[0]));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL, responderCheck);
+
+        assertInstanceOf(RevocationStatus.Good.class, lookup.status());
+        verify(responderCheck).check(delegado, rootCert);
+        verify(cache).putOcsp(anyString(), eq(resposta));
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupDelegadoSemOcspNoCheckRevogadoRetornaMalformed() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        mockHttpResponse(ocspResponse(byName(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
+                single(leafCertId(), CertificateStatus.GOOD)));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL,
+                (responder, issuer) -> new RevocationStatus.Revoked("CRL"));
+
+        assertInstanceOf(RevocationStatus.Malformed.class, lookup.status());
+        assertNull(lookup.evidence());
+        verify(cache, never()).putOcsp(anyString(), any());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupDelegadoSemOcspNoCheckSemConclusaoRetornaMalformed() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        mockHttpResponse(ocspResponse(byName(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
+                single(leafCertId(), CertificateStatus.GOOD)));
+
+        RevocationLookup indisponivel = client.lookup(leafCert, rootCert, OCSP_URL,
+                (responder, issuer) -> new RevocationStatus.CrlUnavailable());
+        RevocationLookup semPontoDeDistribuicao = client.lookup(leafCert, rootCert, OCSP_URL,
+                (responder, issuer) -> new RevocationStatus.NoDistributionPoints());
+
+        assertInstanceOf(RevocationStatus.Malformed.class, indisponivel.status());
+        assertInstanceOf(RevocationStatus.Malformed.class, semPontoDeDistribuicao.status());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookup_VerificacaoDoRespondedorDevolveNull_MalformedComMotivoNoLog() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        mockHttpResponse(ocspResponse(byName(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
+                single(leafCertId(), CertificateStatus.GOOD)));
+
+        RevocationLookup lookup;
+        try (LogCapture warnings = LogCapture.warningsOf(OcspClient.class)) {
+            lookup = client.lookup(leafCert, rootCert, OCSP_URL, (responder, issuer) -> null);
+
+            assertTrue(warnings.contains("verificação de revogação devolveu null"), warnings.messages().toString());
+            assertFalse(warnings.contains("Falha ao processar resposta OCSP"), warnings.messages().toString());
+        }
+
+        assertInstanceOf(RevocationStatus.Malformed.class, lookup.status());
+        assertNull(lookup.evidence());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupAssinadaPelaCaNaoVerificaRevogacaoDoRespondedor() {
+        mockHttpResponse(issuerSigned(single(leafCertId(), CertificateStatus.GOOD)));
+        ResponderRevocationCheck responderCheck = mock(ResponderRevocationCheck.class);
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL, responderCheck);
+
+        assertInstanceOf(RevocationStatus.Good.class, lookup.status());
+        verifyNoInteractions(responderCheck);
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupHitDeCacheComRespondedorRevogadoDepoisRetornaMalformed() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        byte[] resposta = ocspResponse(byName(delegado), delegadoKeyPair, new X509Certificate[]{delegado}, now,
+                single(leafCertId(), CertificateStatus.GOOD));
+        when(cache.getOcsp(anyString())).thenReturn(Optional.of(resposta));
+        mockHttpResponse(resposta);
+        ResponderRevocationCheck responderCheck = mock(ResponderRevocationCheck.class);
+        when(responderCheck.check(delegado, rootCert))
+                .thenReturn(new RevocationStatus.Good("CRL", new byte[0]))
+                .thenReturn(new RevocationStatus.Revoked("CRL"));
+
+        RevocationLookup antes = client.lookup(leafCert, rootCert, OCSP_URL, responderCheck);
+        RevocationLookup depois = client.lookup(leafCert, rootCert, OCSP_URL, responderCheck);
+
+        assertInstanceOf(RevocationStatus.Good.class, antes.status());
+        assertInstanceOf(RevocationStatus.Malformed.class, depois.status());
+        verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupDoisCertificadosDoDelegadoComMesmaChaveUmRevogadoRetornaGood() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate revogado = generateResponderCert(BigInteger.valueOf(21), delegadoKeyPair, rootKeyPair,
+                rootCert, now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        X509Certificate renovado = generateResponderCert(BigInteger.valueOf(22), delegadoKeyPair, rootKeyPair,
+                rootCert, now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        mockHttpResponse(ocspResponse(byName(revogado), delegadoKeyPair, new X509Certificate[]{revogado, renovado},
+                now, single(leafCertId(), CertificateStatus.GOOD)));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL,
+                (responder, issuer) -> responder.equals(revogado)
+                        ? new RevocationStatus.Revoked("CRL")
+                        : new RevocationStatus.Good("CRL", new byte[0]));
+
+        assertInstanceOf(RevocationStatus.Good.class, lookup.status());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupAssinanteAlemDoLimiteDeCandidatosRetornaMalformed() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate delegado = generateResponderCert(delegadoKeyPair, rootKeyPair, rootCert,
+                now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning(), ocspNoCheck());
+        X509Certificate[] certificados = new X509Certificate[11];
+        Arrays.fill(certificados, leafCert);
+        certificados[10] = delegado;
+        mockHttpResponse(ocspResponse(byName(delegado), delegadoKeyPair, certificados, now,
+                single(leafCertId(), CertificateStatus.GOOD)));
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL, null);
+
+        assertInstanceOf(RevocationStatus.Malformed.class, lookup.status());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLookupVerificaRevogacaoDeNoMaximoDoisDelegados() {
+        KeyPair delegadoKeyPair = kpg.generateKeyPair();
+        X509Certificate[] delegados = new X509Certificate[3];
+        for (int i = 0; i < delegados.length; i++) {
+            delegados[i] = generateResponderCert(BigInteger.valueOf(30 + i), delegadoKeyPair, rootKeyPair, rootCert,
+                    now.minus(1, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), ekuOcspSigning());
+        }
+        mockHttpResponse(ocspResponse(byName(delegados[0]), delegadoKeyPair, delegados, now,
+                single(leafCertId(), CertificateStatus.GOOD)));
+        AtomicInteger verificacoes = new AtomicInteger();
+
+        RevocationLookup lookup = client.lookup(leafCert, rootCert, OCSP_URL, (responder, issuer) -> {
+            verificacoes.incrementAndGet();
+            return new RevocationStatus.Revoked("CRL");
+        });
+
+        assertInstanceOf(RevocationStatus.Malformed.class, lookup.status());
+        assertEquals(2, verificacoes.get());
+    }
+
     // --- Helpers: certificados ---
 
     /**
@@ -567,13 +757,20 @@ class OcspClientTest {
      * explícito e as extensões adicionais informadas (ver {@link #ekuOcspSigning()} e
      * {@link #ocspNoCheck()}).
      */
-    @SneakyThrows
     private X509Certificate generateResponderCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
+                                                  X509Certificate issuerCert, Instant notBefore,
+                                                  Instant notAfter, Extension... extensoes) {
+        return generateResponderCert(BigInteger.valueOf(20), subjectKeyPair, issuerKeyPair, issuerCert,
+                notBefore, notAfter, extensoes);
+    }
+
+    @SneakyThrows
+    private X509Certificate generateResponderCert(BigInteger serial, KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                                   X509Certificate issuerCert, Instant notBefore,
                                                   Instant notAfter, Extension... extensoes) {
         X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
         X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
-                issuerName, BigInteger.valueOf(20), Date.from(notBefore), Date.from(notAfter),
+                issuerName, serial, Date.from(notBefore), Date.from(notAfter),
                 RESPONDER_NAME, subjectKeyPair.getPublic());
         builder.addExtension(Extension.basicConstraints, false, new BasicConstraints(false));
         addSki(builder, subjectKeyPair);

@@ -137,6 +137,61 @@ class PkixCertificateValidatorHttpTest {
     }
 
     @Test
+    void testValidate_DelegadoSemOcspNoCheckNaoRevogado_ValidPorOcspComUmaConsultaACrl() {
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(base + "/intermediate.crl", null));
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, NOW, CertificateStatus.GOOD));
+        responses.put("/intermediate.crl", chain.intermediateCrl(NOW, Map.of()));
+        responses.put("/root-ocsp", chain.rootOcsp(NOW, CertificateStatus.GOOD));
+
+        ValidationResult result = validator.validate(chain.leaf());
+
+        ValidationResult.Valid valid = assertInstanceOf(ValidationResult.Valid.class, result);
+        assertTrue(valid.evidence().stream().allMatch(e -> e instanceof RevocationEvidence.OcspResponse));
+        assertEquals(Map.of("/intermediate-ocsp", 1, "/root-ocsp", 1, "/intermediate.crl", 1), counts());
+    }
+
+    @Test
+    void testValidate_DelegadoComOcspNoCheck_ValidSemConsultarCrl() {
+        TestChain.Responder responder = chain.delegatedResponder(
+                new TestChain.Endpoints(base + "/intermediate.crl", null), TestChain.ocspNoCheck());
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, NOW, CertificateStatus.GOOD));
+        responses.put("/root-ocsp", chain.rootOcsp(NOW, CertificateStatus.GOOD));
+
+        ValidationResult result = validator.validate(chain.leaf());
+
+        assertInstanceOf(ValidationResult.Valid.class, result);
+        assertEquals(Map.of("/intermediate-ocsp", 1, "/root-ocsp", 1), counts());
+    }
+
+    @Test
+    void testValidate_DelegadoRevogadoEFolhaRevogadaNaCrl_Revoked() {
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(base + "/intermediate.crl", null));
+        // Chave do responder vazada: ele atesta "good" para uma folha que a AC já revogou
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, NOW, CertificateStatus.GOOD));
+        responses.put("/intermediate.crl", chain.intermediateCrl(NOW, Map.of(
+                responder.certificate().getSerialNumber(), NOW.minusSeconds(3600),
+                chain.leaf().getSerialNumber(), NOW.minusSeconds(3600))));
+
+        ValidationResult result = validator.validate(chain.leaf());
+
+        assertEquals(chain.leaf(), assertInstanceOf(ValidationResult.Revoked.class, result).certificate());
+    }
+
+    @Test
+    void testValidate_DelegadoSemOcspNoCheckCrlIndisponivel_RevocationUndetermined() {
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(base + "/intermediate.crl", null));
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, NOW, CertificateStatus.GOOD));
+        statuses.put("/intermediate.crl", 500);
+
+        ValidationResult result = validator.validate(chain.leaf());
+
+        ValidationResult.RevocationUndetermined undetermined =
+                assertInstanceOf(ValidationResult.RevocationUndetermined.class, result);
+        assertEquals(chain.leaf(), undetermined.certificate());
+        assertEquals(1, requests.get("/intermediate.crl").get());
+    }
+
+    @Test
     void testValidate_FolhaRevogadaNaCrl_RevokedSemConsultarAIntermediaria() {
         statuses.put("/intermediate-ocsp", 500);
         responses.put("/intermediate.crl",

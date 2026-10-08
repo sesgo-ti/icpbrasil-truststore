@@ -1,0 +1,4 @@
+<configuration>
+  <!-- Silencioso por padrão; support.LogCapture liga só o logger que o teste observa. -->
+  <root level="OFF"/>
+</configuration>
