@@ -5,6 +5,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
+import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
@@ -28,16 +29,12 @@ import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
 
 import java.math.BigInteger;
 import java.net.http.HttpClient;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
-import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -70,7 +67,6 @@ public class OcspClient {
     private static final Provider BOUNCY_CASTLE = new BouncyCastleProvider();
     private static final String OCSP_REQUEST_CONTENT_TYPE = "application/ocsp-request";
     private static final String OCSP_RESPONSE_CONTENT_TYPE = "application/ocsp-response";
-    private static final String CACHE_KEY_DIGEST = "SHA-256";
 
     /** Tolerância para diferença de relógio entre este host e o responder; ver {@link ClockSkew}. */
     private static final Duration MAX_CLOCK_SKEW = ClockSkew.MAX_CLOCK_SKEW;
@@ -206,12 +202,7 @@ public class OcspClient {
      * CAs distintas podem ter o mesmo nome e emitir seriais coincidentes.
      */
     private String buildCacheKey(X509Certificate cert, X509Certificate issuer) {
-        try {
-            byte[] issuerDigest = MessageDigest.getInstance(CACHE_KEY_DIGEST).digest(issuer.getEncoded());
-            return HexFormat.of().formatHex(issuerDigest) + "|" + cert.getSerialNumber().toString(16);
-        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Falha ao derivar a chave de cache OCSP do emissor", e);
-        }
+        return CertificateParser.getFingerprintSha256(issuer) + "|" + cert.getSerialNumber().toString(16);
     }
 
     private byte[] sendRequest(X509Certificate cert, X509Certificate issuer,
