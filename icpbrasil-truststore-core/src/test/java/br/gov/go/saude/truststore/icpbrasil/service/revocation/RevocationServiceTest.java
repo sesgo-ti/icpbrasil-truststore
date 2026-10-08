@@ -1,13 +1,19 @@
 package br.gov.go.saude.truststore.icpbrasil.service.revocation;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
+import br.gov.go.saude.truststore.icpbrasil.support.TestChain;
+import com.sun.net.httpserver.HttpServer;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.asn1.DERNull;
+import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AccessDescription;
 import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
@@ -17,21 +23,34 @@ import org.bouncycastle.asn1.x509.DistributionPoint;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.security.auth.x500.X500Principal;
+import java.io.OutputStream;
 import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +71,12 @@ class RevocationServiceTest {
     private X509Certificate leafCert;
     private X509Certificate issuerCert;
 
+    /** Servidor local dos testes com clientes reais; iniciado sob demanda por {@link #realChain}. */
+    private HttpServer server;
+    private final Map<String, byte[]> responses = new ConcurrentHashMap<>();
+    private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
+    private final Map<String, Integer> requests = new ConcurrentHashMap<>();
+
     @SneakyThrows
     @BeforeEach
     void setUp() {
@@ -68,6 +93,13 @@ class RevocationServiceTest {
         leafCert = TestCertificateFactory.generateIcpBrasilPersonCert(leafKeyPair, caKeyPair, issuerCert);
     }
 
+    @AfterEach
+    void tearDown() {
+        if (server != null) {
+            server.stop(0);
+        }
+    }
+
     @Test
     void testCheck_ComCrlRetornandoGood_DeveRetornarGood() {
         // Given - OCSP retorna inconclusivo; CRL retorna Good
@@ -76,7 +108,7 @@ class RevocationServiceTest {
 
         List<String> ocspUrls = CertificateParser.getOcspUrls(leafCert);
         for (String url : ocspUrls) {
-            when(ocspClient.lookup(leafCert, issuerCert, url))
+            when(ocspClient.lookup(eq(leafCert), eq(issuerCert), eq(url), any()))
                     .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.OcspUnavailable()));
         }
         when(crlClient.lookup(leafCert, issuerCert, crlUrls.get(0)))
@@ -94,7 +126,7 @@ class RevocationServiceTest {
     @Test
     void testCheck_OcspMalformedECrlGood_DeveRetornarGood() {
         X509Certificate cert = generateCertComOcspECrl();
-        when(ocspClient.lookup(cert, issuerCert, OCSP_URL))
+        when(ocspClient.lookup(eq(cert), eq(issuerCert), eq(OCSP_URL), any()))
                 .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.Malformed("OCSP")));
         when(crlClient.lookup(cert, issuerCert, CRL_URL)).thenReturn(crlGood());
 
@@ -107,7 +139,7 @@ class RevocationServiceTest {
     @Test
     void testCheck_TudoInconclusivoComNoConnectivity_DeveRetornarNoConnectivity() {
         X509Certificate cert = generateCertComOcspECrl();
-        when(ocspClient.lookup(cert, issuerCert, OCSP_URL))
+        when(ocspClient.lookup(eq(cert), eq(issuerCert), eq(OCSP_URL), any()))
                 .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.NoConnectivity()));
         when(crlClient.lookup(cert, issuerCert, CRL_URL))
                 .thenReturn(RevocationLookup.inconclusive(new RevocationStatus.Malformed("CRL")));
@@ -186,6 +218,148 @@ class RevocationServiceTest {
         assertEquals(3, config.getRetryIntervalSeconds());
         assertEquals(3600, config.getOcspCacheTtlSeconds());
         assertEquals(3600, config.getCrlCacheTtlSeconds());
+    }
+
+    // --- Responder OCSP delegado, com OcspClient e CrlClient reais ---
+
+    @Test
+    @SneakyThrows
+    void testLookup_DelegadoComOcspNoCheck_GoodPorOcspSemConsultarCrl() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null),
+                new Extension(OCSPObjectIdentifiers.id_pkix_ocsp_nocheck, false, DERNull.INSTANCE.getEncoded()));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertEquals("OCSP", assertInstanceOf(RevocationStatus.Good.class, lookup.status()).source());
+        assertEquals(Map.of("/intermediate-ocsp", 1), requests);
+    }
+
+    @Test
+    void testLookup_DelegadoSemOcspNoCheckNaoRevogadoNaCrlDaAc_GoodPorOcsp() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+        responses.put("/intermediate.crl", chain.intermediateCrl(now, Map.of()));
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertEquals("OCSP", assertInstanceOf(RevocationStatus.Good.class, lookup.status()).source());
+        assertInstanceOf(RevocationEvidence.OcspResponse.class, lookup.evidence());
+    }
+
+    @Test
+    void testLookup_DelegadoSemOcspNoCheckRevogadoNaCrlDaAc_StatusDaFolhaVemDaCrl() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        // Chave do responder vazada: ele atesta "good" para uma folha que a AC já revogou
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+        responses.put("/intermediate.crl", chain.intermediateCrl(now, Map.of(
+                responder.certificate().getSerialNumber(), now.minus(1, ChronoUnit.HOURS),
+                chain.leaf().getSerialNumber(), now.minus(1, ChronoUnit.HOURS))));
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertEquals("CRL", assertInstanceOf(RevocationStatus.Revoked.class, lookup.status()).source());
+        assertInstanceOf(RevocationEvidence.Crl.class, lookup.evidence());
+    }
+
+    @Test
+    void testLookup_DelegadoSemOcspNoCheckRevogadoEFolhaNaoRevogada_GoodPorCrl() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+        responses.put("/intermediate.crl", chain.intermediateCrl(now, Map.of(
+                responder.certificate().getSerialNumber(), now.minus(1, ChronoUnit.HOURS))));
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertEquals("CRL", assertInstanceOf(RevocationStatus.Good.class, lookup.status()).source());
+    }
+
+    @Test
+    void testLookup_DelegadoSemOcspNoCheckCrlDaAcIndisponivel_Inconclusivo() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(new TestChain.Endpoints(url("/intermediate.crl"), null));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+        statuses.put("/intermediate.crl", 500);
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertInstanceOf(RevocationStatus.CrlUnavailable.class, lookup.status());
+        // A mesma LCR serve ao responder e ao fallback da folha: uma falha não se repete na consulta
+        assertEquals(1, requests.get("/intermediate.crl"));
+    }
+
+    @Test
+    void testLookup_DelegadoSemOcspNoCheckESemCrlDp_Inconclusivo() {
+        TestChain chain = realChain();
+        TestChain.Responder responder = chain.delegatedResponder(TestChain.Endpoints.none());
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.delegatedOcsp(responder, now, CertificateStatus.GOOD));
+        statuses.put("/intermediate.crl", 500);
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertInstanceOf(RevocationStatus.CrlUnavailable.class, lookup.status());
+    }
+
+    @Test
+    void testLookup_RespostaAssinadaPelaAc_GoodPorOcspSemConsultarCrl() {
+        TestChain chain = realChain();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        responses.put("/intermediate-ocsp", chain.intermediateOcsp(now, CertificateStatus.GOOD));
+
+        RevocationLookup lookup = realService(now).lookup(chain.leaf(), chain.intermediate());
+
+        assertEquals("OCSP", assertInstanceOf(RevocationStatus.Good.class, lookup.status()).source());
+        assertEquals(Map.of("/intermediate-ocsp", 1), requests);
+    }
+
+    /** Cadeia cujos endpoints de revogação apontam para o servidor local. */
+    @SneakyThrows
+    private TestChain realChain() {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            requests.merge(path, 1, Integer::sum);
+            exchange.getRequestBody().readAllBytes();
+            byte[] body = responses.getOrDefault(path, new byte[0]);
+            exchange.sendResponseHeaders(statuses.getOrDefault(path, 200), body.length == 0 ? -1 : body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        return TestChain.create(new TestChain.Endpoints(url("/root.crl"), url("/root-ocsp")),
+                new TestChain.Endpoints(url("/intermediate.crl"), url("/intermediate-ocsp")));
+    }
+
+    private String url(String path) {
+        return "http://127.0.0.1:" + server.getAddress().getPort() + path;
+    }
+
+    /** Serviço com clientes reais e relógio fixo; a política de download libera o loopback do teste. */
+    private static RevocationService realService(Instant now) {
+        DownloadPolicy policy = mock(DownloadPolicy.class);
+        when(policy.getMaxOcspResponseBytes()).thenReturn(1_048_576L);
+        when(policy.getMaxCrlResponseBytes()).thenReturn(52_428_800L);
+        HttpClient httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+        TrustStoreConfig config = new TrustStoreConfig();
+        config.getRevocation().setMaxRetries(0);
+        config.getRevocation().setRetryIntervalSeconds(0);
+        RetryPolicy retryPolicy = new RetryPolicy(config);
+        RevocationCache cache = new RevocationCache(config);
+        Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+        return new RevocationService(
+                new OcspClient(cache, retryPolicy, config.getRevocation(), httpClient, policy, clock),
+                new CrlClient(cache, retryPolicy, config.getRevocation(), httpClient, policy, clock));
     }
 
     /** Good por CRL com uma evidência qualquer: o serviço só repassa o que o cliente devolveu. */

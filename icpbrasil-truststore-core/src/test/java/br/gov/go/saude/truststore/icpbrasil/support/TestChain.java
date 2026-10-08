@@ -1,6 +1,8 @@
 package br.gov.go.saude.truststore.icpbrasil.support;
 
 import lombok.SneakyThrows;
+import org.bouncycastle.asn1.DERNull;
+import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AccessDescription;
 import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
@@ -9,8 +11,10 @@ import org.bouncycastle.asn1.x509.CRLDistPoint;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.DistributionPoint;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
@@ -58,6 +62,9 @@ public record TestChain(KeyPair rootKeyPair, X509Certificate root,
             return new Endpoints(null, null);
         }
     }
+
+    /** Responder OCSP delegado: certificado e par de chaves que assina as respostas. */
+    public record Responder(KeyPair keyPair, X509Certificate certificate) {}
 
     public static final String ROOT_CRL_URL = "http://crl.root.example/root.crl";
     public static final String ROOT_OCSP_URL = "http://ocsp.root.example/";
@@ -112,6 +119,34 @@ public record TestChain(KeyPair rootKeyPair, X509Certificate root,
         return sign(builder, intermediateKeyPair);
     }
 
+    /**
+     * Responder OCSP delegado pela intermediária (EKU {@code id-kp-OCSPSigning}), com os
+     * endpoints e as extensões adicionais informados.
+     */
+    @SneakyThrows
+    public Responder delegatedResponder(Endpoints endpoints, Extension... extra) {
+        KeyPair keyPair = KPG.generateKeyPair();
+        X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(issuerNameOf(intermediate),
+                BigInteger.valueOf(SERIALS.incrementAndGet()),
+                Date.from(Instant.now().minus(Duration.ofDays(1))), Date.from(Instant.now().plus(Duration.ofDays(30))),
+                new X500Name("CN=Test OCSP Responder, O=Test, C=BR"), keyPair.getPublic());
+        builder.addExtension(Extension.basicConstraints, false, new BasicConstraints(false));
+        builder.addExtension(Extension.extendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeId.id_kp_OCSPSigning));
+        addSki(builder, keyPair);
+        addAki(builder, intermediateKeyPair);
+        addEndpoints(builder, endpoints);
+        for (Extension extension : extra) {
+            builder.addExtension(extension);
+        }
+        return new Responder(keyPair, sign(builder, intermediateKeyPair));
+    }
+
+    /** Extensão {@code id-pkix-ocsp-nocheck}, que dispensa a verificação de revogação do responder. */
+    @SneakyThrows
+    public static Extension ocspNoCheck() {
+        return new Extension(OCSPObjectIdentifiers.id_pkix_ocsp_nocheck, false, DERNull.INSTANCE.getEncoded());
+    }
+
     /** CRL da raiz (cobre a intermediária), vigente em {@code now}, em DER. */
     public byte[] rootCrl(Instant now, Map<BigInteger, Instant> revoked) {
         return crl(rootKeyPair, root, now.minus(Duration.ofHours(1)), now.plus(Duration.ofDays(1)), revoked);
@@ -139,6 +174,12 @@ public record TestChain(KeyPair rootKeyPair, X509Certificate root,
 
     public byte[] intermediateOcsp(CertificateStatus status, Instant thisUpdate, Instant nextUpdate) {
         return ocsp(leaf, intermediate, intermediateKeyPair, intermediate, status, thisUpdate, nextUpdate);
+    }
+
+    /** Resposta OCSP sobre a folha assinada pelo responder delegado, vigente em {@code now}. */
+    public byte[] delegatedOcsp(Responder responder, Instant now, CertificateStatus status) {
+        return ocsp(leaf, intermediate, responder.keyPair(), responder.certificate(), status,
+                now.minus(Duration.ofMinutes(1)), now.plus(Duration.ofHours(1)));
     }
 
     // --- Geradores ---

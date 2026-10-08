@@ -6,6 +6,11 @@ public sealed interface RevocationStatus permits
         RevocationStatus.CrlUnavailable, RevocationStatus.NoConnectivity,
         RevocationStatus.Malformed {
 
+    /**
+     * Não revogado no instante da consulta; {@code responseDer} é a evidência (resposta OCSP ou
+     * CRL em DER). Se a resposta OCSP foi assinada por responder delegado sem
+     * {@code ocsp-nocheck}, a evidência do status desse responder não é incluída.
+     */
     record Good(String source, byte[] responseDer) implements RevocationStatus {}
     record Revoked(String source) implements RevocationStatus {}
     record NoDistributionPoints() implements RevocationStatus {}

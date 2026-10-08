@@ -9,15 +9,18 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
+import br.gov.go.saude.truststore.icpbrasil.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
+import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.ocsp.*;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -34,7 +37,9 @@ import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -55,10 +60,19 @@ import java.util.Set;
  *       {@code MAX_CLOCK_SKEW} (RFC 6960 4.2.2.1).</li>
  * </ul>
  *
+ * <p>Responder delegado sem a extensão {@code id-pkix-ocsp-nocheck} (1.3.6.1.5.5.7.48.1.5) só
+ * é aceito se uma {@link ResponderRevocationCheck} confirmar, por evidência independente da
+ * resposta, que o certificado dele não foi revogado ({@code Good}); revogado ou sem conclusão,
+ * a resposta é {@code Malformed}. Sem essa verificação ({@link #check} e
+ * {@link #lookup(X509Certificate, X509Certificate, String)}), o delegado sem {@code ocsp-nocheck}
+ * é sempre recusado; {@link RevocationService} fornece a verificação pela LCR da AC emissora.
+ * Diferentemente do DSS, a extensão ETSI {@code valassured-ST-certs} não dispensa a verificação,
+ * por não ter uso conhecido na ICP-Brasil.</p>
+ *
  * <p>Qualquer violação resulta em {@code Malformed}: a resposta existe, mas não serve como
  * evidência para este certificado neste instante. Respostas em cache passam pelas mesmas
- * verificações a cada uso; a entrada que deixa de passar é tratada como miss e substituída
- * pela próxima resposta válida do responder.</p>
+ * verificações a cada uso, inclusive a do responder delegado; a entrada que deixa de passar é
+ * tratada como miss e substituída pela próxima resposta válida do responder.</p>
  */
 @Slf4j
 public class OcspClient {
@@ -67,6 +81,16 @@ public class OcspClient {
     private static final Provider BOUNCY_CASTLE = new BouncyCastleProvider();
     private static final String OCSP_REQUEST_CONTENT_TYPE = "application/ocsp-request";
     private static final String OCSP_RESPONSE_CONTENT_TYPE = "application/ocsp-response";
+    private static final int MAX_LOG_URL = 200;
+
+    /**
+     * A resposta chega por http sem autenticação até a assinatura ser verificada, e pode trazer
+     * quantos certificados quiser; cada candidato custa verificações de assinatura e cada
+     * delegado sem {@code ocsp-nocheck} pode custar o download de uma LCR, em toda consulta e em
+     * todo acerto de cache. Os excedentes são ignorados (candidatos) ou recusados (verificações).
+     */
+    private static final int MAX_RESPONDER_CANDIDATES = 10;
+    private static final int MAX_DELEGATE_REVOCATION_CHECKS = 2;
 
     /** Tolerância para diferença de relógio entre este host e o responder; ver {@link ClockSkew}. */
     private static final Duration MAX_CLOCK_SKEW = ClockSkew.MAX_CLOCK_SKEW;
@@ -134,7 +158,8 @@ public class OcspClient {
      * @param issuer certificado do emissor
      * @param url    URL do responder OCSP
      * @return status de revogação obtido via OCSP; {@code Malformed} quando a resposta não é
-     *         evidência utilizável para este certificado neste instante
+     *         evidência utilizável para este certificado neste instante, o que inclui a resposta
+     *         de responder delegado sem {@code ocsp-nocheck}
      */
     public RevocationStatus check(X509Certificate cert, X509Certificate issuer, String url) {
         return lookup(cert, issuer, url).status();
@@ -145,17 +170,34 @@ public class OcspClient {
      * que os fundamenta ({@link RevocationEvidence.OcspResponse}).
      */
     public RevocationLookup lookup(X509Certificate cert, X509Certificate issuer, String url) {
+        return lookup(cert, issuer, url, null);
+    }
+
+    /**
+     * Como {@link #lookup(X509Certificate, X509Certificate, String)}, aceitando resposta de
+     * responder delegado sem {@code ocsp-nocheck} quando {@code responderCheck} devolve
+     * {@code Good} para o certificado dele. A verificação roda também quando a resposta vem do
+     * cache, de modo que um responder revogado depois invalida a resposta no uso seguinte. Por
+     * resposta, no máximo dois delegados são verificados; os demais são recusados.
+     *
+     * @param responderCheck verificação de revogação do responder delegado; {@code null} recusa
+     *                       todo delegado sem {@code ocsp-nocheck}
+     */
+    public RevocationLookup lookup(X509Certificate cert, X509Certificate issuer, String url,
+                                   ResponderRevocationCheck responderCheck) {
         String cacheKey = buildCacheKey(cert, issuer);
+        ResponseContext context = new ResponseContext(cert, issuer, url, responderCheck);
 
         Optional<byte[]> cached = cache.getOcsp(cacheKey);
         if (cached.isPresent()) {
-            ParsedResponse parsed = parseResponse(cached.get(), cert, issuer);
+            ParsedResponse parsed = parseResponse(cached.get(), context);
             if (parsed.status().isConclusive()) {
                 log.debug("Resposta OCSP encontrada no cache para {}", cacheKey);
                 return lookupOf(parsed.status(), cached.get());
             }
-            // Uma entrada que venceu ou cujo delegado expirou não é erro do responder; devolver
-            // Malformed aqui prenderia o resultado ao TTL do cache. O putOcsp da nova resposta a substitui.
+            // Uma entrada que venceu ou cujo delegado deixou de ser aceito (expirado, revogado ou
+            // sem verificação conclusiva) não é erro do responder; devolver Malformed aqui
+            // prenderia o resultado ao TTL do cache. O putOcsp da nova resposta a substitui.
             log.debug("Resposta OCSP em cache para {} não passou na revalidação; consultando o responder", cacheKey);
         }
 
@@ -173,7 +215,7 @@ public class OcspClient {
                     config.getRetryIntervalSeconds() * 1000L,
                     () -> sendRequest(cert, issuer, url)));
 
-            ParsedResponse parsed = parseResponse(responseBytes, cert, issuer);
+            ParsedResponse parsed = parseResponse(responseBytes, context);
             if (parsed.cacheable()) {
                 cache.putOcsp(cacheKey, responseBytes);
             }
@@ -239,8 +281,12 @@ public class OcspClient {
         }
     }
 
-    private ParsedResponse parseResponse(byte[] responseBytes, X509Certificate cert,
-                                         X509Certificate issuer) {
+    /** Certificado consultado e o que mais a interpretação de uma resposta precisa saber. */
+    private record ResponseContext(X509Certificate cert, X509Certificate issuer, String url,
+                                   ResponderRevocationCheck responderCheck) {}
+
+    private ParsedResponse parseResponse(byte[] responseBytes, ResponseContext context) {
+        X509Certificate cert = context.cert();
         String serialHex = cert.getSerialNumber().toString(16);
         try {
             OCSPResp ocspResp = new OCSPResp(responseBytes);
@@ -250,10 +296,11 @@ public class OcspClient {
                 return ParsedResponse.unavailable();
             }
             BasicOCSPResp basicResp = (BasicOCSPResp) ocspResp.getResponseObject();
-            X509CertificateHolder issuerHolder = new JcaX509CertificateHolder(issuer);
+            X509CertificateHolder issuerHolder = new JcaX509CertificateHolder(context.issuer());
             Instant now = clock.instant();
 
-            if (!isSignedByAuthorizedResponder(basicResp, issuerHolder, now)) {
+            AuthorizedSigners signers = findAuthorizedSigners(basicResp, issuerHolder, now);
+            if (signers.isEmpty()) {
                 log.warn("Resposta OCSP sem assinatura válida de responder autorizado para certificado serial {}",
                         serialHex);
                 return ParsedResponse.malformed();
@@ -269,6 +316,12 @@ public class OcspClient {
                 log.warn("Resposta OCSP fora da janela de validade para certificado serial {} " +
                                 "(producedAt={}, thisUpdate={}, nextUpdate={})",
                         serialHex, basicResp.getProducedAt(), singleResp.getThisUpdate(), singleResp.getNextUpdate());
+                return ParsedResponse.malformed();
+            }
+
+            // Por último: a verificação do delegado pode baixar uma LCR, e as checagens acima
+            // descartam sem custo as respostas que seriam recusadas de qualquer forma.
+            if (!signers.issuer() && !isAnyDelegateTrusted(signers.delegates(), context)) {
                 return ParsedResponse.malformed();
             }
 
@@ -357,28 +410,85 @@ public class OcspClient {
      * identificado pelo ResponderID, deve ser a CA emissora ou um responder delegado
      * autorizado por ela, e a assinatura deve conferir com a chave desse assinante.
      */
-    private boolean isSignedByAuthorizedResponder(BasicOCSPResp basicResp, X509CertificateHolder issuerHolder,
-                                                  Instant now) {
+    private AuthorizedSigners findAuthorizedSigners(BasicOCSPResp basicResp, X509CertificateHolder issuerHolder,
+                                                    Instant now) {
+        List<X509CertificateHolder> delegates = new ArrayList<>();
         try {
             RespID responderId = basicResp.getResponderId();
             if (identifiesSigner(responderId, issuerHolder) && isSignatureValid(basicResp, issuerHolder)) {
-                return true;
+                return new AuthorizedSigners(true, List.of());
             }
 
             X509CertificateHolder[] certs = basicResp.getCerts();
             if (certs == null) {
-                return false;
+                return new AuthorizedSigners(false, List.of());
             }
-            for (X509CertificateHolder candidate : certs) {
+            if (certs.length > MAX_RESPONDER_CANDIDATES) {
+                log.warn("Resposta OCSP com {} certificados; só os {} primeiros são examinados como assinante",
+                        certs.length, MAX_RESPONDER_CANDIDATES);
+            }
+            for (int i = 0; i < Math.min(certs.length, MAX_RESPONDER_CANDIDATES); i++) {
+                X509CertificateHolder candidate = certs[i];
                 if (identifiesSigner(responderId, candidate)
                         && isAuthorizedResponder(candidate, issuerHolder, now)
                         && isSignatureValid(basicResp, candidate)) {
-                    return true;
+                    delegates.add(candidate);
                 }
             }
         } catch (Exception e) {
             log.warn("Falha ao verificar assinatura OCSP: {}", e.getMessage());
         }
+        return new AuthorizedSigners(false, List.copyOf(delegates));
+    }
+
+    /**
+     * Assinantes autorizados cuja chave verifica a resposta: a CA emissora ou, senão, os
+     * certificados delegados. Mais de um delegado ocorre quando a CA reemite o certificado do
+     * responder com a mesma chave; basta um deles ser aceito.
+     */
+    private record AuthorizedSigners(boolean issuer, List<X509CertificateHolder> delegates) {
+
+        boolean isEmpty() {
+            return !issuer && delegates.isEmpty();
+        }
+    }
+
+    /**
+     * Delegado com {@code ocsp-nocheck} dispensa a verificação de revogação (RFC 6960
+     * 4.2.2.2.1); os demais precisam de {@code Good} da {@link ResponderRevocationCheck}.
+     */
+    private boolean isAnyDelegateTrusted(List<X509CertificateHolder> delegates, ResponseContext context)
+            throws Exception {
+        List<String> refusals = new ArrayList<>();
+        int checks = 0;
+        for (X509CertificateHolder delegate : delegates) {
+            if (delegate.getExtension(OCSPObjectIdentifiers.id_pkix_ocsp_nocheck) != null) {
+                return true;
+            }
+            String delegateSerial = delegate.getSerialNumber().toString(16);
+            if (context.responderCheck() == null) {
+                refusals.add(delegateSerial + " sem ocsp-nocheck e sem verificação de revogação disponível");
+                continue;
+            }
+            if (checks == MAX_DELEGATE_REVOCATION_CHECKS) {
+                refusals.add(delegateSerial + " além do limite de verificações de revogação por resposta");
+                continue;
+            }
+            checks++;
+            X509Certificate delegateCert = new JcaX509CertificateConverter().getCertificate(delegate);
+            RevocationStatus status = context.responderCheck().check(delegateCert, context.issuer());
+            if (status instanceof RevocationStatus.Good) {
+                return true;
+            }
+            if (status == null) {
+                refusals.add(delegateSerial + " sem status: a verificação de revogação devolveu null");
+                continue;
+            }
+            refusals.add(delegateSerial + " revogado ou sem verificação conclusiva de revogação ("
+                    + status.getClass().getSimpleName() + ")");
+        }
+        log.warn("Resposta OCSP de {} recusada: responder delegado serial {}",
+                LogSanitizer.sanitizar(context.url(), MAX_LOG_URL), String.join("; serial ", refusals));
         return false;
     }
 

@@ -43,6 +43,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ### Segurança
 
+- OCSP: resposta assinada por responder delegado sem `id-pkix-ocsp-nocheck` só é aceita se a CRL da AC emissora confirmar que o certificado do responder não foi revogado; revogado ou sem conclusão (CRL indisponível, sem ponto de distribuição), a resposta é `Malformed` e a verificação segue para a CRL do certificado consultado. A checagem vale também para respostas em cache. **Incompatível:** `OcspClient.check`/`lookup` sem `ResponderRevocationCheck` recusam todo delegado sem `ocsp-nocheck`; use `OcspClient.lookup(cert, issuer, url, ResponderRevocationCheck)` ou `RevocationService`. O `RevocationService` chama a sobrecarga com `ResponderRevocationCheck`; subclasses e dublês do `OcspClient` devem sobrescrever ou estubar essa sobrecarga.
 - Versões corrigidas de Tomcat (10.1.60), Netty (4.1.137), Jackson (2.21.7), Log4j API (2.25.5), HttpClient5 (5.6.3), HttpCore5 (5.4.3) e commons-lang3 (3.18.0) sobre o BOM do Spring Boot (#17).
 - Exceções temporárias em `osv-scanner.toml` para GHSA-j9f9-w8pj-32f8 e GHSA-pc63-qcmh-9cmg, do Spring MVC 6.2.19, sem correção na linha 6.2: o serviço REST não usa Server-Sent Events com fragments nem `XsltView`.
 

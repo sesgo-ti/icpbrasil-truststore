@@ -238,6 +238,8 @@ O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados
 | `NoConnectivity` | Verificação interrompida (thread interrupted) |
 | `Malformed` | Resposta OCSP ou CRL corrompida, com status inesperado ou evidência inválida, vencida ou não correspondente ao certificado consultado |
 
+Resposta de responder OCSP delegado sem `id-pkix-ocsp-nocheck` exige a CRL da AC emissora acessível; sem ela, a resposta é recusada e a verificação segue para a CRL do certificado consultado. Liberar só o OCSP no firewall não basta para essas ACs.
+
 Se a seção `revocation` não for definida no YAML, valores padrão são aplicados automaticamente.
 
 ### Validação de certificados (PKIX)
@@ -273,7 +275,7 @@ Somente `Valid` autoriza o uso do certificado; os demais estados são terminais 
 
 A revogação é verificada em duas camadas, certificado a certificado (da folha até o último intermediário): o `RevocationService` obtém e valida a evidência (OCSP, depois CRL) dentro da política de download, e o `PKIXRevocationChecker` do JDK a reavalia, alimentado exclusivamente com essa evidência — cada certificado é submetido como caminho de um só elemento ancorado no seu emissor, por isso a folha pode ser verificada por OCSP e a AC por CRL. O JDK não abre conexões por conta própria: o download de CRL exige a propriedade global `com.sun.security.enableCRLDP` e a consulta OCSP só ocorre sem resposta pré-fornecida. Evidência aceita pela biblioteca e rejeitada pelo JDK resulta em `RevocationUndetermined` com `Malformed`.
 
-Emissores ausentes do acervo e dos `extras` são baixados via AIA pelo `CertificateChainResolver` apenas como candidatos. Para confiar em um emissor por outros meios (ex.: hierarquia de homologação, fora do acervo), use `validate(certificado, extras, TrustMaterial.anchoredAt(List.of(emissor)))`; a revogação da própria âncora não é verificada. Não há validação histórica (LTV): as evidências em `Valid.evidence()` ficam disponíveis para quem precisar preservá-las.
+Emissores ausentes do acervo e dos `extras` são baixados via AIA pelo `CertificateChainResolver` apenas como candidatos. Para confiar em um emissor por outros meios (ex.: hierarquia de homologação, fora do acervo), use `validate(certificado, extras, TrustMaterial.anchoredAt(List.of(emissor)))`; a revogação da própria âncora não é verificada. Não há validação histórica (LTV): as evidências em `Valid.evidence()` ficam disponíveis para quem precisar preservá-las. A CRL que comprovou o status de um responder OCSP delegado sem `ocsp-nocheck` não é incluída, então a resposta OCSP desse responder, sozinha, não basta para revalidar depois.
 
 ### Montagem de cadeia (AIA CA Issuers)
 
