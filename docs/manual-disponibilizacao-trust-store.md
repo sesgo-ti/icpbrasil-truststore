@@ -8,9 +8,9 @@ Certificadoras vigentes da ICP-Brasil e o serve por SKI.
 ## Pré-requisitos
 
 - JDK 21.
-- Saída HTTPS para `acraiz.icpbrasil.gov.br` (download do acervo). Não é preciso configurar
-  truststore na JVM: esse download usa um `SSLContext` próprio, com as âncoras embutidas (veja
-  [gestão das âncoras TLS](manual-gestao-certificados-confiaveis.md)).
+- Saída HTTPS para `acraiz.icpbrasil.gov.br` (download do acervo) e HTTP para `*.i.lencr.org`
+  (AIA, intermediárias do certificado TLS do ITI). Nenhuma configuração de truststore na JVM
+  (veja [gestão das âncoras TLS](manual-gestao-certificados-confiaveis.md)).
 - Armazenamento persistente para o acervo: um diretório local ou um bucket S3-compatível
   (AWS S3, MinIO etc.) com permissão de leitura, escrita, listagem e remoção de objetos.
 

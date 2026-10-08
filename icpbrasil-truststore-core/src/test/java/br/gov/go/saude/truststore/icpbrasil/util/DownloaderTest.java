@@ -1,21 +1,17 @@
 package br.gov.go.saude.truststore.icpbrasil.util;
 
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.stream.Stream;
+import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("integration")
 class DownloaderTest {
 
-    private static final Path PRODUCTION_REGISTRY = Path.of("src/main/resources/registries/certificates");
-
     private Downloader downloader;
     private TrustStoreConfig trustStoreConfig;
 
@@ -37,25 +31,7 @@ class DownloaderTest {
     void setUp() {
         trustStoreConfig = buildTrustStoreConfig();
 
-        // Registro de produção: o teste deve falhar se ele deixar de cobrir o TLS atual do ITI
-        List<byte[]> docs;
-        try (Stream<Path> files = Files.list(PRODUCTION_REGISTRY)) {
-            docs = files.filter(file -> file.toString().endsWith(".json"))
-                    .sorted()
-                    .map(file -> {
-                        try {
-                            return Files.readAllBytes(file);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException("Erro ao ler registro: " + file, e);
-                        }
-                    })
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Erro ao listar registro: " + PRODUCTION_REGISTRY, e);
-        }
-
-        TrustedCertsProvider trustedCertsProvider = new TrustedCertsProvider(docs);
-        TrustStoreManager trustStoreManager = new TrustStoreManager(trustedCertsProvider);
+        TrustStoreManager trustStoreManager = new TrustStoreManager(TlsTrust.pinnedRoots(Clock.systemUTC()));
         RetryPolicy retryPolicy = new RetryPolicy(trustStoreConfig);
         downloader = new Downloader(
                 Downloader.transporteAcervoIti(trustStoreManager.getSslContext(), trustStoreConfig),
@@ -65,7 +41,7 @@ class DownloaderTest {
     @SneakyThrows
     @Test
     void testDownloadBytesRetornaConteudoNaoVazio() {
-        byte[] bytes = downloader.downloadBytes(trustStoreConfig.getCertificateUrl());
+        byte[] bytes = downloader.downloadBytes(IcpBrasilEndpoints.BUNDLE_ZIP_URL);
 
         assertTrue(bytes.length > 0);
         assertNotNull(bytes);
@@ -74,7 +50,7 @@ class DownloaderTest {
     @SneakyThrows
     @Test
     void testDownloadTextExtraiHash() {
-        String text = downloader.downloadText(trustStoreConfig.getHashUrl());
+        String text = downloader.downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL);
 
         assertNotNull(text);
         String[] parts = text.split("  ");
@@ -83,8 +59,6 @@ class DownloaderTest {
 
     private TrustStoreConfig buildTrustStoreConfig() {
         TrustStoreConfig config = new TrustStoreConfig();
-        config.setCertificateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip");
-        config.setHashUrl("https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt");
 
         TrustStoreConfig.NetworkConfig network = new TrustStoreConfig.NetworkConfig();
         network.setDownloadTimeoutSeconds(60);

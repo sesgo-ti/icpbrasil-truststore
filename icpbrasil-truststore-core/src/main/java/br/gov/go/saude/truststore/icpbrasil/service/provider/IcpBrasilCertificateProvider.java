@@ -1,6 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.service.provider;
 
-import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.RecoveryIcpBrasilResourceException;
@@ -49,12 +49,17 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
     private final String icpBrasilHashUrl;
     private final TrustStoreRepository trustStoreRepository;
 
-    public IcpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig, Downloader downloader,
-            TrustStoreRepository trustStoreRepository) {
+    /** Usa os endereços fixos do ITI definidos em {@link IcpBrasilEndpoints}. */
+    public IcpBrasilCertificateProvider(Downloader downloader, TrustStoreRepository trustStoreRepository) {
+        this(downloader, trustStoreRepository, IcpBrasilEndpoints.BUNDLE_ZIP_URL, IcpBrasilEndpoints.BUNDLE_HASH_URL);
+    }
+
+    IcpBrasilCertificateProvider(Downloader downloader, TrustStoreRepository trustStoreRepository,
+            String zipUrl, String hashUrl) {
         this.downloader = downloader;
-        this.icpBrasilZipUrl = trustStoreConfig.getCertificateUrl();
-        this.icpBrasilHashUrl = trustStoreConfig.getHashUrl();
         this.trustStoreRepository = trustStoreRepository;
+        this.icpBrasilZipUrl = zipUrl;
+        this.icpBrasilHashUrl = hashUrl;
     }
 
     /**

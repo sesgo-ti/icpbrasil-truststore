@@ -18,6 +18,8 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ### Alterado
 
+- **Incompatível:** removidas `icpbrasil-truststore.trusted-certs.dir`, `certificate-url` e `hash-url`. O download do acervo usa endereço fixo do ITI e confia só nas raízes ISRG X1/X2 fixadas por fingerprint; intermediárias são obtidas via AIA restrito a `i.lencr.org`, sem intermediárias embutidas. Aplicações que ainda definem essas propriedades não recebem erro: elas são ignoradas.
+- **Incompatível:** `TrustStoreManager` passa a receber `TlsTrust` em vez de `CertificateProvider`, e `IcpBrasilCertificateProvider` deixa de receber `TrustStoreConfig`; removidos `TrustedCertsProvider`, `CertificateDTO` e `TrustStoreManager.TrustStoreCreationException`. O core deixa de depender do Jackson, que não chega mais à aplicação como dependência transitiva.
 - **Incompatível:** a biblioteca deixa de registrar o BouncyCastle na JVM (`Security.addProvider`); a verificação OCSP usa uma instância própria do provider. Aplicações que dependiam desse registro precisam fazê-lo por conta própria.
 - **Incompatível:** `Downloader` passa a receber um `CertificateHttpTransport` (ver `Downloader.transporteAcervoIti`) em vez de `TrustStoreManager`; removida `TrustStoreManager.CertificateAdditionException`.
 - **Incompatível:** `icpbrasil-truststore.revocation.ocsp-cache-max-size` e `crl-cache-max-size` (entradas) foram substituídas por `ocsp-cache-max-bytes` (padrão 16 MiB) e `crl-cache-max-bytes` (padrão 256 MiB), com eviction por peso (#13).

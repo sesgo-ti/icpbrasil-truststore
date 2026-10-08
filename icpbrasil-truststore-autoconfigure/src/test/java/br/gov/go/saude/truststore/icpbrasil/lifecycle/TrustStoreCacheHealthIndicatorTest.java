@@ -1,5 +1,6 @@
 package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 
+import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
@@ -69,7 +70,7 @@ class TrustStoreCacheHealthIndicatorTest {
         clock = new TestClock(Instant.now());
         cache = new Cache(clock);
         FilesystemTrustStoreRepository repository = new FilesystemTrustStoreRepository(config);
-        IcpBrasilCertificateProvider provider = new IcpBrasilCertificateProvider(config, downloader, repository);
+        IcpBrasilCertificateProvider provider = new IcpBrasilCertificateProvider(downloader, repository);
         service = new TrustStoreService(repository, provider, config, cache, clock);
         indicator = new TrustStoreCacheHealthIndicator(config, cache);
     }
@@ -121,8 +122,8 @@ class TrustStoreCacheHealthIndicatorTest {
     @SneakyThrows
     private void publicar(Instant confirmadoEm) {
         clock.set(confirmadoEm);
-        when(downloader.downloadText(config.getHashUrl())).thenReturn(hash + "  ACcompactado.zip\n");
-        when(downloader.downloadBytes(config.getCertificateUrl())).thenReturn(zip);
+        when(downloader.downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL)).thenReturn(hash + "  ACcompactado.zip\n");
+        when(downloader.downloadBytes(IcpBrasilEndpoints.BUNDLE_ZIP_URL)).thenReturn(zip);
         service.refresh();
         assertTrue(cache.isCacheValid(), "pré-condição: snapshot publicado");
         assertEquals(confirmadoEm, cache.getState().orElseThrow().confirmedAt());

@@ -1,6 +1,9 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
 import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
+import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.ItiTlsAnchors;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreCacheHealthIndicator;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.S3Repository;
@@ -9,8 +12,6 @@ import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.CacheTrustMaterialSource;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.CertificateProvider;
-import br.gov.go.saude.truststore.icpbrasil.service.provider.TrustedCertsProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.actuate.health.HealthIndicator;
@@ -23,13 +24,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -56,8 +53,6 @@ class TrustStoreAutoConfigurationTest {
 
     /** Conjunto explícito de propriedades (storage filesystem), independente dos defaults. */
     private static final String[] PROPS_MINIMAS = {
-            "icpbrasil-truststore.certificate-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip",
-            "icpbrasil-truststore.hash-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt",
             "icpbrasil-truststore.network.download-timeout-seconds=30",
             "icpbrasil-truststore.network.max-retries=3",
             "icpbrasil-truststore.network.retry-interval-seconds=10",
@@ -69,7 +64,6 @@ class TrustStoreAutoConfigurationTest {
             "icpbrasil-truststore.storage.hash-file-path=hash.txt",
             "icpbrasil-truststore.storage.confirmation-file-path=confirmacao.txt",
             "icpbrasil-truststore.filesystem.base-dir=target/test-truststore",
-            "icpbrasil-truststore.trusted-certs.dir=classpath:registries/certificates",
             "icpbrasil-truststore.bootstrap.enabled=false",
             "icpbrasil-truststore.scheduling.enabled=false",
     };
@@ -112,11 +106,9 @@ class TrustStoreAutoConfigurationTest {
                 .run(context -> {
                     assertNull(context.getStartupFailure());
                     TrustStoreConfig config = context.getBean(TrustStoreConfig.class);
-                    assertTrue(config.getCertificateUrl().startsWith("https://acraiz.icpbrasil.gov.br/"));
                     assertEquals(2, config.getRefreshIntervalHours());
                     assertEquals(72, config.getCacheTtlCriticalHours());
                     assertEquals(168, config.getCacheTtlMaxHours());
-                    assertEquals("classpath:registries/certificates", config.getTrustedCerts().getDir());
                     assertNotNull(context.getBean(TrustStoreService.class));
                     assertInstanceOf(FilesystemTrustStoreRepository.class, context.getBean(TrustStoreRepository.class));
                     assertFalse(context.containsBean("trustStoreCacheHealthIndicator"));
@@ -188,37 +180,6 @@ class TrustStoreAutoConfigurationTest {
     }
 
     @Test
-    void testContexto_CertificateUrlVazia_FalhaComMensagemDaPropriedade() {
-        runner.withPropertyValues(substituir(PROPS_MINIMAS, "icpbrasil-truststore.certificate-url="))
-                .run(context -> {
-                    assertNotNull(context.getStartupFailure());
-                    String causa = mensagemRaiz(context.getStartupFailure());
-                    assertTrue(causa.contains("icpbrasil-truststore.certificate-url"),
-                            "Mensagem deve apontar a propriedade inválida. Recebido: " + causa);
-                });
-    }
-
-    @Test
-    void testContexto_ComCertificateUrlHttp_FalhaExigindoHttps() {
-        runner.withPropertyValues(substituir(PROPS_MINIMAS,
-                        "icpbrasil-truststore.certificate-url=http://acraiz.icpbrasil.gov.br/x.zip"))
-                .run(context -> {
-                    assertNotNull(context.getStartupFailure());
-                    assertTrue(mensagemRaiz(context.getStartupFailure()).contains("HTTPS"));
-                });
-    }
-
-    @Test
-    void testContexto_TrustedCertsDirVazio_FalhaComMensagemDaPropriedade() {
-        runner.withPropertyValues(substituir(PROPS_MINIMAS, "icpbrasil-truststore.trusted-certs.dir="))
-                .run(context -> {
-                    assertNotNull(context.getStartupFailure());
-                    assertTrue(mensagemRaiz(context.getStartupFailure())
-                            .contains("icpbrasil-truststore.trusted-certs.dir"));
-                });
-    }
-
-    @Test
     void testContexto_SemFilesystemBaseDir_FalhaComMensagemDaPropriedade() {
         runner.withPropertyValues(remover(PROPS_MINIMAS, "icpbrasil-truststore.filesystem.base-dir"))
                 .run(context -> {
@@ -236,13 +197,13 @@ class TrustStoreAutoConfigurationTest {
     }
 
     @Test
-    void testContexto_ConsumidorSobrescreveProvider_NaoDuplicaBean() {
-        runner.withUserConfiguration(ProviderCustomizado.class)
+    void testContexto_ConsumidorSobrescreveTrustStoreManager_NaoDuplicaBean() {
+        runner.withUserConfiguration(TrustStoreManagerCustomizado.class)
                 .withPropertyValues(PROPS_MINIMAS)
                 .run(context -> {
                     assertNull(context.getStartupFailure());
-                    assertSame(context.getBean(ProviderCustomizado.class).provider,
-                            context.getBean("trustedCertsProvider"));
+                    assertSame(context.getBean(TrustStoreManagerCustomizado.class).manager,
+                            context.getBean(TrustStoreManager.class));
                 });
     }
 
@@ -253,26 +214,12 @@ class TrustStoreAutoConfigurationTest {
     }
 
     @Configuration
-    static class ProviderCustomizado {
-        // Provider real com um certificado do classpath: o TrustStoreManager
-        // rejeita providers sem certificados, então um stub vazio não serve.
-        CertificateProvider provider = new TrustedCertsProvider(
-                List.of(lerRecurso("registries/certificates/letsencrypt_ye1.json")));
+    static class TrustStoreManagerCustomizado {
+        TrustStoreManager manager = new TrustStoreManager(TlsTrust.dedicatedCa(ItiTlsAnchors.load()));
 
         @Bean
-        CertificateProvider trustedCertsProvider() {
-            return provider;
-        }
-
-        private static byte[] lerRecurso(String nome) {
-            try (InputStream is = ProviderCustomizado.class.getClassLoader().getResourceAsStream(nome)) {
-                if (is == null) {
-                    throw new IllegalStateException("Recurso de teste não encontrado: " + nome);
-                }
-                return is.readAllBytes();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+        TrustStoreManager trustStoreManagerDoConsumidor() {
+            return manager;
         }
     }
 

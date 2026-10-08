@@ -1,18 +1,6 @@
 {
   "properties": [
     {
-      "name": "icpbrasil-truststore.certificate-url",
-      "type": "java.lang.String",
-      "description": "URL HTTPS do ZIP com os certificados das ACs vigentes da ICP-Brasil.",
-      "defaultValue": "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip"
-    },
-    {
-      "name": "icpbrasil-truststore.hash-url",
-      "type": "java.lang.String",
-      "description": "URL HTTPS do hash SHA-512 do ZIP, no formato sha512sum.",
-      "defaultValue": "https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt"
-    },
-    {
       "name": "icpbrasil-truststore.refresh-interval-hours",
       "type": "java.lang.Integer",
       "description": "Intervalo, em horas, entre verificações de nova geração do acervo (1 a cache-ttl-critical-hours).",
@@ -76,12 +64,6 @@
       "name": "icpbrasil-truststore.filesystem.base-dir",
       "type": "java.lang.String",
       "description": "Diretório base do storage filesystem. Obrigatório: sem default."
-    },
-    {
-      "name": "icpbrasil-truststore.trusted-certs.dir",
-      "type": "java.lang.String",
-      "description": "Diretório (classpath: ou file:) com os JSONs das CAs embutidas usadas no TLS do download do ITI.",
-      "defaultValue": "classpath:registries/certificates"
     },
     {
       "name": "icpbrasil-truststore.network.download-timeout-seconds",

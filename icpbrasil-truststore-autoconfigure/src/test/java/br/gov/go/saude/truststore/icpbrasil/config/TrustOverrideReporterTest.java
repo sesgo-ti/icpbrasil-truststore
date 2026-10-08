@@ -26,8 +26,6 @@ class TrustOverrideReporterTest {
     private static final String AVISO = "substituído pela aplicação";
 
     private static final String[] PROPS_MINIMAS = {
-            "icpbrasil-truststore.certificate-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/ACcompactado.zip",
-            "icpbrasil-truststore.hash-url=https://acraiz.icpbrasil.gov.br/credenciadas/CertificadosAC-ICP-Brasil/hashsha512.txt",
             "icpbrasil-truststore.network.download-timeout-seconds=30",
             "icpbrasil-truststore.network.max-retries=3",
             "icpbrasil-truststore.network.retry-interval-seconds=10",
@@ -39,7 +37,6 @@ class TrustOverrideReporterTest {
             "icpbrasil-truststore.storage.hash-file-path=hash.txt",
             "icpbrasil-truststore.storage.confirmation-file-path=confirmacao.txt",
             "icpbrasil-truststore.filesystem.base-dir=target/test-truststore",
-            "icpbrasil-truststore.trusted-certs.dir=classpath:registries/certificates",
             "icpbrasil-truststore.bootstrap.enabled=false",
             "icpbrasil-truststore.scheduling.enabled=false",
     };

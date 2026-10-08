@@ -30,6 +30,7 @@ public class DownloadPolicy {
     private static final Pattern IPV4_LITERAL = Pattern.compile("[0-9.]+");
 
     private static final String HOST_ACERVO_ITI = "acraiz.icpbrasil.gov.br";
+    private static final String DOMINIO_AIA_LETS_ENCRYPT = "i.lencr.org";
 
     private final TrustStoreConfig.DownloadPolicyConfig config;
 
@@ -53,6 +54,23 @@ public class DownloadPolicy {
     static TrustStoreConfig.DownloadPolicyConfig configAcervoIti() {
         TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
         config.setAllowedDomains(List.of(HOST_ACERVO_ITI));
+        return config;
+    }
+
+    /**
+     * Política da busca AIA no TLS do ITI: só {@code i.lencr.org} e seus subdomínios, com bloqueio
+     * de destinos não públicos. A URL vem do certificado apresentado pelo servidor (num MITM, do
+     * atacante); como as âncoras do canal são só as raízes ISRG, intermediária legítima só vem do
+     * Let's Encrypt.
+     */
+    public static DownloadPolicy aiaLetsEncrypt() {
+        return new DownloadPolicy(configAiaLetsEncrypt());
+    }
+
+    /** Configuração da política AIA do TLS do ITI; separada para que testes a exerçam com DNS simulado. */
+    static TrustStoreConfig.DownloadPolicyConfig configAiaLetsEncrypt() {
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
+        config.setAllowedDomains(List.of(DOMINIO_AIA_LETS_ENCRYPT));
         return config;
     }
 

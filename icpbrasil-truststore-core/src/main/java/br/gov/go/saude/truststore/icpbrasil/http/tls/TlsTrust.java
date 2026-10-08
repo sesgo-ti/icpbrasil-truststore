@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -21,7 +22,7 @@ import java.util.stream.Collectors;
  *
  * <p>Cada canal recebe o próprio {@link SSLContext}; nada é instalado como padrão da JVM.</p>
  */
-public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.DedicatedCa {
+public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.DedicatedCa, TlsTrust.PinnedRoots {
 
     /** Confiança nos certificados raiz padrão da JVM (cacerts). */
     static TlsTrust jvmDefault() {
@@ -37,7 +38,22 @@ public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.Dedicated
         return new DedicatedCa(List.copyOf(new LinkedHashSet<>(anchors)));
     }
 
-    /** Cria um novo {@link X509TrustManager} a cada chamada; o chamador pode guardá-lo e reutilizá-lo. */
+    /**
+     * Confiança do download do acervo: raízes ISRG embutidas como únicas âncoras e intermediárias
+     * buscadas via AIA restrito a {@code i.lencr.org}.
+     *
+     * @param clock data de validação das cadeias
+     */
+    static TlsTrust pinnedRoots(Clock clock) {
+        ItiTrustManager trustManager = ItiTrustManager.producao(clock);
+        return new PinnedRoots(List.of(trustManager.getAcceptedIssuers()), trustManager);
+    }
+
+    /**
+     * {@link X509TrustManager} desta confiança; o chamador pode guardá-lo e reutilizá-lo.
+     * {@link PinnedRoots} devolve sempre a mesma instância, para que as intermediárias já
+     * buscadas sirvam a todas as conexões; as demais variantes criam um novo a cada chamada.
+     */
     X509TrustManager trustManager();
 
     /** Âncoras da confiança dedicada, sem duplicatas e em ordem de inserção; vazio para {@link JvmDefault}. */
@@ -103,6 +119,25 @@ public sealed interface TlsTrust permits TlsTrust.JvmDefault, TlsTrust.Dedicated
             return anchors.size() + " âncora(s): " + anchors.stream()
                     .map(a -> a.getSubjectX500Principal().getName() + " (sha256 " + CertificateParser.getFingerprintSha256(a) + ")")
                     .collect(Collectors.joining("; "));
+        }
+    }
+
+    /**
+     * Âncoras fixadas com intermediárias via AIA.
+     *
+     * @throws IllegalArgumentException se {@code anchors} diferir das âncoras do {@code trustManager}
+     */
+    record PinnedRoots(List<X509Certificate> anchors, ItiTrustManager trustManager) implements TlsTrust {
+        public PinnedRoots {
+            anchors = List.copyOf(anchors);
+            if (!anchors.equals(List.of(trustManager.getAcceptedIssuers()))) {
+                throw new IllegalArgumentException("As âncoras devem ser as do ItiTrustManager");
+            }
+        }
+
+        @Override
+        public String describe() {
+            return new DedicatedCa(anchors).describe() + "; intermediárias via AIA";
         }
     }
 

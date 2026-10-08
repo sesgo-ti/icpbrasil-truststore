@@ -24,14 +24,11 @@ class TrustStoreConfigTest {
 
         assertDoesNotThrow(config::validateProperties);
 
-        assertEquals(IcpBrasilEndpoints.BUNDLE_ZIP_URL, config.getCertificateUrl());
-        assertEquals(IcpBrasilEndpoints.BUNDLE_HASH_URL, config.getHashUrl());
         assertTrue(IcpBrasilEndpoints.BUNDLE_ZIP_URL.startsWith("https://acraiz.icpbrasil.gov.br/"));
         assertEquals("filesystem", config.getStorage().getType());
         assertEquals("ACcompactado.zip", config.getStorage().getTruststoreArchivePath());
         assertEquals("hash.txt", config.getStorage().getHashFilePath());
         assertEquals("ultima_confirmacao.txt", config.getStorage().getConfirmationFilePath());
-        assertEquals("classpath:registries/certificates", config.getTrustedCerts().getDir());
         assertEquals(2, config.getRefreshIntervalHours());
         assertEquals(72, config.getCacheTtlCriticalHours());
         assertEquals(168, config.getCacheTtlMaxHours());

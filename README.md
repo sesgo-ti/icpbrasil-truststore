@@ -31,7 +31,7 @@ Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets
 - Montagem de cadeia de certificados via AIA CA Issuers (suporte a DER, PEM e PKCS#7)
 - Verificação de revogação de certificados via OCSP e CRL com cache e fallback automático
 - Proteção contra SSRF e limites de tamanho configuráveis para downloads iniciados por extensões de certificados (AIA, OCSP, CRL)
-- `SSLContext` e `X509TrustManager` com trust exclusivo nas CAs embutidas
+- `SSLContext` dedicado ao download do acervo: raízes ISRG fixadas, intermediárias via AIA restrito a `i.lencr.org`
 - Health indicator (`/actuator/health`) com estados VALID / CRITICAL / EXPIRED / UNAVAILABLE
 
 ---
@@ -133,8 +133,6 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 
 | Propriedade | Padrão | Descrição |
 |---|---|---|
-| `certificate-url` | Repositório ITI | URL do ZIP com as ACs vigentes da ICP-Brasil (HTTPS obrigatório) |
-| `hash-url` | Repositório ITI | URL do hash SHA-512 para verificação de integridade |
 | `refresh-interval-hours` | `2` | Intervalo de verificação de atualizações (1 a `cache-ttl-critical-hours`) |
 | `cache-ttl-critical-hours` | `72` | Horas sem atualização para estado CRITICAL (24–168) |
 | `cache-ttl-max-hours` | `168` | Horas até o cache expirar (72–720, deve ser > critical) |
@@ -142,7 +140,6 @@ Para detalhes sobre health check, estados do cache e logs de monitoramento, veja
 | `scheduling.enabled` | `true` | Ativa a rotina de atualização em background |
 | `bootstrap.enabled` | `true` | Executa carga síncrona do cache no startup |
 | `bootstrap.fail-fast` | `true` | Falha no bootstrap aborta o startup |
-| `trusted-certs.dir` | `classpath:registries/certificates` | Diretório com CAs fixas (JSON) |
 
 ### Armazenamento: filesystem
 
@@ -364,13 +361,13 @@ A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBoo
 
 ## Contexto SSL e segurança
 
-A biblioteca cria um `SSLContext` interno usando **exclusivamente** os certificados embutidos em `registries/certificates/`. Esse contexto é encapsulado em `TrustStoreManager` e usado apenas para o download do acervo de ACs vigentes do repositório do ITI — não é exposto como bean Spring nem aplicado globalmente à JVM.
+O download do acervo usa um `SSLContext` interno, encapsulado em `TrustStoreManager`, que confia **exclusivamente** nas raízes ISRG Root X1 e X2 (`tls/iti/`, fixadas por fingerprint SHA-256). Não há intermediárias embutidas: elas são obtidas via AIA CA Issuers, restrito a `i.lencr.org`, e validadas por PKIX contra essas raízes. O contexto não é exposto como bean Spring nem aplicado à JVM. O endereço do acervo é fixo (`IcpBrasilEndpoints`): troca de CA ou de endereço do ITI exige nova release.
 
 O isolamento é intencional: usar a truststore padrão da JVM para essa conexão exporia o download a um MITM com qualquer uma das ~150 CAs comerciais presentes no `cacerts`.
 
 | Contexto | Trust utilizado |
 |---|---|
-| Download do acervo de ACs (repositório ITI) | Apenas CAs de `registries/certificates/` |
+| Download do acervo de ACs (repositório ITI) | Apenas ISRG Root X1 e X2 fixadas |
 | Conexão S3 sem `S3_CA_CERT_PATH` | JVM default truststore (`cacerts`) |
 | Conexão S3 com `S3_CA_CERT_PATH` | TrustManager dedicado com aquela CA |
 | Downloads de AIA CA Issuers, OCSP e CRL | JVM default truststore (`cacerts`), declarado explicitamente via `TlsTrust.jvmDefault()` |
@@ -379,18 +376,7 @@ O isolamento é intencional: usar a truststore padrão da JVM para essa conexão
 
 A confiança de cada canal (acervo ITI, S3, AIA/OCSP/CRL) é registrada em log no início. Configuração nunca altera a confiança; só código da aplicação pode, ao declarar o próprio bean de `TrustStoreManager` ou de `TrustMaterialSource` — e a biblioteca emite um `WARN` quando isso acontece.
 
-**CAs embutidas em `registries/certificates/`:**
-
-| Arquivo | Tipo | Propósito |
-|---|---|---|
-| `letsencrypt_ye1.json`, `letsencrypt_ye2.json`, `letsencrypt_ye3.json` | Intermediárias ECDSA (emitidas por ISRG Root YE) | Emissoras possíveis do certificado TLS de `acraiz.icpbrasil.gov.br` com chave ECDSA (desde 2026-07-21 o ITI usa a YE1) |
-| `letsencrypt_yr1.json`, `letsencrypt_yr2.json`, `letsencrypt_yr3.json` | Intermediárias RSA (emitidas por ISRG Root YR) | Emissoras possíveis caso o ITI renove com chave RSA |
-
-`acraiz.icpbrasil.gov.br` **não envia a intermediária** no handshake TLS e o JDK não busca emissores via AIA; por isso a própria intermediária precisa constar do registro — no `TrustManager` do `SSLContext` interno, toda entrada é âncora. As raízes ISRG não são embutidas: sem a intermediária no handshake elas não formam caminho algum. A Let's Encrypt alterna entre as intermediárias da mesma hierarquia a cada emissão, então todas as da geração Y ficam no registro.
-
-O alias de cada âncora no KeyStore é `sha256-<fingerprint do DER>`: certificados de mesmo CN (reemissões e cross-signs) coexistem e duplicatas idênticas entram uma vez. Como incluir ou trocar âncoras: [gestão das âncoras TLS](docs/manual-gestao-certificados-confiaveis.md).
-
-Quando o ITI trocar de hierarquia (nova geração de intermediárias da Let's Encrypt ou outra AC), o download falha com `PKIX path building failed` até o registro ser atualizado. O teste `EmbeddedTrustedCertsTest` fixa o certificado TLS vigente do ITI (snapshot em `src/test/resources/tls/`) e o teste de integração `DownloaderTest` (`./mvnw verify -Pintegration-tests`) usa o registro de produção contra o ITI real. Em produção, é possível trocar o registro sem nova versão apontando `icpbrasil-truststore.trusted-certs.dir` para um diretório com os JSON atualizados — ele **substitui** o registro embutido.
+Se o ITI trocar de CA, o download falha e a biblioteca registra `WARN` com o motivo e as URLs de CA Issuers. O teste de integração `DownloaderTest` (`./mvnw verify -Pintegration-tests`) baixa do ITI real. Procedimento de atualização: [gestão das âncoras TLS](docs/manual-gestao-certificados-confiaveis.md).
 
 ---
 

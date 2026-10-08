@@ -3,8 +3,6 @@ package br.gov.go.saude.truststore.icpbrasil.config;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 
 /**
@@ -23,18 +21,6 @@ public class TrustStoreConfig {
 
     private static final long MIB = 1024L * 1024;
     private static final long GIB = 1024 * MIB;
-
-    /**
-     * URL do arquivo de certificados (Trust Store ICP-Brasil).
-     * [Resultado]: Define de onde o sistema baixa as atualizações.
-     */
-    private String certificateUrl = IcpBrasilEndpoints.BUNDLE_ZIP_URL;
-
-    /**
-     * URL do arquivo contendo o hash do arquivo de certificados.
-     * [Resultado]: Usado para verificar a integridade do download.
-     */
-    private String hashUrl = IcpBrasilEndpoints.BUNDLE_HASH_URL;
 
     /**
      * Configurações de Rede e Resiliência.
@@ -71,12 +57,6 @@ public class TrustStoreConfig {
      * Ativado quando storage.type=filesystem.
      */
     private FilesystemConfig filesystem = new FilesystemConfig();
-
-    /**
-     * Diretório de Certificados Confiáveis Fixos.
-     * [Resultado]: Local onde o sistema busca certificados adicionais (JSON).
-     */
-    private TrustedCertsConfig trustedCerts = new TrustedCertsConfig();
 
     /**
      * Configurações de verificação de revogação (OCSP e CRL).
@@ -137,17 +117,6 @@ public class TrustStoreConfig {
     }
 
     /**
-     * Configurações de certificados confiáveis no filesystem
-     */
-    @Data
-    public static class TrustedCertsConfig {
-        /**
-         * Diretório contendo os arquivos JSON de certificados confiáveis (classpath ou disco).
-         */
-        private String dir = "classpath:registries/certificates";
-    }
-
-    /**
      * Configurações de rede para download
      */
     @Data
@@ -191,7 +160,6 @@ public class TrustStoreConfig {
     public void validateProperties() {
         log.info("Iniciando validação das propriedades de configuração do TrustStore ICP-Brasil");
 
-        validateUrls();
         validateNetworkConfig();
         validateCacheConfig();
         validateStorageConfig();
@@ -214,47 +182,6 @@ public class TrustStoreConfig {
         }
 
         log.debug("Configurações de bootstrap validadas com sucesso");
-    }
-
-    /**
-     * Valida as URLs de certificado e hash
-     */
-    private void validateUrls() {
-        if (certificateUrl == null || certificateUrl.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] URL do Certificado: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.certificate-url'");
-        }
-
-        validateUrl(certificateUrl, "URL do Certificado", "icpbrasil-truststore.certificate-url");
-
-        if (hashUrl == null || hashUrl.isBlank()) {
-            throw new IllegalStateException("[Erro de Configuração] URL do Hash: Não pode ser nulo ou vazio. Propriedade: 'icpbrasil-truststore.hash-url'");
-        }
-
-        validateUrl(hashUrl, "URL do Hash", "icpbrasil-truststore.hash-url");
-
-        log.debug("URLs validadas com sucesso");
-    }
-
-    /**
-     * Valida se uma URL é válida e usa HTTPS
-     */
-    private void validateUrl(String urlString, String description, String propertyName) {
-        try {
-            URI uri = new URI(urlString);
-
-            if (!"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalStateException(String.format("[Erro de Configuração] %s: Deve usar protocolo HTTPS por segurança. Propriedade: '%s' (Valor: '%s')",
-                        description, propertyName, urlString));
-            }
-
-            if (!uri.isAbsolute() || uri.getHost() == null) {
-                throw new IllegalStateException(String.format("[Erro de Configuração] %s: Deve ser uma URL absoluta válida com host. Propriedade: '%s' (Valor: '%s')",
-                        description, propertyName, urlString));
-            }
-        } catch (URISyntaxException e) {
-            throw new IllegalStateException(String.format("[Erro de Configuração] %s: URL inválida. Propriedade: '%s' (Valor: '%s')",
-                    description, propertyName, urlString), e);
-        }
     }
 
     /**
