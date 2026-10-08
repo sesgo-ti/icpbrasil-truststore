@@ -1,10 +1,10 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.DefaultResourceLoader;
-import org.springframework.core.io.Resource;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -13,15 +13,12 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 import java.io.InputStream;
 import java.net.URI;
-import java.security.KeyStore;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.Arrays;
+import java.util.List;
 
 /**
  * Fábrica do {@link S3Client} padrão da biblioteca. Importada por {@link S3StorageConfiguration}
@@ -54,11 +51,10 @@ class S3ClientFactory {
                 .socketTimeout(Duration.ofSeconds(60));
 
         if (StringUtils.hasText(props.getCaCertPath())) {
-            log.info("S3: usando CA dedicada para TLS: {}", props.getCaCertPath());
             TrustManager[] dedicatedTrustManagers = buildDedicatedTrustManagers(props.getCaCertPath());
             httpClientBuilder.tlsTrustManagersProvider(() -> dedicatedTrustManagers);
         } else {
-            log.info("S3: usando JVM default truststore para TLS");
+            log.info("S3: confia em {}", TlsTrust.jvmDefault().describe());
         }
 
         return S3Client.builder()
@@ -77,30 +73,14 @@ class S3ClientFactory {
      * confie em CAs além da especificada, reduzindo a superfície de ataque em redes privadas.
      */
     private TrustManager[] buildDedicatedTrustManagers(String certPath) {
-        try {
-            Resource resource = new DefaultResourceLoader().getResource(certPath);
-
-            X509Certificate caCert;
-            try (InputStream is = resource.getInputStream()) {
-                caCert = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
-            }
-
-            log.info("S3: CA carregada — subject: {}, válido até: {}",
-                    caCert.getSubjectX500Principal().getName(), caCert.getNotAfter());
-
-            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-            keyStore.load(null, null);
-            keyStore.setCertificateEntry("s3-ca", caCert);
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(keyStore);
-
-            return Arrays.stream(tmf.getTrustManagers())
-                    .filter(tm -> tm instanceof X509TrustManager)
-                    .toArray(TrustManager[]::new);
-
+        X509Certificate caCert;
+        try (InputStream is = new DefaultResourceLoader().getResource(certPath).getInputStream()) {
+            caCert = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
         } catch (Exception e) {
             throw new IllegalStateException("Falha ao carregar certificado CA do S3: " + certPath, e);
         }
+        TlsTrust trust = TlsTrust.dedicatedCa(List.of(caCert));
+        log.info("S3: confia em {}", trust.describe());
+        return new TrustManager[]{trust.trustManager()};
     }
 }

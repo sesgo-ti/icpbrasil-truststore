@@ -3,16 +3,12 @@ package br.gov.go.saude.truststore.icpbrasil.service;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import lombok.extern.slf4j.Slf4j;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -82,7 +78,7 @@ public class Cache {
     static final Comparator<X509Certificate> PREFERENCE =
             Comparator.comparing((X509Certificate certificate) -> !CertificateParser.isSelfSigned(certificate))
                     .thenComparing(X509Certificate::getNotAfter, Comparator.reverseOrder())
-                    .thenComparing(Cache::fingerprint);
+                    .thenComparing(CertificateParser::getFingerprintSha256);
 
     private final Clock clock;
     private volatile Snapshot snapshot;
@@ -132,14 +128,6 @@ public class Cache {
             candidates.put(ski, list.stream().sorted(PREFERENCE).toList());
         });
         return Map.copyOf(candidates);
-    }
-
-    private static String fingerprint(X509Certificate certificate) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()));
-        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
-            throw new IllegalArgumentException("Certificado não codificável: " + certificate.getSubjectX500Principal(), e);
-        }
     }
 
     /**

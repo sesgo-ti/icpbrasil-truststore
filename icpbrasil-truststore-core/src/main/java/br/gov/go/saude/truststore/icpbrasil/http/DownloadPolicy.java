@@ -29,6 +29,8 @@ public class DownloadPolicy {
     // tratá-lo como literal cobre formas abreviadas como "1234", que a JVM expande para IPv4.
     private static final Pattern IPV4_LITERAL = Pattern.compile("[0-9.]+");
 
+    private static final String HOST_ACERVO_ITI = "acraiz.icpbrasil.gov.br";
+
     private final TrustStoreConfig.DownloadPolicyConfig config;
 
     public DownloadPolicy(TrustStoreConfig trustStoreConfig) {
@@ -37,6 +39,21 @@ public class DownloadPolicy {
 
     public DownloadPolicy(TrustStoreConfig.DownloadPolicyConfig config) {
         this.config = config;
+    }
+
+    /**
+     * Política do download do acervo: só o host do ITI, com bloqueio de destinos não públicos
+     * (barra também um DNS do ITI sequestrado para endereço interno).
+     */
+    public static DownloadPolicy acervoIti() {
+        return new DownloadPolicy(configAcervoIti());
+    }
+
+    /** Configuração da política do acervo; separada para que testes a exerçam com DNS simulado. */
+    static TrustStoreConfig.DownloadPolicyConfig configAcervoIti() {
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
+        config.setAllowedDomains(List.of(HOST_ACERVO_ITI));
+        return config;
     }
 
     /**
@@ -91,6 +108,14 @@ public class DownloadPolicy {
             throw new DownloadPolicyException("Host ausente na URL: " + rawUrl);
         }
 
+        // A allowlist vem antes de qualquer resolução: a URL pode ser escolhida por um atacante
+        // e host fora da lista não deve gerar consulta DNS.
+        List<String> allowlist = config.getAllowedDomains();
+        if (allowlist != null && !allowlist.isEmpty() && !isAllowed(host, allowlist)) {
+            throw new DownloadPolicyException(
+                    "Domínio '" + host + "' não está na lista de domínios permitidos");
+        }
+
         if (BLOCKED_HOSTNAMES.contains(host.toLowerCase())) {
             throw new DownloadPolicyException("Host reservado bloqueado: " + host);
         }
@@ -103,12 +128,6 @@ public class DownloadPolicy {
             }
         } else if (config.isBlockPrivateHostnames()) {
             checkResolvedAddresses(host, rawUrl);
-        }
-
-        List<String> allowlist = config.getAllowedDomains();
-        if (allowlist != null && !allowlist.isEmpty() && !isAllowed(host, allowlist)) {
-            throw new DownloadPolicyException(
-                    "Domínio '" + host + "' não está na lista de domínios permitidos");
         }
     }
 

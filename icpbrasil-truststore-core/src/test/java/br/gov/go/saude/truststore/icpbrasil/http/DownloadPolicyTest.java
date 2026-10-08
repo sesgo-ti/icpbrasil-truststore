@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,6 +25,39 @@ class DownloadPolicyTest {
         config.setBlockPrivateHostnames(false); // desativa resolução DNS nos testes unitários
         config.setAllowedDomains(List.of());
         policy = new DownloadPolicy(config);
+    }
+
+    // --- acervoIti ---
+
+    @Test
+    void testAcervoIti_HostDoIti_Aceita() {
+        DownloadPolicy policy = acervoItiResolvendoPara("200.198.1.1");
+
+        assertDoesNotThrow(() -> policy.validateUrl("https://acraiz.icpbrasil.gov.br/credenciadas/x.zip"));
+    }
+
+    @Test
+    void testAcervoIti_OutroHost_LancaDownloadPolicyException() {
+        DownloadPolicy policy = acervoItiResolvendoPara("93.184.216.34");
+
+        assertThrows(DownloadPolicyException.class, () -> policy.validateUrl("https://exemplo.com.br/x.zip"));
+    }
+
+    @Test
+    void testAcervoIti_IpPrivado_LancaDownloadPolicyException() {
+        assertThrows(DownloadPolicyException.class,
+                () -> DownloadPolicy.acervoIti().validateUrl("https://10.0.0.5/x.zip"));
+    }
+
+    @SneakyThrows
+    private static DownloadPolicy acervoItiResolvendoPara(String ip) {
+        InetAddress[] resolved = {InetAddress.getByName(ip)};
+        return new DownloadPolicy(DownloadPolicy.configAcervoIti()) {
+            @Override
+            InetAddress[] resolve(String host) {
+                return resolved;
+            }
+        };
     }
 
     // --- validateUrl: esquemas ---
@@ -221,6 +255,24 @@ class DownloadPolicyTest {
 
         assertDoesNotThrow(() -> nonResolving.validateUrl("http://ocsp.example.com/status"));
         assertFalse(resolved.get());
+    }
+
+    @Test
+    void testValidateUrl_HostForaDaAllowlist_LancaExcecaoSemResolverDns() {
+        AtomicInteger resolucoes = new AtomicInteger();
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
+        config.setBlockPrivateHostnames(true);
+        config.setAllowedDomains(List.of("permitido.example.com"));
+        DownloadPolicy contador = new DownloadPolicy(config) {
+            @Override
+            InetAddress[] resolve(String host) throws UnknownHostException {
+                resolucoes.incrementAndGet();
+                throw new UnknownHostException(host);
+            }
+        };
+
+        assertThrows(DownloadPolicyException.class, () -> contador.validateUrl("http://atacante.example.net/x"));
+        assertEquals(0, resolucoes.get());
     }
 
     /**

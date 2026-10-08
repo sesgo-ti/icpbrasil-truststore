@@ -5,6 +5,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreBootstrap;
 import br.gov.go.saude.truststore.icpbrasil.lifecycle.TrustStoreScheduler;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
@@ -22,7 +23,9 @@ import br.gov.go.saude.truststore.icpbrasil.service.revocation.CrlClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.OcspClient;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationCache;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
@@ -58,6 +61,7 @@ import java.util.List;
  * assinaturas: a introspecção dos métodos {@code @Bean} carregaria as classes ausentes e
  * derrubaria o contexto mesmo com {@code storage.type=filesystem}.</p>
  */
+@Slf4j
 @AutoConfiguration
 @Import({S3StorageConfiguration.class, HealthConfiguration.class})
 public class TrustStoreAutoConfiguration {
@@ -156,7 +160,8 @@ public class TrustStoreAutoConfiguration {
     @ConditionalOnMissingBean
     public Downloader downloader(TrustStoreManager trustStoreManager, RetryPolicy retryPolicy,
                                  TrustStoreConfig trustStoreConfig) {
-        return new Downloader(trustStoreManager, retryPolicy, trustStoreConfig);
+        return new Downloader(Downloader.transporteAcervoIti(trustStoreManager.getSslContext(), trustStoreConfig),
+                retryPolicy, trustStoreConfig);
     }
 
     @Bean
@@ -207,7 +212,17 @@ public class TrustStoreAutoConfiguration {
         int connectTimeoutSeconds = Math.min(trustStoreConfig.getChain().getDownloadTimeoutSeconds(),
                 Math.min(trustStoreConfig.getRevocation().getOcspTimeoutSeconds(),
                         trustStoreConfig.getRevocation().getCrlTimeoutSeconds()));
+        log.info("AIA, OCSP e CRL: confia em {}", TlsTrust.jvmDefault().describe());
         return new CertificateHttpTransport(downloadPolicy, Duration.ofSeconds(connectTimeoutSeconds));
+    }
+
+    /**
+     * Estático porque é um {@code SmartInitializingSingleton}: evita instanciar a auto-configuração
+     * antes do tempo para registrar o reporter.
+     */
+    @Bean
+    static TrustOverrideReporter trustOverrideReporter(ConfigurableListableBeanFactory beanFactory) {
+        return new TrustOverrideReporter(beanFactory);
     }
 
     @Bean

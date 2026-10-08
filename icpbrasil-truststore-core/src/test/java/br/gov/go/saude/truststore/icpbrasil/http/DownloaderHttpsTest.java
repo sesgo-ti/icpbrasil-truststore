@@ -1,6 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.http;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.http.tls.TlsTrust;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import com.sun.net.httpserver.HttpHandler;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyStore;
@@ -33,10 +35,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * Exercita o {@link Downloader} contra um servidor HTTPS local cujo certificado é a única
- * âncora do {@link TrustStoreManager}, reproduzindo o isolamento de TLS usado em produção.
+ * âncora do {@link TlsTrust}, reproduzindo o isolamento de TLS usado em produção.
  */
 class DownloaderHttpsTest {
 
@@ -69,8 +72,14 @@ class DownloaderHttpsTest {
         baseUrl = "https://" + bound.getHostString() + ":" + bound.getPort();
 
         TrustStoreConfig config = buildConfig();
-        TrustStoreManager trustStoreManager = new TrustStoreManager(() -> List.of(serverCert));
-        downloader = new Downloader(trustStoreManager, new RetryPolicy(config), config);
+        SSLContext clientContext = TlsTrust.dedicatedCa(List.of(serverCert)).sslContext();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .sslContext(clientContext)
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+        // O servidor local está em loopback, que a política do ITI bloquearia.
+        CertificateHttpTransport transport = new CertificateHttpTransport(mock(DownloadPolicy.class), httpClient);
+        downloader = new Downloader(transport, new RetryPolicy(config), config);
     }
 
     @AfterEach
@@ -102,7 +111,7 @@ class DownloaderHttpsTest {
     }
 
     @Test
-    void testDownloadBytes_Redirect302_LancaIOExceptionSemSeguir() {
+    void testDownloadBytes_Redirect302_LancaDownloadPolicyExceptionSemSeguir() {
         AtomicInteger destinoAcessado = new AtomicInteger();
         server.createContext("/destino", exchange -> {
             destinoAcessado.incrementAndGet();
@@ -114,9 +123,10 @@ class DownloaderHttpsTest {
             exchange.close();
         });
 
-        IOException ex = assertThrows(IOException.class, () -> downloader.downloadBytes(baseUrl + "/antigo"));
+        DownloadPolicyException ex = assertThrows(DownloadPolicyException.class,
+                () -> downloader.downloadBytes(baseUrl + "/antigo"));
 
-        assertTrue(ex.getMessage().contains("302"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("Redirecionamento HTTP 302"), ex.getMessage());
         assertEquals(0, destinoAcessado.get());
     }
 
@@ -130,13 +140,14 @@ class DownloaderHttpsTest {
     }
 
     @Test
-    void testDownloadText_CorpoExcedeMaxTextBytes_LancaIOException() {
+    void testDownloadText_CorpoExcedeMaxTextBytes_LancaDownloadPolicyException() {
         byte[] excedente = new byte[Downloader.MAX_TEXT_BYTES + 1];
         server.createContext("/hash.txt", fixedLength(200, excedente));
 
-        IOException ex = assertThrows(IOException.class, () -> downloader.downloadText(baseUrl + "/hash.txt"));
+        DownloadPolicyException ex = assertThrows(DownloadPolicyException.class,
+                () -> downloader.downloadText(baseUrl + "/hash.txt"));
 
-        assertTrue(ex.getMessage().contains("limite"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("excede o limite"), ex.getMessage());
     }
 
     @Test
