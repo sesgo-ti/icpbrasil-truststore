@@ -9,6 +9,7 @@ import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationLookup;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
+import br.gov.go.saude.truststore.icpbrasil.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.DistributionPoint;
@@ -59,6 +60,9 @@ import java.util.Set;
  *       entrada tem certificateIssuer e a entrada do certificado não tem reasonCode removeFromCRL.</li>
  * </ul>
  *
+ * <p>Entrada do certificado com data de revogação posterior ao instante da verificação ainda não
+ * revoga: o resultado é {@code Good}, com aviso no log (ver {@link RevocationService}).</p>
+ *
  * <p>Qualquer violação resulta em {@code Malformed}: a CRL existe, mas não serve como evidência
  * para este certificado neste instante. O cache guarda a CRL já decodificada ({@link X509CRL}),
  * cuja consulta por serial é indexada e cuja assinatura se verifica sobre os bytes originais sem
@@ -70,6 +74,7 @@ public class CrlClient {
 
     /** Posição do bit cRLSign no array de {@link X509Certificate#getKeyUsage()}. */
     private static final int KEY_USAGE_CRL_SIGN = 6;
+    private static final int MAX_LOG_URL = 200;
 
     private final RevocationCache cache;
     private final RetryPolicy retryPolicy;
@@ -261,7 +266,8 @@ public class CrlClient {
                 return new RevocationStatus.Malformed("CRL");
             }
 
-            if (!isWithinValidityWindow(crl, clock.instant())) {
+            Instant now = clock.instant();
+            if (!isWithinValidityWindow(crl, now)) {
                 log.warn("CRL de {} fora da janela de validade (thisUpdate={}, nextUpdate={})",
                         url, crl.getThisUpdate(), crl.getNextUpdate());
                 return new RevocationStatus.Malformed("CRL");
@@ -280,6 +286,14 @@ public class CrlClient {
                 log.warn("Entrada da CRL de {} para o certificado serial {} tem extensão não processável",
                         url, serialHex);
                 return new RevocationStatus.Malformed("CRL");
+            }
+            Instant revokedAt = entry.getRevocationDate().toInstant();
+            if (revokedAt.isAfter(now)) {
+                log.warn("CRL de {}: evidência com data de revogação futura para o certificado serial {} " +
+                                "(revogação em {}, {} após o instante da verificação); tratada como não revogada " +
+                                "até essa data",
+                        LogSanitizer.sanitizar(url, MAX_LOG_URL), serialHex, revokedAt, Duration.between(now, revokedAt));
+                return new RevocationStatus.Good("CRL", encoded != null ? encoded : crl.getEncoded());
             }
             return new RevocationStatus.Revoked("CRL");
         } catch (Exception e) {

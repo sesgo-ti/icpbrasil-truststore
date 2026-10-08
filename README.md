@@ -226,12 +226,14 @@ O `RevocationService` verifica se um certificado foi revogado consultando OCSP e
 2. Se OCSP for inconclusivo, tenta CRL (se o certificado possuir CRL Distribution Points)
 3. Respostas OCSP e CRLs são cacheadas em memória com TTL configurável
 
+O certificado é considerado revogado a partir da data de revogação, como o JDK e o DSS: uma resposta OCSP `revoked` ou entrada de CRL com data posterior ao instante da consulta resulta em `Good`, com aviso no log. O cache guarda a evidência, não o veredito, então o resultado passa a `Revoked` assim que a data chega, sem esperar o TTL.
+
 O resultado é um `RevocationStatus` (sealed interface) com os seguintes estados; `lookup(cert, issuer)` devolve, junto do status, a evidência que o fundamenta (`RevocationEvidence`: resposta OCSP em DER ou CRL decodificada) quando ele é conclusivo:
 
 | Status | Significado |
 |---|---|
-| `Good` | Certificado não revogado (inclui bytes da resposta para LTV) |
-| `Revoked` | Certificado revogado |
+| `Good` | Certificado não revogado no instante da consulta (inclui bytes da resposta para LTV); a evidência pode declarar revogação com data posterior a esse instante |
+| `Revoked` | Certificado revogado no instante da consulta |
 | `NoDistributionPoints` | Certificado não possui extensões OCSP nem CRL |
 | `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
 | `CrlUnavailable` | CRL inacessível ou sem evidência utilizável após todas as tentativas |
@@ -273,7 +275,7 @@ Somente `Valid` autoriza o uso do certificado; os demais estados são terminais 
 | `RevocationUndetermined` | Caminho confiável, mas a revogação de `certificate` não pôde ser determinada; `status` é o `RevocationStatus` correspondente |
 | `TrustStoreUnavailable` | Acervo indisponível ou expirado; nenhuma validação é possível |
 
-A revogação é verificada em duas camadas, certificado a certificado (da folha até o último intermediário): o `RevocationService` obtém e valida a evidência (OCSP, depois CRL) dentro da política de download, e o `PKIXRevocationChecker` do JDK a reavalia, alimentado exclusivamente com essa evidência — cada certificado é submetido como caminho de um só elemento ancorado no seu emissor, por isso a folha pode ser verificada por OCSP e a AC por CRL. O JDK não abre conexões por conta própria: o download de CRL exige a propriedade global `com.sun.security.enableCRLDP` e a consulta OCSP só ocorre sem resposta pré-fornecida. Evidência aceita pela biblioteca e rejeitada pelo JDK resulta em `RevocationUndetermined` com `Malformed`.
+A revogação é verificada em duas camadas, certificado a certificado (da folha até o último intermediário): o `RevocationService` obtém e valida a evidência (OCSP, depois CRL) dentro da política de download, e o `PKIXRevocationChecker` do JDK a reavalia, alimentado exclusivamente com essa evidência — cada certificado é submetido como caminho de um só elemento ancorado no seu emissor, por isso a folha pode ser verificada por OCSP e a AC por CRL. O JDK não abre conexões por conta própria: o download de CRL exige a propriedade global `com.sun.security.enableCRLDP` e a consulta OCSP só ocorre sem resposta pré-fornecida. Evidência aceita pela biblioteca e rejeitada pelo JDK, ou com veredito diferente nas duas camadas, resulta em `RevocationUndetermined` com `Malformed` e aviso no log.
 
 Emissores ausentes do acervo e dos `extras` são baixados via AIA pelo `CertificateChainResolver` apenas como candidatos. Para confiar em um emissor por outros meios (ex.: hierarquia de homologação, fora do acervo), use `validate(certificado, extras, TrustMaterial.anchoredAt(List.of(emissor)))`; a revogação da própria âncora não é verificada. Não há validação histórica (LTV): as evidências em `Valid.evidence()` ficam disponíveis para quem precisar preservá-las. A CRL que comprovou o status de um responder OCSP delegado sem `ocsp-nocheck` não é incluída, então a resposta OCSP desse responder, sozinha, não basta para revalidar depois.
 

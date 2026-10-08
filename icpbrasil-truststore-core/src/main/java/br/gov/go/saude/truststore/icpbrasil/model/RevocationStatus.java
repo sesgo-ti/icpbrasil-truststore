@@ -8,10 +8,17 @@ public sealed interface RevocationStatus permits
 
     /**
      * Não revogado no instante da consulta; {@code responseDer} é a evidência (resposta OCSP ou
-     * CRL em DER). Se a resposta OCSP foi assinada por responder delegado sem
-     * {@code ocsp-nocheck}, a evidência do status desse responder não é incluída.
+     * CRL em DER). A evidência pode declarar a revogação do certificado com data posterior ao
+     * instante da consulta, e por isso não serve como prova de que ele nunca foi revogado. Se a
+     * resposta OCSP foi assinada por responder delegado sem {@code ocsp-nocheck}, a evidência do
+     * status desse responder não é incluída.
      */
     record Good(String source, byte[] responseDer) implements RevocationStatus {}
+    /**
+     * Revogado no instante da consulta: a evidência declara a revogação com data igual ou
+     * anterior a esse instante. Com data posterior o certificado ainda não está revogado, e o
+     * status é {@link Good}.
+     */
     record Revoked(String source) implements RevocationStatus {}
     record NoDistributionPoints() implements RevocationStatus {}
     record OcspUnavailable() implements RevocationStatus {}

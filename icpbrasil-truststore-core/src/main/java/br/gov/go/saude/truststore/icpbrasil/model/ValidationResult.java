@@ -52,7 +52,7 @@ public sealed interface ValidationResult {
      * O caminho é confiável, mas o estado de revogação de {@code certificate} não pôde ser
      * determinado; {@code status} é o motivo, nos termos de {@link RevocationStatus} —
      * {@link RevocationStatus.Malformed} inclui o caso em que a evidência obtida pela biblioteca
-     * foi rejeitada pelo verificador PKIX do JDK.
+     * foi rejeitada pelo verificador PKIX do JDK ou teve veredito diferente nas duas camadas.
      */
     record RevocationUndetermined(X509Certificate certificate, RevocationStatus status) implements ValidationResult {}
 

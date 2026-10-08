@@ -5,6 +5,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.RevocationEvidence;
+import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
 import br.gov.go.saude.truststore.icpbrasil.model.ValidationResult;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.revocation.CrlClient;
@@ -14,6 +15,7 @@ import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService
 import br.gov.go.saude.truststore.icpbrasil.support.TestChain;
 import com.sun.net.httpserver.HttpServer;
 import org.bouncycastle.cert.ocsp.CertificateStatus;
+import org.bouncycastle.cert.ocsp.RevokedStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,9 +26,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +55,7 @@ class PkixCertificateValidatorHttpTest {
     Map<String, AtomicInteger> requests;
     Map<String, byte[]> responses;
     Map<String, Integer> statuses;
+    RevocationService revocationService;
     PkixCertificateValidator validator;
 
     @BeforeEach
@@ -93,7 +98,7 @@ class PkixCertificateValidatorHttpTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         OcspClient ocspClient = new OcspClient(cache, retryPolicy, config.getRevocation(), httpClient, policy, clock);
         CrlClient crlClient = new CrlClient(cache, retryPolicy, config.getRevocation(), httpClient, policy, clock);
-        RevocationService revocationService = new RevocationService(ocspClient, crlClient);
+        revocationService = new RevocationService(ocspClient, crlClient);
         CertificateChainResolver resolver = new CertificateChainResolver(retryPolicy, config, transport);
 
         validator = new PkixCertificateValidator(() -> Optional.of(TrustMaterial.of(chain.authorities())),
@@ -201,6 +206,45 @@ class PkixCertificateValidatorHttpTest {
 
         assertEquals(chain.leaf(), assertInstanceOf(ValidationResult.Revoked.class, result).certificate());
         assertEquals(Map.of("/intermediate-ocsp", 1, "/intermediate.crl", 1), counts());
+    }
+
+    @Test
+    void testValidate_OcspRevogadaComDataPassada_RevokedNasDuasCamadas() {
+        responses.put("/intermediate-ocsp", chain.intermediateOcsp(NOW,
+                new RevokedStatus(Date.from(NOW.minus(Duration.ofMinutes(10))))));
+
+        ValidationResult result = validator.validate(chain.leaf());
+        RevocationStatus status = revocationService.check(chain.leaf(), chain.intermediate());
+
+        assertEquals(chain.leaf(), assertInstanceOf(ValidationResult.Revoked.class, result).certificate());
+        assertInstanceOf(RevocationStatus.Revoked.class, status);
+    }
+
+    @Test
+    void testValidate_OcspRevogadaComDataFutura_GoodNasDuasCamadas() {
+        responses.put("/intermediate-ocsp", chain.intermediateOcsp(NOW,
+                new RevokedStatus(Date.from(NOW.plus(Duration.ofMinutes(5))))));
+        responses.put("/root-ocsp", chain.rootOcsp(NOW, CertificateStatus.GOOD));
+
+        ValidationResult result = validator.validate(chain.leaf());
+        RevocationStatus status = revocationService.check(chain.leaf(), chain.intermediate());
+
+        assertInstanceOf(ValidationResult.Valid.class, result);
+        assertInstanceOf(RevocationStatus.Good.class, status);
+    }
+
+    @Test
+    void testValidate_CrlComEntradaDeDataFutura_GoodNasDuasCamadas() {
+        statuses.put("/intermediate-ocsp", 500);
+        responses.put("/intermediate.crl",
+                chain.intermediateCrl(NOW, Map.of(chain.leaf().getSerialNumber(), NOW.plus(Duration.ofMinutes(5)))));
+        responses.put("/root-ocsp", chain.rootOcsp(NOW, CertificateStatus.GOOD));
+
+        ValidationResult result = validator.validate(chain.leaf());
+        RevocationStatus status = revocationService.check(chain.leaf(), chain.intermediate());
+
+        assertInstanceOf(ValidationResult.Valid.class, result);
+        assertInstanceOf(RevocationStatus.Good.class, status);
     }
 
     private Map<String, Integer> counts() {
