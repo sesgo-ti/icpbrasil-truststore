@@ -1,0 +1,11 @@
+# Exceções temporárias do osv-scanner no CI. Critério de bloqueio e triagem: SECURITY.md.
+# Cada exceção tem:
+#   - id: identificador OSV/GHSA/CVE;
+#   - ignoreUntil: no máximo 90 dias à frente; vencida, o build volta a falhar;
+#   - reason: por que o código não é afetado ou qual mitigação existe, e o responsável.
+#
+# Exemplo:
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
+# reason = "Só afeta o conector AJP, desabilitado no serviço REST. Responsável: @usuario"

@@ -11,6 +11,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
 - Cache de revogação: downloads concorrentes da mesma CRL ou da mesma resposta OCSP são compartilhados (#13).
+- SBOM CycloneDX (`-Psbom`) e análise de dependências com osv-scanner no CI; exceções temporárias, com responsável e validade, em `osv-scanner.toml` (#17).
 - Build reproduzível: `project.build.outputTimestamp` fixa as datas gravadas nos JARs, e o workflow de release usa a data do commit da tag; checksum da distribuição do Maven no wrapper (#15).
 
 ### Alterado
@@ -18,12 +19,18 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - **Incompatível:** `icpbrasil-truststore.revocation.ocsp-cache-max-size` e `crl-cache-max-size` (entradas) foram substituídas por `ocsp-cache-max-bytes` (padrão 16 MiB) e `crl-cache-max-bytes` (padrão 256 MiB), com eviction por peso (#13).
 - **Incompatível:** `TrustStoreRepository` persiste por geração: `recuperarGeracao()` e `armazenarGeracao(zip, hash, confirmacao)` substituem `armazenarZip`/`armazenarHash`; filesystem e S3 gravam em `geracoes/<hash>/` e trocam o ponteiro `hash.txt` por último. O layout da 0.0.1 é lido e migrado sem novo download (#16).
 - `/certificate`: parâmetros validados antes da consulta (precedência 400 → 503 → 404); `ski` aceita octetos hexadecimais em maiúsculas ou minúsculas, de 1 a 64; `ski` ou `type` ausentes, vazios ou repetidos respondem 400 (#19).
+- Spring Boot 3.5.16, BouncyCastle 1.86, AWS SDK 2.55.8, commons-codec 1.22.1 e commons-compress 1.28.0 (#17).
 
 ### Corrigido
 
 - Âncoras TLS do download do ITI com o mesmo CN (reemissões e cross-signs) deixaram de se sobrescrever: o alias passou a ser o fingerprint SHA-256; certificado sem CN deixou de impedir a carga (#18).
 - Montagem de cadeia: a primeira URL AIA sem o emissor correto não encerra mais a busca; entre candidatos com o mesmo SKI, o emissor é escolhido pelo nome e pela assinatura, preferindo o autoassinado, em qualquer ordem (#20).
 - Acervo: a raiz autoassinada e sua versão cross-signed com o mesmo SKI são mantidas; o material PKIX usa ambas (#20).
+- Lombok deixou de ser empacotado no executável REST (escopo `provided`, excluído do repackage) (#17).
+
+### Segurança
+
+- Versões corrigidas de Tomcat (10.1.60), Netty (4.1.137), Jackson (2.21.6), Log4j API (2.25.5), HttpClient5 (5.6.3), HttpCore5 (5.4.3) e commons-lang3 (3.18.0) sobre o BOM do Spring Boot (#17).
 
 ## [0.0.1] - 2026-09-10
 

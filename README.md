@@ -393,6 +393,10 @@ Quando o ITI trocar de hierarquia (nova geração de intermediárias da Let's En
 ./mvnw clean package -DskipTests
 ```
 
+```bash
+./mvnw package -DskipTests -Psbom   # SBOM CycloneDX agregado em target/bom.json
+```
+
 ---
 
 ## Backlog
