@@ -67,15 +67,12 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
      */
     @Override
     public List<X509Certificate> getCertificates() {
-        byte[] zipData = trustStoreRepository.recuperarZip()
-                .filter(zip -> zip.length > 0)
-                .orElseThrow(() -> new IllegalStateException("ZIP ICP-Brasil ausente no repositório local"));
-        String expectedHash = trustStoreRepository.recuperarHash()
-                .filter(hash -> !hash.isBlank())
-                .orElseThrow(() -> new IllegalStateException("Hash ICP-Brasil ausente no repositório local"));
+        TrustStoreRepository.Geracao geracao = trustStoreRepository.recuperarGeracao()
+                .filter(g -> g.zip().length > 0)
+                .orElseThrow(() -> new IllegalStateException("Acervo ICP-Brasil ausente no repositório local"));
 
-        validateZipIntegrity(zipData, expectedHash);
-        return parseCertificates(zipData);
+        validateZipIntegrity(geracao.zip(), geracao.hash());
+        return parseCertificates(geracao.zip());
     }
 
     public byte[] baixarZipIcpBrasil() {
