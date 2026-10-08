@@ -56,6 +56,9 @@
     <spring-boot.version>3.4.5</spring-boot.version>
     <lombok.version>1.18.36</lombok.version>
     <surefire.version>3.2.5</surefire.version>
+    <!-- Build reproduzível: data fixa gravada nos JARs. O workflow de release a substitui pela
+         data do commit da tag. -->
+    <project.build.outputTimestamp>2026-09-29T00:00:00Z</project.build.outputTimestamp>
   </properties>
 
   <dependencyManagement>

@@ -25,6 +25,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # O valor do pom.xml vale para builds locais; a release grava nos artefatos a data do
+      # commit da tag, que todo rebuild do mesmo commit reproduz.
+      - name: Fixar a data dos artefatos na data do commit da tag
+        run: echo "OUTPUT_TIMESTAMP=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       # Roda antes de qualquer credencial: tag diferente de v<versão dos POMs> ou versão SNAPSHOT aborta.
       - name: Validar tag contra a versão do projeto
         env:
@@ -37,7 +42,7 @@ jobs:
           [[ "$RELEASE_TAG" == "v$version" ]] || { echo "Tag $RELEASE_TAG não corresponde à versão $version"; exit 1; }
 
       - name: Build e testes de todos os módulos (sem assinatura)
-        run: ./mvnw -B -ntp clean verify -Prelease -Dgpg.skip=true
+        run: ./mvnw -B -ntp clean verify -Prelease -Dgpg.skip=true -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
 
       - name: Configurar credenciais do Central e chave GPG
         uses: actions/setup-java@v4
@@ -60,7 +65,7 @@ jobs:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: ./mvnw -B -ntp -Prelease -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am deploy
+        run: ./mvnw -B -ntp -Prelease -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am deploy -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
 
       - name: Criar GitHub Release
         env:
