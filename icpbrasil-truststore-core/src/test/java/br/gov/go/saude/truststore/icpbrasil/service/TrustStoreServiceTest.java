@@ -493,6 +493,7 @@ class TrustStoreServiceTest {
         assertEquals(1, cache.getState().orElseThrow().raizesNaoFixadas().size());
     }
 
+    @SneakyThrows
     @Test
     void testRefresh_ReconfirmacaoPorHash_PreservaRaizesNaoFixadas() {
         byte[] zip = TestBundleFactory.bundleOf(rootA, rogueRoot);
@@ -503,7 +504,39 @@ class TrustStoreServiceTest {
 
         service.refresh();
 
+        verify(downloader, times(1)).downloadBytes(ZIP_URL);
+        assertEquals(T0.plus(Duration.ofHours(2)), cache.getState().orElseThrow().confirmedAt());
         assertEquals(1, cache.getState().orElseThrow().raizesNaoFixadas().size());
+    }
+
+    @SneakyThrows
+    @Test
+    void testRefresh_ItiSoComRaizesNaoFixadas_MantemSnapshotSemPersistir() {
+        remoto(hashA, zipA);
+        service.refresh();
+        clock.advance(Duration.ofHours(2));
+        byte[] zip = TestBundleFactory.bundleOf(rogueRoot, rogueIntermediate);
+        remoto(HashValidator.computeSha512(zip), zip);
+
+        service.refresh();
+
+        Cache.State state = cache.getState().orElseThrow();
+        assertEquals(hashA, state.hash());
+        assertEquals(T0.plus(TTL_MAX), state.expiresAt());
+        assertNotNull(cache.getCertificateBySki(ski(rootA)));
+        assertArrayEquals(zipA, repository.recuperarZip().orElseThrow());
+    }
+
+    @Test
+    void testRefresh_RepositorioLocalSoComRaizesNaoFixadas_NaoPublica() {
+        byte[] zip = TestBundleFactory.bundleOf(rogueRoot, rogueIntermediate);
+        storage(zip, HashValidator.computeSha512(zip), T0);
+        remotoIndisponivel();
+
+        service.refresh();
+
+        assertFalse(service.isCacheValid());
+        assertTrue(cache.getState().isEmpty());
     }
 
     private TrustStoreService criarServico(TrustStoreRepository repositorio) {

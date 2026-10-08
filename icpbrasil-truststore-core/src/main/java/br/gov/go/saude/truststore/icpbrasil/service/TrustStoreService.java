@@ -1,8 +1,10 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
+import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
+import br.gov.go.saude.truststore.icpbrasil.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 
 import java.security.cert.X509Certificate;
@@ -36,6 +38,7 @@ public class TrustStoreService {
      * pois estenderia a validade do acervo para além do TTL configurado.
      */
     private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(15);
+    private static final int MAX_LOG_RAIZ = 500;
 
     private final TrustStoreRepository trustStoreRepository;
     private final IcpBrasilCertificateProvider icpBrasilCertificateProvider;
@@ -109,7 +112,8 @@ public class TrustStoreService {
                 .map(Cache.State::raizesNaoFixadas)
                 .filter(raizes -> !raizes.isEmpty())
                 .ifPresent(raizes -> log.error(
-                        "Raízes fora da lista fixada descartadas (requer conferência e release): {}", raizes));
+                        "Raízes fora da lista fixada descartadas (requer conferência e release): {}",
+                        paraLog(raizes)));
     }
 
     private void carregarAcervoLocal(Instant now) {
@@ -137,6 +141,9 @@ public class TrustStoreService {
             byte[] zipData = geracao.zip();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hash);
             RaizesFixadas.Resultado acervo = raizesFixadas.filtrar(icpBrasilCertificateProvider.parseCertificates(zipData));
+            if (semCertificados(acervo)) {
+                return;
+            }
             cache.publish(acervo.certificados(), acervo.raizesDescartadas(), hash, confirmedAt, expiresAt);
             log.info("Acervo do repositório local publicado (confirmado em {})", confirmedAt);
         } catch (RuntimeException e) {
@@ -164,6 +171,9 @@ public class TrustStoreService {
             byte[] zipData = icpBrasilCertificateProvider.baixarZipIcpBrasil();
             icpBrasilCertificateProvider.validateZipIntegrity(zipData, hashRemoto);
             RaizesFixadas.Resultado acervo = raizesFixadas.filtrar(icpBrasilCertificateProvider.parseCertificates(zipData));
+            if (semCertificados(acervo)) {
+                return;
+            }
 
             // Publicar antes de persistir: a validação já precedeu ambos, e uma geração que remove
             // uma AC deve valer imediatamente mesmo com o repositório indisponível.
@@ -173,6 +183,24 @@ public class TrustStoreService {
             log.warn("Falha na sincronização com o ITI; snapshot atual mantido até o prazo original: {}",
                     e.getMessage());
         }
+    }
+
+    /**
+     * Acervo que o filtro esvaziou é tratado como ZIP sem certificados: não é publicado nem
+     * persistido, e o snapshot atual, se houver, segue até o prazo original.
+     */
+    private static boolean semCertificados(RaizesFixadas.Resultado acervo) {
+        if (!acervo.certificados().isEmpty()) {
+            return false;
+        }
+        log.error("Acervo sem nenhum certificado após descartar raízes fora da lista fixada; nada publicado: {}",
+                paraLog(acervo.raizesDescartadas()));
+        return true;
+    }
+
+    /** O subject vem do ZIP e pode conter quebras de linha que forjariam entradas no log. */
+    private static List<String> paraLog(List<RaizDescartada> raizes) {
+        return raizes.stream().map(raiz -> LogSanitizer.sanitizar(raiz.toString(), MAX_LOG_RAIZ)).toList();
     }
 
     /**

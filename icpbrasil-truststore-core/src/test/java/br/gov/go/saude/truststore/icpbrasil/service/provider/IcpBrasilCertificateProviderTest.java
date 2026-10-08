@@ -6,6 +6,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.RecoveryIcpBrasilResourceException;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
@@ -27,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -69,7 +71,8 @@ class IcpBrasilCertificateProviderTest {
         config = buildConfig(baseDir);
         repository = new FilesystemTrustStoreRepository(config);
         downloader = mock(Downloader.class);
-        provider = new IcpBrasilCertificateProvider(downloader, repository, ZIP_URL, HASH_URL);
+        provider = new IcpBrasilCertificateProvider(downloader, repository,
+                RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root))), ZIP_URL, HASH_URL);
     }
 
     @Test
@@ -319,6 +322,18 @@ class IcpBrasilCertificateProviderTest {
         List<X509Certificate> certificates = provider.getCertificates();
 
         assertEquals(List.of(root, intermediate), certificates);
+    }
+
+    @Test
+    void testGetCertificates_RaizNaoFixadaNoRepositorio_RetornaSoMaterialDasRaizesFixadas() {
+        KeyPair estranhaKp = TestBundleFactory.newKeyPair();
+        X509Certificate estranha = TestBundleFactory.caCert("Raiz Estranha", estranhaKp);
+        X509Certificate filhaDaEstranha = TestBundleFactory.intermediateCaCert("AC Estranha",
+                TestBundleFactory.newKeyPair(), estranha, estranhaKp);
+        byte[] zip = TestBundleFactory.bundleOf(root, intermediate, estranha, filhaDaEstranha);
+        repository.armazenarGeracao(zip, HashValidator.computeSha512(zip), Instant.now());
+
+        assertEquals(List.of(root, intermediate), provider.getCertificates());
     }
 
     @Test

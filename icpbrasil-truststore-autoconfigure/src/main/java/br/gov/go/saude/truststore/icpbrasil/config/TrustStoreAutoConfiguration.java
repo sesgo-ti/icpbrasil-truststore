@@ -124,10 +124,10 @@ public class TrustStoreAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public IcpBrasilCertificateProvider icpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig,
-                                                                     Downloader downloader,
-                                                                     TrustStoreRepository trustStoreRepository) {
-        return new IcpBrasilCertificateProvider(downloader, trustStoreRepository);
+    public IcpBrasilCertificateProvider icpBrasilCertificateProvider(Downloader downloader,
+                                                                     TrustStoreRepository trustStoreRepository,
+                                                                     RaizesFixadas raizesFixadas) {
+        return new IcpBrasilCertificateProvider(downloader, trustStoreRepository, raizesFixadas);
     }
 
     /**

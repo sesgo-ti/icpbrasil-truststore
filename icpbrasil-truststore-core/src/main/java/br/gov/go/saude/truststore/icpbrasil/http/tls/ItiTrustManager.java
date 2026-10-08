@@ -6,6 +6,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
 import br.gov.go.saude.truststore.icpbrasil.service.IncompleteChainException;
+import br.gov.go.saude.truststore.icpbrasil.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.net.ssl.CertPathTrustManagerParameters;
@@ -32,7 +33,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -52,7 +52,6 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
     private static final int MAX_POOL = 64;
     private static final int MAX_LOG_URL = 200;
     private static final int MAX_LOG_MOTIVO = 500;
-    private static final Pattern CONTROLE = Pattern.compile("[\\p{Cc}\\u2028\\u2029]");
 
     private final List<X509Certificate> anchors;
     private final Set<TrustAnchor> trustAnchors;
@@ -168,19 +167,10 @@ public final class ItiTrustManager extends X509ExtendedTrustManager {
     // URLs e mensagem podem vir do certificado de um MITM: sem isso, CR/LF forjariam linhas no log.
     private static void registrarRecusa(X509Certificate leaf, CertificateException motivo) {
         List<String> urls = CertificateParser.getCaIssuersUrls(leaf).stream()
-                .map(url -> sanitizarParaLog(url, MAX_LOG_URL))
+                .map(url -> LogSanitizer.sanitizar(url, MAX_LOG_URL))
                 .toList();
         log.warn("TLS do ITI recusado; CA Issuers da folha {}: {}",
-                urls, sanitizarParaLog(motivo.getMessage(), MAX_LOG_MOTIVO));
-    }
-
-    /** Troca controles C0/C1 (inclusive CR/LF e NEL) e separadores de linha Unicode por {@code ?} e trunca. */
-    static String sanitizarParaLog(String valor, int tamanhoMaximo) {
-        if (valor == null) {
-            return "null";
-        }
-        String limpo = CONTROLE.matcher(valor).replaceAll("?");
-        return limpo.length() <= tamanhoMaximo ? limpo : limpo.substring(0, tamanhoMaximo) + "...";
+                urls, LogSanitizer.sanitizar(motivo.getMessage(), MAX_LOG_MOTIVO));
     }
 
     /** @return {@code false} se a busca AIA falhou ou não trouxe nenhuma intermediária */
