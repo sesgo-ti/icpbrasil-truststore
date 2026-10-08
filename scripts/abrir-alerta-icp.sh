@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Abre a issue de alerta do workflow raizes-icp.yml ou, se ela já estiver aberta, comenta nela.
-# O corpo é o relatório gravado pelos testes de integração (AlertaIcp) ou, sem ele, um texto fixo
-# (ex.: falha de TLS no download, antes da conferência das raízes).
-# Requer GH_TOKEN e as variáveis GITHUB_* do Actions.
+# Abre a issue de alerta do raizes-icp.yml ou comenta nela, se já estiver aberta.
+# Corpo: relatório dos testes (AlertaIcp) ou texto fixo. Requer GH_TOKEN e as variáveis GITHUB_* do Actions.
 set -euo pipefail
 
 titulo="Alerta ICP-Brasil/TLS do ITI"

@@ -80,22 +80,20 @@ Notas importantes:
 
 ## Alerta agendado das raízes ICP-Brasil e do TLS do ITI
 
-O workflow *Alerta de raízes ICP-Brasil e TLS do ITI* (`.github/workflows/raizes-icp.yml`) roda todo dia
-às 09:17 UTC, em push na `main` e manualmente. Ele executa `DownloaderTest` (download real do ITI com as
-âncoras TLS fixadas em `ItiTlsAnchors`) e `RaizesFixadasIntegrationTest` (acervo real contra `RaizesFixadas`),
-com `-Pintegration-tests`. Se algo falha, abre a issue "Alerta ICP-Brasil/TLS do ITI"
-(`scripts/abrir-alerta-icp.sh`); enquanto ela estiver aberta, cada nova falha vira um comentário nela.
-Feche a issue quando o problema estiver resolvido.
+O workflow `.github/workflows/raizes-icp.yml` roda diariamente (por volta de 09:17 UTC), a cada push
+na `main` e sob demanda. Ele baixa o acervo real do ITI pelo TLS fixado e compara as raízes com
+`RaizesFixadas`. Qualquer falha abre a issue "Alerta ICP-Brasil/TLS do ITI"; com ela aberta, novas
+falhas viram comentários. Feche-a ao resolver.
 
-Ao receber a issue:
+Ao receber a issue, confirme no DOU/ITI antes de alterar qualquer lista:
 
-- **Raiz nova ou fora da lista**: confirmar no DOU/ITI que a mudança é oficial → atualizar `RaizesFixadas` → publicar release.
-- **Raiz fixada ausente do acervo**: confirmar no DOU/ITI se a raiz foi retirada → remover de `RaizesFixadas` → publicar release; sem retirada oficial, tratar como acervo com raiz omitida e investigar.
-- **Falha de TLS no download**: verificar se o ITI trocou de CA → atualizar `ItiTlsAnchors` → publicar release.
-- Falha sem mudança oficial (acervo adulterado ou instabilidade do ITI): investigar antes de alterar qualquer lista.
+- **Raiz nova ou fora da lista**: atualizar `RaizesFixadas` e publicar release.
+- **Raiz fixada ausente**: se a retirada for oficial, removê-la de `RaizesFixadas` e publicar release.
+- **Falha de TLS no download**: se o ITI trocou de CA, atualizar `ItiTlsAnchors` e publicar release.
+- **Sem mudança oficial** (acervo adulterado ou ITI instável): investigar.
 
-**Limitação**: o GitHub desativa workflows agendados após 60 dias sem atividade no repositório, e nenhum
-aviso é emitido. Em período sem commits, reative em Actions → o workflow → *Enable workflow*.
+**Limitação**: o GitHub desativa workflows agendados após 60 dias sem commits no repositório.
+Reative em Actions → o workflow → *Enable workflow*.
 
 ## Secrets da organização (GitHub → sesgo-ti → Actions)
 
