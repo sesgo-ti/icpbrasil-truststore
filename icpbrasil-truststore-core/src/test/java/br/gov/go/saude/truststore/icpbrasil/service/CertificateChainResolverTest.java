@@ -249,6 +249,48 @@ class CertificateChainResolverTest {
         verify(mockHttpClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
+    @Test
+    @SneakyThrows
+    void testResolveChain_PrimeiraAiaSemEmissorCorreto_TentaAProxima() {
+        String semEmissor = "http://test.example.com/outra.cer";
+        X509Certificate folha = leafWithAia(semEmissor, INTERMEDIATE_AIA_URL);
+        mockHttpResponse(semEmissor, generateRootCert(kpg().generateKeyPair()).getEncoded());
+        mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(List.of(intermediateCert, rootCert)));
+
+        List<X509Certificate> chain = resolver.resolveChain(folha);
+
+        assertEquals(List.of(folha, intermediateCert, rootCert), chain);
+    }
+
+    @Test
+    @SneakyThrows
+    void testResolveChain_RaizECrossSignedComMesmoSki_TerminaNaAutoassinadaEmAmbasAsOrdens() {
+        X509Certificate crossSigned = crossSign(rootCert, rootKeyPair);
+        assertEquals(CertificateParser.getSubjectKeyIdentifier(rootCert), CertificateParser.getSubjectKeyIdentifier(crossSigned));
+
+        for (List<X509Certificate> pacote : List.of(
+                List.of(intermediateCert, rootCert, crossSigned),
+                List.of(intermediateCert, crossSigned, rootCert))) {
+            mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(pacote));
+
+            assertEquals(List.of(leafCert, intermediateCert, rootCert), resolver.resolveChain(leafCert));
+        }
+    }
+
+    @Test
+    @SneakyThrows
+    void testResolveChain_CandidatoComSkiForjado_EmissorLegitimoSelecionadoEmAmbasAsOrdens() {
+        X509Certificate forjado = generateCertWithSpoofedSki(rootCert);
+
+        for (List<X509Certificate> pacote : List.of(
+                List.of(intermediateCert, rootCert, forjado),
+                List.of(intermediateCert, forjado, rootCert))) {
+            mockHttpResponse(INTERMEDIATE_AIA_URL, buildP7b(pacote));
+
+            assertEquals(List.of(leafCert, intermediateCert, rootCert), resolver.resolveChain(leafCert));
+        }
+    }
+
     // --- Helpers: HTTP mock ---
 
     @SneakyThrows
@@ -279,9 +321,46 @@ class CertificateChainResolverTest {
     // --- Helpers: geração de certificados ---
 
     @SneakyThrows
+    private static KeyPairGenerator kpg() {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        return kpg;
+    }
+
+    /** Folha emitida pela intermediária com várias URLs CA Issuers, na ordem informada. */
+    @SneakyThrows
+    private X509Certificate leafWithAia(String... urls) {
+        X500Name issuerName = issuerNameOf(intermediateCert);
+        X500Name subject = new X500Name("CN=Test Leaf Multi AIA, O=Test, C=BR");
+        X509v3CertificateBuilder builder = createBuilder(issuerName, subject, 5, leafKeyPair);
+        builder.addExtension(Extension.basicConstraints, false, new BasicConstraints(false));
+        addSki(builder, leafKeyPair);
+        addAki(builder, intermediateKeyPair);
+        AccessDescription[] descriptions = new AccessDescription[urls.length];
+        for (int i = 0; i < urls.length; i++) {
+            descriptions[i] = new AccessDescription(AccessDescription.id_ad_caIssuers,
+                    new GeneralName(GeneralName.uniformResourceIdentifier, urls[i]));
+        }
+        builder.addExtension(Extension.authorityInfoAccess, false, new AuthorityInformationAccess(descriptions));
+        return sign(builder, intermediateKeyPair);
+    }
+
+    /** Versão de {@code selfSigned} emitida por outra raiz: mesmo subject, mesma chave, mesmo SKI. */
+    @SneakyThrows
+    private static X509Certificate crossSign(X509Certificate selfSigned, KeyPair subjectKeyPair) {
+        KeyPair otherKeyPair = kpg().generateKeyPair();
+        X509Certificate otherRoot = generateRootCert(otherKeyPair);
+        X509v3CertificateBuilder builder = createBuilder(issuerNameOf(otherRoot), issuerNameOf(selfSigned), 7, subjectKeyPair);
+        builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
+        addSki(builder, subjectKeyPair);
+        addAki(builder, otherKeyPair);
+        return sign(builder, otherKeyPair);
+    }
+
+    @SneakyThrows
     private static X509Certificate generateIntermediateCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                                      X509Certificate issuerCert, String aiaUrl) {
-        X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
+        X500Name issuerName = issuerNameOf(issuerCert);
         X500Name subject = new X500Name("CN=Test Intermediate CA, O=Test, C=BR");
 
         X509v3CertificateBuilder builder = createBuilder(issuerName, subject, 2, subjectKeyPair);
@@ -296,7 +375,7 @@ class CertificateChainResolverTest {
     @SneakyThrows
     private static X509Certificate generateLeafCert(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                              X509Certificate issuerCert, String aiaUrl) {
-        X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
+        X500Name issuerName = issuerNameOf(issuerCert);
         X500Name subject = new X500Name("CN=Test Leaf, O=Test, C=BR");
 
         X509v3CertificateBuilder builder = createBuilder(issuerName, subject, 3, subjectKeyPair);
@@ -311,7 +390,7 @@ class CertificateChainResolverTest {
     @SneakyThrows
     private X509Certificate generateCertWithoutAia(KeyPair subjectKeyPair, KeyPair issuerKeyPair,
                                                    X509Certificate issuerCert) {
-        X500Name issuerName = new X500Name(issuerCert.getSubjectX500Principal().getName());
+        X500Name issuerName = issuerNameOf(issuerCert);
         X500Name subject = new X500Name("CN=Test No AIA, O=Test, C=BR");
 
         X509v3CertificateBuilder builder = createBuilder(issuerName, subject, 4, subjectKeyPair);

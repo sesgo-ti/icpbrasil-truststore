@@ -65,6 +65,11 @@ public class ValidacaoAssinaturaService {
 }
 ```
 
+`getCertificateBySki` devolve o candidato preferido quando o acervo tem mais de um certificado com
+o mesmo SKI (mesma chave reemitida ou cross-signed): o autoassinado, depois o de maior `notAfter`
+e, por fim, o de menor fingerprint SHA-256. Para montar cadeias, use `cache.getCertificatesBySki(ski)`,
+que devolve todos.
+
 ## 4. Variáveis de configuração relevantes
 
 | Propriedade | Default | Quando mudar |

@@ -3,10 +3,18 @@ package br.gov.go.saude.truststore.icpbrasil.service;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import lombok.extern.slf4j.Slf4j;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,9 +64,25 @@ public class Cache {
     public record Lookup(boolean available, X509Certificate certificate) {
     }
 
-    private record Snapshot(Map<String, X509Certificate> index, String hash,
+    /**
+     * @param index        SKI → candidato preferido (ver {@link #PREFERENCE})
+     * @param candidates   SKI → todos os certificados com esse SKI, o preferido primeiro
+     * @param certificates todos os certificados distintos da geração, na ordem recebida
+     */
+    private record Snapshot(Map<String, X509Certificate> index, Map<String, List<X509Certificate>> candidates,
+                            List<X509Certificate> certificates, String hash,
                             Instant confirmedAt, Instant expiresAt) {
     }
+
+    /**
+     * Ordem entre certificados que compartilham o SKI (mesma chave, reemitida ou cross-signed):
+     * autoassinado primeiro, por encerrar a cadeia; depois o de maior {@code notAfter}; por fim,
+     * o menor fingerprint SHA-256, só para que a escolha não dependa da ordem recebida.
+     */
+    static final Comparator<X509Certificate> PREFERENCE =
+            Comparator.comparing((X509Certificate certificate) -> !CertificateParser.isSelfSigned(certificate))
+                    .thenComparing(X509Certificate::getNotAfter, Comparator.reverseOrder())
+                    .thenComparing(Cache::fingerprint);
 
     private final Clock clock;
     private volatile Snapshot snapshot;
@@ -72,18 +96,24 @@ public class Cache {
     }
 
     /**
-     * Monta o índice SKI → certificado a partir dos certificados já parseados.
-     * Falha se algum certificado não tiver SKI, para que o pipeline detecte o problema antes
-     * de persistir ou publicar qualquer coisa.
-     *
-     * <p>Contrato: o índice tem uma entrada por SKI. Se o bundle trouxer dois certificados com o
-     * mesmo SKI (reemissão de uma AC com a mesma chave), o último na ordem do ZIP prevalece e o
-     * anterior deixa de constar do acervo servido; o caso é registrado em WARN.</p>
+     * Índice com uma entrada por SKI: o candidato preferido segundo {@link #PREFERENCE}. Os
+     * demais certificados com o mesmo SKI ficam fora do índice; no acervo publicado, continuam
+     * acessíveis por {@link #getCertificatesBySki} e {@link #currentCertificates}.
      *
      * @throws IllegalArgumentException se algum certificado não possuir a extensão SKI
      */
-    static Map<String, X509Certificate> indexBySki(List<X509Certificate> certificates) {
+    public static Map<String, X509Certificate> indexBySki(List<X509Certificate> certificates) {
         Map<String, X509Certificate> index = new HashMap<>();
+        candidatesBySki(distinct(certificates)).forEach((ski, candidates) -> index.put(ski, candidates.getFirst()));
+        return Map.copyOf(index);
+    }
+
+    private static List<X509Certificate> distinct(List<X509Certificate> certificates) {
+        return List.copyOf(new LinkedHashSet<>(certificates));
+    }
+
+    private static Map<String, List<X509Certificate>> candidatesBySki(List<X509Certificate> certificates) {
+        Map<String, List<X509Certificate>> grouped = new LinkedHashMap<>();
         for (X509Certificate certificate : certificates) {
             String ski;
             try {
@@ -92,27 +122,44 @@ public class Cache {
                 throw new IllegalArgumentException("Certificado sem Subject Key Identifier: "
                         + certificate.getSubjectX500Principal(), e);
             }
-            X509Certificate anterior = index.put(ski, certificate);
-            if (anterior != null) {
-                log.warn("SKI {} duplicado no acervo; mantido o último certificado ({})",
-                        ski, certificate.getSubjectX500Principal());
-            }
+            grouped.computeIfAbsent(ski, k -> new ArrayList<>()).add(certificate);
         }
-        return Map.copyOf(index);
+        Map<String, List<X509Certificate>> candidates = new HashMap<>();
+        grouped.forEach((ski, list) -> {
+            if (list.size() > 1) {
+                log.info("SKI {} compartilhado por {} certificados no acervo; todos mantidos", ski, list.size());
+            }
+            candidates.put(ski, list.stream().sorted(PREFERENCE).toList());
+        });
+        return Map.copyOf(candidates);
+    }
+
+    private static String fingerprint(X509Certificate certificate) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()));
+        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException("Certificado não codificável: " + certificate.getSubjectX500Principal(), e);
+        }
     }
 
     /**
-     * Publica um novo snapshot, substituindo o anterior de forma atômica.
-     * Pré-condição (garantida pelo pipeline): o índice foi montado a partir de um ZIP cujo
-     * hash foi validado e cujos certificados foram todos parseados.
+     * Publica um novo snapshot, substituindo o anterior de forma atômica. Certificados idênticos
+     * contam uma vez; os que compartilham SKI são todos mantidos.
+     *
+     * @throws IllegalArgumentException se algum certificado não possuir a extensão SKI; nesse
+     *                                  caso o snapshot anterior é mantido
      */
-    synchronized void publish(Map<String, X509Certificate> index, String hash,
+    synchronized void publish(List<X509Certificate> certificates, String hash,
                               Instant confirmedAt, Instant expiresAt) {
-        snapshot = new Snapshot(Map.copyOf(index), Objects.requireNonNull(hash, "hash"),
+        List<X509Certificate> distinct = distinct(certificates);
+        Map<String, List<X509Certificate>> candidates = candidatesBySki(distinct);
+        Map<String, X509Certificate> index = new HashMap<>();
+        candidates.forEach((ski, list) -> index.put(ski, list.getFirst()));
+        snapshot = new Snapshot(Map.copyOf(index), candidates, distinct, Objects.requireNonNull(hash, "hash"),
                 Objects.requireNonNull(confirmedAt, "confirmedAt"),
                 Objects.requireNonNull(expiresAt, "expiresAt"));
-        log.info("Cache de certificados atualizado com {} entradas (hash {}, expira em {}).",
-                index.size(), hash, expiresAt);
+        log.info("Cache de certificados atualizado com {} certificados e {} SKIs (hash {}, expira em {}).",
+                distinct.size(), index.size(), hash, expiresAt);
     }
 
     /**
@@ -128,7 +175,7 @@ public class Cache {
         if (atual == null || !atual.hash().equals(hash)) {
             return false;
         }
-        snapshot = new Snapshot(atual.index(), hash, Objects.requireNonNull(confirmedAt, "confirmedAt"),
+        snapshot = new Snapshot(atual.index(), atual.candidates(), atual.certificates(), hash, Objects.requireNonNull(confirmedAt, "confirmedAt"),
                 Objects.requireNonNull(expiresAt, "expiresAt"));
         log.info("Validade do cache renovada até {} (hash {}).", expiresAt, hash);
         return true;
@@ -174,6 +221,30 @@ public class Cache {
             return new Lookup(false, null);
         }
         return new Lookup(true, atual.index().get(ski));
+    }
+
+    /**
+     * Todos os certificados do acervo vigente com o SKI informado, o preferido primeiro (ver
+     * {@link #PREFERENCE}). Mais de um candidato ocorre quando uma AC foi reemitida ou
+     * cross-signed com a mesma chave; quem monta cadeias deve considerar todos.
+     *
+     * @return lista imutável; vazia se o SKI não existe ou se não há acervo vigente
+     */
+    public List<X509Certificate> getCertificatesBySki(String ski) {
+        Snapshot atual = vigente();
+        return atual == null ? List.of() : atual.candidates().getOrDefault(ski, List.of());
+    }
+
+    /**
+     * Todos os certificados distintos do acervo vigente, inclusive os que compartilham SKI.
+     * Como {@link #currentIndex()}, a referência é a da geração publicada e se mantém em
+     * {@code renew}, permitindo memoização por geração.
+     *
+     * @return lista imutável; vazia se não há acervo vigente
+     */
+    public List<X509Certificate> currentCertificates() {
+        Snapshot atual = vigente();
+        return atual == null ? List.of() : atual.certificates();
     }
 
     /**
