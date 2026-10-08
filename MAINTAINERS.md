@@ -158,8 +158,8 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main vX.Y.Z
 
 # 6. Acompanhe o workflow em Actions e aprove os jobs do environment `release`;
-#    ao final ele cria a GitHub Release e o artefato fica disponível no Central
-#    em até ~30 min
+#    ao final ele cria a GitHub Release. O job do Central conclui assim que o Central
+#    valida o bundle: o artefato pode ainda não estar disponível nesse momento
 
 # 7. Reabra o ciclo de desenvolvimento
 ./mvnw versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT && ./mvnw versions:commit
