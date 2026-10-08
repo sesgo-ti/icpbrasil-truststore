@@ -394,7 +394,7 @@ Quando o ITI trocar de hierarquia (nova geração de intermediárias da Let's En
 ```
 
 ```bash
-./mvnw package -DskipTests -Psbom   # SBOM CycloneDX agregado em target/bom.json (requer rede)
+./mvnw package -DskipTests -Psbom   # SBOM CycloneDX agregado em target/bom.json
 ```
 
 ---

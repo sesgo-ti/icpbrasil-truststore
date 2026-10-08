@@ -63,10 +63,9 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- Correções de segurança sobre o BOM do Spring Boot 3.5.16, apontadas pela SCA do CI
-           (ver SECURITY.md). Vêm antes do BOM do Boot porque, em dependencyManagement, a primeira
-           declaração vence; propriedades como tomcat.version só valem com o parent do Boot.
-           Remover cada entrada quando o BOM do Boot trouxer versão igual ou superior. -->
+      <!-- Versões corrigidas de dependências do BOM do Spring Boot. Precisam vir antes do import do
+           BOM: em dependencyManagement vence a primeira declaração. Ao subir o Spring Boot, remover
+           as que o BOM novo já cobre; esquecidas, elas rebaixam a versão. -->
       <dependency>
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
@@ -141,8 +140,7 @@
       </dependency>
 
       <!-- Versões de dependências compartilhadas — módulos herdam sem repetir a versão -->
-      <!-- Lombok só atua na compilação: provided o mantém fora das dependências transitivas dos
-           consumidores, e a mesma propriedade versiona a dependência e o annotation processor -->
+      <!-- Lombok só atua na compilação; provided o mantém fora das dependências dos consumidores -->
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
@@ -320,8 +318,8 @@
       </build>
     </profile>
 
-    <!-- SBOM CycloneDX agregado em target/bom.json; o timestamp segue project.build.outputTimestamp
-         e o número de série é omitido para que o SBOM seja reproduzível como os JARs. -->
+    <!-- Número de série omitido e timestamp de project.build.outputTimestamp: o SBOM sai
+         reproduzível como os JARs. -->
     <profile>
       <id>sbom</id>
       <build>

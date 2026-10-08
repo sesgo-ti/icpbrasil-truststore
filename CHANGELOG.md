@@ -11,7 +11,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
 - Cache de revogação: downloads concorrentes da mesma CRL ou da mesma resposta OCSP são compartilhados (#13).
-- SBOM CycloneDX (`-Psbom`) e análise de dependências com osv-scanner no CI, com exceções com responsável e validade em `osv-scanner.toml` (#17).
+- SBOM CycloneDX (`-Psbom`) e análise de dependências com osv-scanner no CI; exceções temporárias, com responsável e validade, em `osv-scanner.toml` (#17).
 - Build reproduzível: `project.build.outputTimestamp` fixa as datas gravadas nos JARs, e o workflow de release usa a data do commit da tag; checksum da distribuição do Maven no wrapper (#15).
 
 ### Alterado
@@ -30,7 +30,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ### Segurança
 
-- Versões corrigidas de Tomcat (10.1.60), Netty (4.1.137), Jackson (2.21.6), Log4j API (2.25.5), HttpClient5 (5.6.3), HttpCore5 (5.4.3) e commons-lang3 (3.18.0) sobre o BOM do Spring Boot; o osv-scanner não reporta vulnerabilidades no SBOM (#17).
+- Versões corrigidas de Tomcat (10.1.60), Netty (4.1.137), Jackson (2.21.6), Log4j API (2.25.5), HttpClient5 (5.6.3), HttpCore5 (5.4.3) e commons-lang3 (3.18.0) sobre o BOM do Spring Boot (#17).
 
 ## [0.0.1] - 2026-09-10
 

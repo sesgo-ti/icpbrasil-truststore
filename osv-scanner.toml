@@ -1,9 +1,7 @@
-# Exceções da análise de composição (SCA) feita pelo osv-scanner no CI sobre o SBOM (target/bom.json).
-#
-# Critério de bloqueio: toda vulnerabilidade conhecida em dependência distribuída falha o build.
-# Uma exceção só entra aqui depois da triagem descrita em SECURITY.md, com:
+# Exceções temporárias do osv-scanner no CI. Critério de bloqueio e triagem: SECURITY.md.
+# Cada exceção tem:
 #   - id: identificador OSV/GHSA/CVE;
-#   - ignoreUntil: data de validade (a exceção expira e o build volta a falhar);
+#   - ignoreUntil: no máximo 90 dias à frente; vencida, o build volta a falhar;
 #   - reason: por que o código não é afetado ou qual mitigação existe, e o responsável.
 #
 # Exemplo:

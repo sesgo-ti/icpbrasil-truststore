@@ -83,7 +83,6 @@ jobs:
           path: target/bom.json
           retention-days: 30
 
-      # Binário oficial com versão e checksum fixados; a base OSV é consultada no momento do scan.
       - name: Instalar osv-scanner
         run: |
           curl -sSfL -o "$RUNNER_TEMP/osv-scanner" \
@@ -91,6 +90,7 @@ jobs:
           echo "${OSV_SCANNER_SHA256}  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/osv-scanner"
 
-      # Critério de bloqueio e exceções: SECURITY.md e osv-scanner.toml
+      # A base OSV é consultada na hora: o job pode falhar sem mudança no código quando surge uma
+      # vulnerabilidade nova. Critério de bloqueio e exceções: SECURITY.md e osv-scanner.toml.
       - name: Analisar vulnerabilidades do SBOM
         run: '"$RUNNER_TEMP/osv-scanner" scan source --config osv-scanner.toml -L target/bom.json'
