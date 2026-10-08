@@ -242,6 +242,10 @@ Se a seção `revocation` não for definida no YAML, valores padrão são aplica
 
 O `PkixCertificateValidator` responde se um certificado é confiável **agora**: constrói o caminho até uma raiz do acervo ICP-Brasil com o `CertPathBuilder` PKIX do JDK, valida-o (encadeamento de nomes, assinaturas, validade, BasicConstraints, KeyUsage, políticas, extensões críticas e `jdk.certpath.disabledAlgorithms`) e verifica a revogação de cada certificado do caminho.
 
+Raízes aceitas: só as fixadas em `RaizesFixadas` (v5, v6, v7, v10, v11, v12); raiz fora da lista e seus descendentes são descartados do acervo publicado.
+
+A hierarquia v7 usa algoritmo proprietário (Kryptus, curva E-521) não suportado pelo JDK nem pelo BouncyCastle; certificados sob ela resultam em `Untrusted`.
+
 ```java
 ValidationResult result = validator.validate(certificado);          // só o certificado
 ValidationResult result = validator.validate(certificado, extras);  // com intermediárias conhecidas (ex.: de uma assinatura CMS)

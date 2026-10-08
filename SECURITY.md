@@ -53,8 +53,8 @@ We follow the principles of **responsible disclosure**. Once a fix is released w
 
 The trust chain (pinned TLS to ITI → SHA-512 validation → storage → in-memory index with write access restricted to the load pipeline) has two **documented residual risks** that operators must mitigate:
 
-1. **Hash and bundle share the same origin and channel.** ITI does not publish a detached signature for the CA bundle; the SHA-512 file is downloaded from the same host over the same TLS channel. Integrity validation therefore protects against corruption and storage tampering of a single artifact, not against a full compromise of the origin. Mitigation: TLS is pinned to a dedicated trust store (not the JVM defaults).
-2. **Storage (filesystem/S3) must have restrictive ACLs.** An attacker with write access to the storage can replace the *pair* (bundle + hash), which passes local revalidation until the next remote sync detects the divergence. Restrict write access to the artifact directory/bucket to the application identity only.
+1. **Hash and bundle share the same origin and channel.** ITI does not publish a detached signature for the CA bundle; the SHA-512 file is downloaded from the same host over the same TLS channel. Integrity validation therefore protects against corruption and storage tampering of a single artifact, not against a full compromise of the origin. Mitigation: TLS is pinned to a dedicated trust store (not the JVM defaults), and only the pinned ICP-Brasil roots (`RaizesFixadas`, by SHA-256) are accepted: an unpinned root and its descendants are discarded.
+2. **Storage (filesystem/S3) must have restrictive ACLs.** An attacker with write access to the storage can replace the *pair* (bundle + hash), which passes local revalidation until the next remote sync detects the divergence. With pinned roots, an attacker with write access can only present an old bundle or one without CAs, not insert a root. Restrict write access to the artifact directory/bucket to the application identity only.
 
 ## Dependency analysis (SBOM and SCA)
 

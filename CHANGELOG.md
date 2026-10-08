@@ -18,6 +18,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ### Alterado
 
+- **Incompatível:** raiz do acervo fora da lista fixada (v5, v6, v7, v10, v11, v12) é descartada com seus descendentes; o health expõe `raizesNaoFixadas`. `TrustStoreService` recebe `RaizesFixadas` nos construtores, e `Cache.State` ganhou o componente `raizesNaoFixadas`.
 - **Incompatível:** removidas `icpbrasil-truststore.trusted-certs.dir`, `certificate-url` e `hash-url`. O download do acervo usa endereço fixo do ITI e confia só nas raízes ISRG X1/X2 fixadas por fingerprint; intermediárias são obtidas via AIA restrito a `i.lencr.org`, sem intermediárias embutidas. Aplicações que ainda definem essas propriedades não recebem erro: elas são ignoradas.
 - **Incompatível:** `TrustStoreManager` passa a receber `TlsTrust` em vez de `CertificateProvider`, e `IcpBrasilCertificateProvider` deixa de receber `TrustStoreConfig`; removidos `TrustedCertsProvider`, `CertificateDTO` e `TrustStoreManager.TrustStoreCreationException`. O core deixa de depender do Jackson, que não chega mais à aplicação como dependência transitiva.
 - **Incompatível:** a biblioteca deixa de registrar o BouncyCastle na JVM (`Security.addProvider`); a verificação OCSP usa uma instância própria do provider. Aplicações que dependiam desse registro precisam fazê-lo por conta própria.
