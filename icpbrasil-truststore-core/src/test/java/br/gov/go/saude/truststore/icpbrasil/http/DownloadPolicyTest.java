@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -254,6 +255,24 @@ class DownloadPolicyTest {
 
         assertDoesNotThrow(() -> nonResolving.validateUrl("http://ocsp.example.com/status"));
         assertFalse(resolved.get());
+    }
+
+    @Test
+    void testValidateUrl_HostForaDaAllowlist_LancaExcecaoSemResolverDns() {
+        AtomicInteger resolucoes = new AtomicInteger();
+        TrustStoreConfig.DownloadPolicyConfig config = new TrustStoreConfig.DownloadPolicyConfig();
+        config.setBlockPrivateHostnames(true);
+        config.setAllowedDomains(List.of("permitido.example.com"));
+        DownloadPolicy contador = new DownloadPolicy(config) {
+            @Override
+            InetAddress[] resolve(String host) throws UnknownHostException {
+                resolucoes.incrementAndGet();
+                throw new UnknownHostException(host);
+            }
+        };
+
+        assertThrows(DownloadPolicyException.class, () -> contador.validateUrl("http://atacante.example.net/x"));
+        assertEquals(0, resolucoes.get());
     }
 
     /**

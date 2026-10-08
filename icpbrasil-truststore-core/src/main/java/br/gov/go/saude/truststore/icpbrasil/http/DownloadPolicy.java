@@ -108,6 +108,14 @@ public class DownloadPolicy {
             throw new DownloadPolicyException("Host ausente na URL: " + rawUrl);
         }
 
+        // A allowlist vem antes de qualquer resolução: a URL pode ser escolhida por um atacante
+        // e host fora da lista não deve gerar consulta DNS.
+        List<String> allowlist = config.getAllowedDomains();
+        if (allowlist != null && !allowlist.isEmpty() && !isAllowed(host, allowlist)) {
+            throw new DownloadPolicyException(
+                    "Domínio '" + host + "' não está na lista de domínios permitidos");
+        }
+
         if (BLOCKED_HOSTNAMES.contains(host.toLowerCase())) {
             throw new DownloadPolicyException("Host reservado bloqueado: " + host);
         }
@@ -120,12 +128,6 @@ public class DownloadPolicy {
             }
         } else if (config.isBlockPrivateHostnames()) {
             checkResolvedAddresses(host, rawUrl);
-        }
-
-        List<String> allowlist = config.getAllowedDomains();
-        if (allowlist != null && !allowlist.isEmpty() && !isAllowed(host, allowlist)) {
-            throw new DownloadPolicyException(
-                    "Domínio '" + host + "' não está na lista de domínios permitidos");
         }
     }
 
