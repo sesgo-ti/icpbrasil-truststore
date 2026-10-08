@@ -61,6 +61,8 @@ Na inicialização, um `ApplicationRunner` síncrono verifica se o acervo de ACs
 
 Se a carga inicial falhar (rede indisponível, hash inválido, timeout), o startup é abortado por padrão (`bootstrap.fail-fast=true`). Veja [Inicialização síncrona (bootstrap)](#inicialização-síncrona-bootstrap) para ajustar esse comportamento em testes ou cenários de desenvolvimento sem conectividade.
 
+**Verificação da assinatura:** o Maven não verifica os arquivos `.asc` por padrão. Para exigir que as dependências estejam assinadas por chaves conhecidas, use o [`pgpverify-maven-plugin`](https://www.simplify4u.org/pgpverify-maven-plugin/) e inclua a chave de release no `keysMap` (fingerprint `8EF6 6D44 5A97 6C0A 2C3B 4FB5 566A 199A 481E 3355`, conforme [MAINTAINERS.md](MAINTAINERS.md#chave-gpg-de-release)).
+
 Para um exemplo completo de integração (incluindo o comportamento do bootstrap síncrono e testes), veja [docs/exemplo-integracao-lib.md](docs/exemplo-integracao-lib.md).
 
 **Configuração mínima:**
@@ -365,22 +367,15 @@ A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBoo
 
 ## Contexto SSL e segurança
 
-O download do acervo usa um `SSLContext` interno, encapsulado em `TrustStoreManager`, que confia **exclusivamente** nas raízes ISRG Root X1 e X2 (`tls/iti/`, fixadas por fingerprint SHA-256). Não há intermediárias embutidas: elas são obtidas via AIA CA Issuers, restrito a `i.lencr.org`, e validadas por PKIX contra essas raízes. O contexto não é exposto como bean Spring nem aplicado à JVM. O endereço do acervo é fixo (`IcpBrasilEndpoints`): troca de CA ou de endereço do ITI exige nova release.
-
-O isolamento é intencional: usar a truststore padrão da JVM para essa conexão exporia o download a um MITM com qualquer uma das ~150 CAs comerciais presentes no `cacerts`.
-
-| Contexto | Trust utilizado |
+| Canal | Confiança |
 |---|---|
-| Download do acervo de ACs (repositório ITI) | Apenas ISRG Root X1 e X2 fixadas |
-| Conexão S3 sem `S3_CA_CERT_PATH` | JVM default truststore (`cacerts`) |
-| Conexão S3 com `S3_CA_CERT_PATH` | TrustManager dedicado com aquela CA |
-| Downloads de AIA CA Issuers, OCSP e CRL | JVM default truststore (`cacerts`), declarado explicitamente via `TlsTrust.jvmDefault()` |
+| Download do acervo (ITI) | Raízes ISRG X1/X2 fixadas; intermediárias via AIA em `i.lencr.org` |
+| AIA, OCSP e CRL | `cacerts` da JVM; URLs `http://` e integridade pela assinatura |
+| S3/MinIO | `cacerts` da JVM ou a CA de `S3_CA_CERT_PATH` |
 
-> **Diferença importante:** Ao contrário do download do acervo ITI — que usa um `SSLContext` isolado com CAs próprias —, os downloads disparados por extensões de certificados X.509 (AIA CA Issuers, endpoints OCSP, CRL Distribution Points) **não possuem isolamento de `SSLContext`** (usam o `cacerts` da JVM). Esses endpoints são públicos, operados pelas próprias ACs, e a confiança no certificado TLS deles recai sobre a truststore padrão da JVM. A camada de segurança aplicada a esses downloads é o `DownloadPolicy` — um mecanismo distinto que atua na validação da URL de destino (bloqueio de SSRF, IPs privados, esquemas não-HTTP(S)) e no limite de tamanho da resposta antes de carregá-la em memória. Veja a seção [Política de download](#política-de-download-ssrf-e-limites-de-tamanho) para detalhes de configuração.
+O `SSLContext` do download não é exposto como bean nem aplicado à JVM. A confiança no canal do ITI e nas raízes ICP-Brasil nunca muda por configuração; só código da aplicação pode alterá-la (bean próprio de `TrustStoreManager`, `TrustMaterialSource` ou `RaizesFixadas`), e a biblioteca registra `WARN` quando isso acontece. No S3, a confiança é configurada por `S3_CA_CERT_PATH`. A confiança de cada canal é registrada em log no início. Os downloads por extensões X.509 passam pelo `DownloadPolicy` descrito em [Política de download](#política-de-download-ssrf-e-limites-de-tamanho).
 
-A confiança de cada canal (acervo ITI, S3, AIA/OCSP/CRL) é registrada em log no início. Configuração nunca altera a confiança; só código da aplicação pode, ao declarar o próprio bean de `TrustStoreManager` ou de `TrustMaterialSource` — e a biblioteca emite um `WARN` quando isso acontece.
-
-Se o ITI trocar de CA, o download falha e a biblioteca registra `WARN` com o motivo e as URLs de CA Issuers. O teste de integração `DownloaderTest` (`./mvnw verify -Pintegration-tests`) baixa do ITI real. Procedimento de atualização: [gestão das âncoras TLS](docs/manual-gestao-certificados-confiaveis.md).
+Troca de CA do ITI ou nova raiz ICP-Brasil: [manual de gestão](docs/manual-gestao-certificados-confiaveis.md). Sinais de falha: [monitoramento](docs/manual-monitoramento.md).
 
 ---
 
@@ -401,11 +396,3 @@ Se o ITI trocar de CA, o download falha e a biblioteca registra `WARN` com o mot
 ```bash
 ./mvnw package -DskipTests -Psbom   # SBOM CycloneDX agregado em target/bom.json
 ```
-
----
-
-## Backlog
-
-- [ ] **Notificação de cache crítico** — webhook ou e-mail ao atingir `cache-ttl-critical-hours` sem sincronização
-- [ ] **Notificação de cache expirado** — alerta de severidade máxima ao atingir `cache-ttl-max-hours`
-- [ ] **Suporte a múltiplas CAs para S3** — `S3_CA_CERT_PATH` aceita apenas um certificado; suporte a bundle completo para cadeias intermediárias

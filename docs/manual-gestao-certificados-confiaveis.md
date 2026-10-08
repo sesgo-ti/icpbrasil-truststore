@@ -1,25 +1,21 @@
-## Gestão das âncoras TLS do download do acervo
+# Gestão das raízes confiáveis
 
-Objetivo: manter as raízes em que o `SSLContext` interno confia para baixar o acervo de ACs
-vigentes do ITI (`acraiz.icpbrasil.gov.br`).
+Objetivo: manter atualizadas as raízes fixadas na biblioteca, as do TLS do download do ITI e as do acervo ICP-Brasil.
 
-### Conjuntos de confiança
+Sinais de falha (logs, health): [manual de monitoramento](manual-monitoramento.md).
 
-| Conjunto | Origem | Para que serve |
+## O que é fixado e onde
+
+| O quê | Onde | Para que serve |
 |---|---|---|
-| Âncoras TLS do download do ITI | PEM ISRG Root X1 e X2 em `core/src/main/resources/tls/iti/`, fixados por SHA-256 em `ItiTlsAnchors.FINGERPRINTS` | `SSLContext` interno, usado **apenas** para baixar o ZIP e o hash do acervo |
-| Intermediárias do TLS do ITI | AIA CA Issuers, restrito a `i.lencr.org` | Candidatas para formar o caminho até as raízes ISRG; nunca são âncoras |
-| Acervo ICP-Brasil | ZIP oficial do ITI, validado pelo SHA-512 publicado | Raízes e intermediárias ICP-Brasil servidas por `/certificate` e usadas na validação PKIX |
-| Emissores baixados via AIA | Extensão CA Issuers dos certificados validados | Candidatos para **montar** a cadeia; nunca estabelecem confiança |
+| Raízes ISRG X1 e X2 | PEM em `icpbrasil-truststore-core/src/main/resources/tls/iti/`; SHA-256 em `ItiTlsAnchors.FINGERPRINTS` | Âncoras do `SSLContext` interno, usado **apenas** para baixar o ZIP e o hash do acervo |
+| Intermediárias do TLS do ITI | AIA CA Issuers, restrito a `i.lencr.org` | Candidatas ao caminho até as raízes ISRG; nunca são âncoras |
+| Raízes ICP-Brasil | SHA-256 em `RaizesFixadas.PRODUCAO` | Só as raízes listadas entram no acervo publicado e na validação PKIX |
 
 Nada é adicionado ao `cacerts` nem aplicado à JVM. O endereço do acervo é fixo na biblioteca e
-não há propriedade para alterar âncoras ou endereço: mudança exige nova release.
+não há propriedade para alterar âncoras ou endereço: toda mudança exige nova release.
 
-### Sintoma
-
-O download do acervo falha e o log traz `WARN` com o motivo e as URLs de CA Issuers.
-
-### Procedimento: ITI trocou de CA
+## Procedimento: ITI trocou de CA
 
 1. Confira a cadeia nova:
 
@@ -34,24 +30,19 @@ O download do acervo falha e o log traz `WARN` com o motivo e as URLs de CA Issu
    openssl x509 -in RAIZ.pem -noout -fingerprint -sha256
    ```
 
-4. Copie o PEM para `icpbrasil-truststore-core/src/main/resources/tls/iti/` e adicione o
-   fingerprint a `ItiTlsAnchors.FINGERPRINTS`.
-5. Rode `./mvnw verify` e, com rede, `./mvnw verify -Pintegration-tests`.
-6. Registre a mudança no CHANGELOG.
-7. Publique a release.
+4. Copie o PEM para `icpbrasil-truststore-core/src/main/resources/tls/iti/` e adicione o fingerprint a `ItiTlsAnchors.FINGERPRINTS`.
+5. Se a nova CA servir as intermediárias fora de `i.lencr.org`, altere também a restrição do AIA no código.
+6. Valide e publique (checklist abaixo).
 
-Se a nova CA servir as intermediárias fora de `i.lencr.org`, a restrição do AIA também precisa
-mudar no código.
-
-## Gestão das raízes ICP-Brasil fixadas
-
-Só as raízes listadas em `RaizesFixadas` (por SHA-256) entram no acervo publicado; o log `ERROR`
-`Raízes fora da lista fixada descartadas` e o detalhe `raizesNaoFixadas` do health indicam raiz fora da lista.
-
-### Procedimento: Nova raiz ICP-Brasil
+## Procedimento: nova raiz ICP-Brasil
 
 1. Confira o fingerprint SHA-256 no DOU/ITI (nunca só no ZIP do acervo).
 2. Acrescente-o a `RaizesFixadas.PRODUCAO`, com comentário da versão da hierarquia.
-3. Rode `./mvnw verify -Pintegration-tests`.
-4. Registre a mudança no CHANGELOG.
-5. Publique a release.
+3. Valide e publique (checklist abaixo).
+
+## Checklist
+
+1. `./mvnw verify`.
+2. Com rede: `./mvnw verify -Pintegration-tests`.
+3. Registrar a mudança no CHANGELOG.
+4. Publicar a release ([MAINTAINERS.md](../MAINTAINERS.md#publicando-uma-nova-versão)).
