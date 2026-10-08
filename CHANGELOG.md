@@ -7,6 +7,10 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Alterado
+
+- Release: o deploy no Maven Central espera só a validação do bundle, não a publicação, para não falhar por timeout com o artefato já publicado.
+
 ## [0.0.2] - 2026-10-08
 
 ### Adicionado

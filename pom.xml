@@ -423,7 +423,9 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
-              <waitUntil>published</waitUntil>
+              <!-- Espera só a validação: a publicação segue automática no Central, mas a sincronização
+                   pode passar dos 30 min do waitMaxTime e marcar como falho um deploy bem-sucedido. -->
+              <waitUntil>validated</waitUntil>
               <!-- Exclui o fat jar do REST. Não usar skipPublishing no módulo: como último do
                    reactor, a flag suprimia o upload de todos os módulos (plugin anterior à 0.9.0). -->
               <excludeArtifacts>
