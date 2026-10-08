@@ -35,30 +35,9 @@ jobs:
           ./mvnw -B -ntp -pl icpbrasil-truststore-core -am verify -Pintegration-tests
           -Dtest='DownloaderTest,RaizesFixadasIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false
 
+      # Falha em qualquer passo anterior abre a issue de alerta, ou comenta nela se já estiver aberta.
       - name: Abrir issue de alerta
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          corpo=icpbrasil-truststore-core/target/alerta-icp.md
-          if [[ -f "$corpo" ]]; then
-            base="$corpo"
-          else
-            # Sem relatório (ex.: falha de TLS no download ou erro antes dos testes): o título deriva de um texto fixo,
-            # porque o corpo traz a URL da execução e mudaria a cada dia.
-            base=$(mktemp)
-            printf 'O job falhou na verificação real (download do ITI com as âncoras fixadas ou conferência das raízes). Ver a execução abaixo.\n' > "$base"
-            mkdir -p "$(dirname "$corpo")"
-            { cat "$base"; printf '\nExecução: %s/%s/actions/runs/%s\n' \
-                "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"; } > "$corpo"
-          fi
-          titulo="Alerta ICP-Brasil/TLS: $(sha256sum "$base" | cut -c1-12)"
-          existente=$(gh issue list -R "$GITHUB_REPOSITORY" --state open \
-            --search "\"$titulo\" in:title" --json number,title \
-            -q "map(select(.title == \"$titulo\")) | .[0].number // empty")
-          if [[ -n "$existente" ]]; then
-            echo "Issue já aberta (#$existente): $titulo"
-          else
-            gh issue create -R "$GITHUB_REPOSITORY" --title "$titulo" --body-file "$corpo"
-          fi
+        run: scripts/abrir-alerta-icp.sh

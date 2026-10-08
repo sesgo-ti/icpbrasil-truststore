@@ -83,8 +83,9 @@ Notas importantes:
 O workflow *Alerta de raízes ICP-Brasil e TLS do ITI* (`.github/workflows/raizes-icp.yml`) roda todo dia
 às 09:17 UTC, em push na `main` e manualmente. Ele executa `DownloaderTest` (download real do ITI com as
 âncoras TLS fixadas em `ItiTlsAnchors`) e `RaizesFixadasIntegrationTest` (acervo real contra `RaizesFixadas`),
-com `-Pintegration-tests`. Se algo diverge, abre uma issue cujo título traz o hash do relatório: a mesma
-divergência não gera issue duplicada enquanto a anterior estiver aberta.
+com `-Pintegration-tests`. Se algo falha, abre a issue "Alerta ICP-Brasil/TLS do ITI"
+(`scripts/abrir-alerta-icp.sh`); enquanto ela estiver aberta, cada nova falha vira um comentário nela.
+Feche a issue quando o problema estiver resolvido.
 
 Ao receber a issue:
 
