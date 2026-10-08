@@ -7,6 +7,8 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-08
+
 ### Adicionado
 
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
@@ -90,5 +92,6 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - `DownloadPolicy.validateOcspResponseSize`, `validateCrlResponseSize` e `validateAiaResponseSize`: o limite é aplicado pelo transporte durante o recebimento.
 - Métodos públicos de mutação do acervo em `TrustStoreService` (`assegurarDisponibilidade`, `reposicaoArtefatosRepositorioLocal`, `carregarArtefatosNoRepositorioLocal`, `verificarDisponibilidadeRepositorioLocal`, `verificarSincronizacaoRepositorioLocal`, `assegurrarNaoExpiracaoCache`) e o enum `DisponibilidadeRepositorio`; `refresh()` é o único ponto de entrada.
 
-[Unreleased]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/9f6a0b852e7d10ecef4799396e8c250ea47cfa46...main
+[Unreleased]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/v0.0.2...main
+[0.0.2]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/sesgo-ti/icpbrasil-truststore/tree/9f6a0b852e7d10ecef4799396e8c250ea47cfa46
