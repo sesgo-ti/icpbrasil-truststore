@@ -89,6 +89,7 @@ divergência não gera issue duplicada enquanto a anterior estiver aberta.
 Ao receber a issue:
 
 - **Raiz nova ou fora da lista**: confirmar no DOU/ITI que a mudança é oficial → atualizar `RaizesFixadas` → publicar release.
+- **Raiz fixada ausente do acervo**: confirmar no DOU/ITI se a raiz foi retirada → remover de `RaizesFixadas` → publicar release; sem retirada oficial, tratar como acervo com raiz omitida e investigar.
 - **Falha de TLS no download**: verificar se o ITI trocou de CA → atualizar `ItiTlsAnchors` → publicar release.
 - Falha sem mudança oficial (acervo adulterado ou instabilidade do ITI): investigar antes de alterar qualquer lista.
 

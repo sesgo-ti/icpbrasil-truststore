@@ -45,10 +45,10 @@ jobs:
           if [[ -f "$corpo" ]]; then
             base="$corpo"
           else
-            # Sem relatório (ex.: falha de TLS no download): o título deriva de um texto fixo,
+            # Sem relatório (ex.: falha de TLS no download ou erro antes dos testes): o título deriva de um texto fixo,
             # porque o corpo traz a URL da execução e mudaria a cada dia.
             base=$(mktemp)
-            printf 'Falha no download real do ITI com as âncoras fixadas (troca de CA ou de hierarquia).\n' > "$base"
+            printf 'O job falhou na verificação real (download do ITI com as âncoras fixadas ou conferência das raízes). Ver a execução abaixo.\n' > "$base"
             mkdir -p "$(dirname "$corpo")"
             { cat "$base"; printf '\nExecução: %s/%s/actions/runs/%s\n' \
                 "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"; } > "$corpo"
