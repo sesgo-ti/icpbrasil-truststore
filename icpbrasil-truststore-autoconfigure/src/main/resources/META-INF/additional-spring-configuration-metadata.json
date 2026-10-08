@@ -156,16 +156,16 @@
       "defaultValue": 3600
     },
     {
-      "name": "icpbrasil-truststore.revocation.ocsp-cache-max-size",
+      "name": "icpbrasil-truststore.revocation.ocsp-cache-max-bytes",
       "type": "java.lang.Long",
-      "description": "Máximo de respostas OCSP em cache (100 a 1000000).",
-      "defaultValue": 10000
+      "description": "Orçamento do cache OCSP em bytes de DER (1048576 a 1073741824). Entradas mais antigas são descartadas ao exceder.",
+      "defaultValue": 16777216
     },
     {
-      "name": "icpbrasil-truststore.revocation.crl-cache-max-size",
+      "name": "icpbrasil-truststore.revocation.crl-cache-max-bytes",
       "type": "java.lang.Long",
-      "description": "Máximo de CRLs em cache (100 a 100000).",
-      "defaultValue": 1000
+      "description": "Orçamento do cache de CRLs em bytes de DER (16777216 a 4294967296). A CRL decodificada ocupa mais que o DER; dimensione o heap com folga.",
+      "defaultValue": 268435456
     },
     {
       "name": "icpbrasil-truststore.download-policy.max-ocsp-response-bytes",

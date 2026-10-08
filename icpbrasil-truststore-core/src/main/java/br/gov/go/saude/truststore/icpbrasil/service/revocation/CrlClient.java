@@ -76,6 +76,11 @@ public class CrlClient {
     private final TrustStoreConfig.RevocationConfig config;
     private final CertificateHttpTransport transport;
     private final Clock clock;
+    /** Downloads concorrentes da mesma URL compartilham uma única transferência e decodificação. */
+    private final InFlightLoads<String, Downloaded> downloads = new InFlightLoads<>();
+
+    /** DER baixado e sua decodificação; {@code crl} nulo se o conteúdo não é uma CRL X.509. */
+    private record Downloaded(byte[] der, X509CRL crl) {}
 
     /**
      * Construtor de produção: o transporte é compartilhado com os demais clientes de artefatos
@@ -159,13 +164,16 @@ public class CrlClient {
         }
 
         try {
-            byte[] crlBytes = retryPolicy.executeWithRetry(
-                    "CRL " + url,
-                    config.getMaxRetries(),
-                    config.getRetryIntervalSeconds() * 1000L,
-                    () -> download(url));
-
-            X509CRL crl = decode(crlBytes);
+            Downloaded downloaded = downloads.load(url, () -> {
+                byte[] der = retryPolicy.executeWithRetry(
+                        "CRL " + url,
+                        config.getMaxRetries(),
+                        config.getRetryIntervalSeconds() * 1000L,
+                        () -> download(url));
+                return new Downloaded(der, decode(der));
+            });
+            byte[] crlBytes = downloaded.der();
+            X509CRL crl = downloaded.crl();
             if (crl == null) {
                 log.warn("Conteúdo de {} não é uma CRL X.509 decodificável", url);
                 return RevocationLookup.inconclusive(new RevocationStatus.Malformed("CRL"));
@@ -176,7 +184,7 @@ public class CrlClient {
             }
             RevocationStatus result = evaluate(crl, crlBytes, cert, issuer, url, point);
             if (result.isConclusive()) {
-                cache.putCrl(url, crl);
+                cache.putCrl(url, crl, crlBytes.length);
             }
             return lookupOf(result, crl);
         } catch (DownloadPolicyException e) {

@@ -97,8 +97,8 @@ icpbrasil-truststore:
     retry-interval-seconds: 3       # Intervalo entre tentativas (1-60s)
     ocsp-cache-ttl-seconds: 3600    # TTL do cache OCSP (60-86400s)
     crl-cache-ttl-seconds: 3600     # TTL do cache CRL (60-86400s)
-    ocsp-cache-max-size: 10000      # Máximo de entradas no cache OCSP (100-1000000)
-    crl-cache-max-size: 1000        # Máximo de entradas no cache CRL (100-100000)
+    ocsp-cache-max-bytes: 16777216    # Orçamento do cache OCSP em bytes de DER (1 MiB - 1 GiB)
+    crl-cache-max-bytes: 268435456    # Orçamento do cache CRL em bytes de DER (16 MiB - 4 GiB)
 
   # Diretório de Certificados Confiáveis Fixos
   # [Resultado]: Local onde o sistema busca certificados adicionais (JSON) no classpath ou disco

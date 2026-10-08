@@ -177,7 +177,15 @@ icpbrasil-truststore:
     retry-interval-seconds: 3
     ocsp-cache-ttl-seconds: 3600
     crl-cache-ttl-seconds: 3600
+    ocsp-cache-max-bytes: 16777216    # orçamento em bytes de DER (1 MiB–1 GiB)
+    crl-cache-max-bytes: 268435456    # orçamento em bytes de DER (16 MiB–4 GiB)
 ```
+
+Os caches de revogação são limitados por **bytes**, não por quantidade de entradas: uma CRL da
+ICP-Brasil vai de poucos kilobytes a dezenas de megabytes. O peso de cada entrada é o tamanho do
+DER; como a CRL fica guardada decodificada, ela ocupa mais que isso no heap — dimensione a memória
+com folga. Consultas simultâneas pela mesma CRL (mesma URL) ou pela mesma resposta OCSP (mesmo
+emissor, serial e responder) compartilham um único download; falhas não ficam memorizadas.
 
 O `RevocationService` verifica se um certificado foi revogado consultando OCSP e CRL. A estratégia é:
 
