@@ -1,9 +1,12 @@
 package br.gov.go.saude.truststore.icpbrasil.service.pkix;
 
+import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CacheFixture;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestClock;
+import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +46,14 @@ class TrustMaterialTest {
         KeyPair otherKp = TestBundleFactory.newKeyPair();
         otherRoot = TestBundleFactory.caCert("Raiz B", otherKp);
         rootCrossSigned = TestBundleFactory.intermediateCaCert("Raiz A", rootKp, otherRoot, otherKp);
+    }
+
+    @Test
+    @SneakyThrows
+    void testOf_RaizV7_ViraAncora() {
+        X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
+
+        assertEquals(Set.of(v7), trustedCerts(TrustMaterial.of(List.of(v7)).anchors()));
     }
 
     @Test

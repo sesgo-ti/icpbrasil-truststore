@@ -1,8 +1,10 @@
 package br.gov.go.saude.truststore.icpbrasil.service;
 
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.model.RaizDescartada;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestClock;
+import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +65,15 @@ class CacheTest {
     }
 
     @Test
+    @SneakyThrows
+    void testGetRootCertificates_RaizV7_ClassificadaComoRaiz() {
+        X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
+        cache.publish(List.of(v7), HASH_A, T0, T0.plus(TTL));
+
+        assertTrue(cache.getRootCertificates().containsValue(v7));
+    }
+
+    @Test
     void testLeituras_SemSnapshot_RetornamVazio() {
         assertNull(cache.getCertificateBySki(ski(root)));
         assertTrue(cache.getAllCertificates().isEmpty());
@@ -85,6 +96,24 @@ class CacheTest {
         assertEquals(T0, state.confirmedAt());
         assertEquals(T0.plus(TTL), state.expiresAt());
         assertTrue(state.valid());
+    }
+
+    @Test
+    void testPublish_SemDescartadas_EstadoComListaVazia() {
+        cache.publish(certsA, HASH_A, T0, T0.plus(TTL));
+
+        assertEquals(List.of(), cache.getState().orElseThrow().raizesNaoFixadas());
+    }
+
+    @Test
+    void testPublishERenew_RaizesDescartadas_ExpostasEPreservadasNaRenovacao() {
+        RaizDescartada estranha = new RaizDescartada("CN=Estranha", "ab".repeat(32));
+        cache.publish(certsA, List.of(estranha), HASH_A, T0, T0.plus(TTL));
+        assertEquals(List.of(estranha), cache.getState().orElseThrow().raizesNaoFixadas());
+
+        assertTrue(cache.renew(HASH_A, T0.plusSeconds(60), T0.plus(TTL).plusSeconds(60)));
+
+        assertEquals(List.of(estranha), cache.getState().orElseThrow().raizesNaoFixadas());
     }
 
     @Test

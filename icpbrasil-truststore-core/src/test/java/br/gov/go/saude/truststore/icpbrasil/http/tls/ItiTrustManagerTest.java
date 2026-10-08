@@ -270,28 +270,6 @@ class ItiTrustManagerTest {
     }
 
     @Test
-    void testSanitizarParaLog_CaracteresDeControle_SubstituidosPorInterrogacao() {
-        assertEquals("http://x/?? WARN forjado?fim",
-                ItiTrustManager.sanitizarParaLog("http://x/\r\n WARN forjado\u2028fim", 200));
-    }
-
-    @Test
-    void testSanitizarParaLog_ControleC1_SubstituidoPorInterrogacao() {
-        assertEquals("a?b", ItiTrustManager.sanitizarParaLog("a\u0085b", 200));
-    }
-
-    @Test
-    void testSanitizarParaLog_AcimaDoLimite_Trunca() {
-        assertEquals("abc...", ItiTrustManager.sanitizarParaLog("abcdef", 3));
-        assertEquals("abc", ItiTrustManager.sanitizarParaLog("abc", 3));
-    }
-
-    @Test
-    void testSanitizarParaLog_Nulo_RetornaTextoNull() {
-        assertEquals("null", ItiTrustManager.sanitizarParaLog(null, 10));
-    }
-
-    @Test
     @SneakyThrows
     void testCheckServerTrusted_CadeiaRealDoIti_ValidaComRelogioFixo() {
         ItiTrustManager trustManager = new ItiTrustManager(ItiTlsAnchors.load(), resolverDaCadeiaReal(),

@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.config;
 import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -23,7 +24,7 @@ class TrustOverrideReporter implements SmartInitializingSingleton {
 
     // Downloader e CertificateHttpTransport carregam a confiança do canal (SSLContext e política de destino).
     static final List<Class<?>> TIPOS_DE_CONFIANCA = List.of(
-            TrustStoreManager.class, TrustMaterialSource.class,
+            TrustStoreManager.class, TrustMaterialSource.class, RaizesFixadas.class,
             Downloader.class, CertificateHttpTransport.class);
 
     private final ConfigurableListableBeanFactory beanFactory;

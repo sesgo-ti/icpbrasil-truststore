@@ -42,3 +42,16 @@ O download do acervo falha e o log traz `WARN` com o motivo e as URLs de CA Issu
 
 Se a nova CA servir as intermediárias fora de `i.lencr.org`, a restrição do AIA também precisa
 mudar no código.
+
+## Gestão das raízes ICP-Brasil fixadas
+
+Só as raízes listadas em `RaizesFixadas` (por SHA-256) entram no acervo publicado; o log `ERROR`
+`Raízes fora da lista fixada descartadas` e o detalhe `raizesNaoFixadas` do health indicam raiz fora da lista.
+
+### Procedimento: Nova raiz ICP-Brasil
+
+1. Confira o fingerprint SHA-256 no DOU/ITI (nunca só no ZIP do acervo).
+2. Acrescente-o a `RaizesFixadas.PRODUCAO`, com comentário da versão da hierarquia.
+3. Rode `./mvnw verify -Pintegration-tests`.
+4. Registre a mudança no CHANGELOG.
+5. Publique a release.

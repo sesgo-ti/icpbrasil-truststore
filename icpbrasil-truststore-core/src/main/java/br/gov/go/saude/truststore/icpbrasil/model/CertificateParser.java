@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.model;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.*;
+import org.bouncycastle.asn1.x509.Extension;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -10,6 +11,7 @@ import javax.naming.ldap.Rdn;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.*;
@@ -503,6 +505,52 @@ public class CertificateParser {
             return true;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * Indica se o certificado é uma raiz: subject igual ao issuer, AKI ausente ou igual ao
+     * próprio SKI e assinatura que confere com a própria chave. Quando a JVM não suporta o
+     * algoritmo da assinatura (Raiz v7, curva E-521), a verificação é impossível e o
+     * certificado é aceito como raiz pelos demais critérios; confiança continua sendo decidida
+     * pelas âncoras de quem chama (ex.: {@code RaizesFixadas}, PKIX).
+     */
+    public static boolean isSelfSignedRoot(X509Certificate certificate) {
+        if (!certificate.getSubjectX500Principal().equals(certificate.getIssuerX500Principal())) {
+            return false;
+        }
+        // Lê as extensões sem os getters públicos: eles lançam (e registram ERROR) quando a
+        // extensão falta ou está malformada, e um predicado não pode derrubar quem o chama.
+        if (certificate.getExtensionValue(Extension.authorityKeyIdentifier.getId()) != null) {
+            byte[] aki = rawKeyIdentifier(certificate, Extension.authorityKeyIdentifier.getId());
+            byte[] ski = rawKeyIdentifier(certificate, Extension.subjectKeyIdentifier.getId());
+            if (aki == null || ski == null || !Arrays.equals(aki, ski)) {
+                return false;
+            }
+        }
+        try {
+            certificate.verify(certificate.getPublicKey());
+            return true;
+        } catch (NoSuchAlgorithmException algoritmoNaoSuportado) {
+            return true;
+        } catch (GeneralSecurityException | RuntimeException assinaturaInvalidaOuProviderComFalha) {
+            return false;
+        }
+    }
+
+    /** keyIdentifier do SKI ou AKI; {@code null} se a extensão faltar, não tiver keyIdentifier ou for ilegível. */
+    private static byte[] rawKeyIdentifier(X509Certificate certificate, String oid) {
+        try {
+            byte[] value = certificate.getExtensionValue(oid);
+            if (value == null) {
+                return null;
+            }
+            byte[] octets = ASN1OctetString.getInstance(value).getOctets();
+            return oid.equals(Extension.authorityKeyIdentifier.getId())
+                    ? AuthorityKeyIdentifier.getInstance(octets).getKeyIdentifier()
+                    : SubjectKeyIdentifier.getInstance(octets).getKeyIdentifier();
+        } catch (RuntimeException ilegivel) {
+            return null;
         }
     }
 

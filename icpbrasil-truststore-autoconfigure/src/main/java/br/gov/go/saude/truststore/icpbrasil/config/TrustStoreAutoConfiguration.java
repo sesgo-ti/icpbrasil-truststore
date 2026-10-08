@@ -12,6 +12,7 @@ import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepos
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CertificateChainResolver;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.CacheTrustMaterialSource;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
@@ -123,10 +124,10 @@ public class TrustStoreAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public IcpBrasilCertificateProvider icpBrasilCertificateProvider(TrustStoreConfig trustStoreConfig,
-                                                                     Downloader downloader,
-                                                                     TrustStoreRepository trustStoreRepository) {
-        return new IcpBrasilCertificateProvider(downloader, trustStoreRepository);
+    public IcpBrasilCertificateProvider icpBrasilCertificateProvider(Downloader downloader,
+                                                                     TrustStoreRepository trustStoreRepository,
+                                                                     RaizesFixadas raizesFixadas) {
+        return new IcpBrasilCertificateProvider(downloader, trustStoreRepository, raizesFixadas);
     }
 
     /**
@@ -140,14 +141,22 @@ public class TrustStoreAutoConfiguration {
         return new Cache();
     }
 
+    /** Raízes ICP-Brasil aceitas; um bean próprio substitui a lista (e é sinalizado em log). */
+    @Bean
+    @ConditionalOnMissingBean
+    public RaizesFixadas raizesFixadas() {
+        return RaizesFixadas.producao();
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public TrustStoreService trustStoreService(TrustStoreRepository trustStoreRepository,
                                                IcpBrasilCertificateProvider icpBrasilCertificateProvider,
                                                TrustStoreConfig trustStoreConfig,
-                                               Cache trustStoreCache) {
+                                               Cache trustStoreCache,
+                                               RaizesFixadas raizesFixadas) {
         return new TrustStoreService(trustStoreRepository, icpBrasilCertificateProvider, trustStoreConfig,
-                trustStoreCache);
+                trustStoreCache, raizesFixadas);
     }
 
     /**

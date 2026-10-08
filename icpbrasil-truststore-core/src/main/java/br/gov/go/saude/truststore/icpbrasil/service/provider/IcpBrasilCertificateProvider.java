@@ -3,6 +3,7 @@ package br.gov.go.saude.truststore.icpbrasil.service.provider;
 import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.repository.TrustStoreRepository;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.RecoveryIcpBrasilResourceException;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.util.HashValidator;
@@ -16,6 +17,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -48,14 +50,23 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
     private final String icpBrasilZipUrl;
     private final String icpBrasilHashUrl;
     private final TrustStoreRepository trustStoreRepository;
+    private final RaizesFixadas raizesFixadas;
 
-    /** Usa os endereços fixos do ITI definidos em {@link IcpBrasilEndpoints}. */
+    /** Usa os endereços fixos do ITI e as raízes de {@link RaizesFixadas#producao()}. */
     public IcpBrasilCertificateProvider(Downloader downloader, TrustStoreRepository trustStoreRepository) {
-        this(downloader, trustStoreRepository, IcpBrasilEndpoints.BUNDLE_ZIP_URL, IcpBrasilEndpoints.BUNDLE_HASH_URL);
+        this(downloader, trustStoreRepository, RaizesFixadas.producao());
+    }
+
+    /** Usa os endereços fixos do ITI e a lista de raízes informada para {@link #getCertificates()}. */
+    public IcpBrasilCertificateProvider(Downloader downloader, TrustStoreRepository trustStoreRepository,
+            RaizesFixadas raizesFixadas) {
+        this(downloader, trustStoreRepository, raizesFixadas,
+                IcpBrasilEndpoints.BUNDLE_ZIP_URL, IcpBrasilEndpoints.BUNDLE_HASH_URL);
     }
 
     IcpBrasilCertificateProvider(Downloader downloader, TrustStoreRepository trustStoreRepository,
-            String zipUrl, String hashUrl) {
+            RaizesFixadas raizesFixadas, String zipUrl, String hashUrl) {
+        this.raizesFixadas = Objects.requireNonNull(raizesFixadas, "raizesFixadas");
         this.downloader = downloader;
         this.trustStoreRepository = trustStoreRepository;
         this.icpBrasilZipUrl = zipUrl;
@@ -63,7 +74,8 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
     }
 
     /**
-     * Lê apenas o acervo já persistido no repositório local, valida o hash e parseia o bundle.
+     * Lê apenas o acervo já persistido no repositório local, valida o hash, parseia o bundle e
+     * devolve só o material das raízes fixadas (raízes descartadas e descendentes não aparecem).
      * Não acessa a rede; o download é responsabilidade do pipeline de sincronização.
      *
      * @throws IllegalStateException    se o repositório local não contém ZIP e hash
@@ -77,7 +89,7 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
                 .orElseThrow(() -> new IllegalStateException("Acervo ICP-Brasil ausente no repositório local"));
 
         validateZipIntegrity(geracao.zip(), geracao.hash());
-        return parseCertificates(geracao.zip());
+        return raizesFixadas.filtrar(parseCertificates(geracao.zip())).certificados();
     }
 
     public byte[] baixarZipIcpBrasil() {
@@ -146,6 +158,8 @@ public class IcpBrasilCertificateProvider implements CertificateProvider {
      * O bundle deve ter ao menos um certificado e respeitar {@code MAX_ZIP_BYTES},
      * {@code MAX_ENTRIES}, {@code MAX_ENTRY_BYTES} e {@code MAX_TOTAL_BYTES}; os limites por
      * entrada e total são aplicados durante a descompressão.</p>
+     *
+     * <p>Não aplica {@link RaizesFixadas}: é a etapa de parsing, e o pipeline filtra o resultado.</p>
      *
      * @throws IllegalArgumentException se qualquer regra for violada ou o ZIP for ilegível
      */

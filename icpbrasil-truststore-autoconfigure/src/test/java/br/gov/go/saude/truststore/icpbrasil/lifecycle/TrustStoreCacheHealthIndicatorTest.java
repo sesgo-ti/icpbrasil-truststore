@@ -3,8 +3,10 @@ package br.gov.go.saude.truststore.icpbrasil.lifecycle;
 import br.gov.go.saude.truststore.icpbrasil.config.IcpBrasilEndpoints;
 import br.gov.go.saude.truststore.icpbrasil.config.TrustStoreConfig;
 import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
+import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.repository.FilesystemTrustStoreRepository;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
+import br.gov.go.saude.truststore.icpbrasil.service.RaizesFixadas;
 import br.gov.go.saude.truststore.icpbrasil.service.TrustStoreService;
 import br.gov.go.saude.truststore.icpbrasil.service.provider.IcpBrasilCertificateProvider;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
@@ -22,6 +24,8 @@ import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +44,7 @@ class TrustStoreCacheHealthIndicatorTest {
     private static final Duration TTL_CRITICAL = Duration.ofHours(72);
     private static final Duration TTL_MAX = Duration.ofHours(168);
 
+    static X509Certificate root;
     static byte[] zip;
     static String hash;
 
@@ -55,7 +60,7 @@ class TrustStoreCacheHealthIndicatorTest {
 
     @BeforeAll
     static void generateBundle() {
-        X509Certificate root = TestBundleFactory.caCert("Raiz A", TestBundleFactory.newKeyPair());
+        root = TestBundleFactory.caCert("Raiz A", TestBundleFactory.newKeyPair());
         zip = TestBundleFactory.bundleOf(root);
         hash = HashValidator.computeSha512(zip);
     }
@@ -71,7 +76,8 @@ class TrustStoreCacheHealthIndicatorTest {
         cache = new Cache(clock);
         FilesystemTrustStoreRepository repository = new FilesystemTrustStoreRepository(config);
         IcpBrasilCertificateProvider provider = new IcpBrasilCertificateProvider(downloader, repository);
-        service = new TrustStoreService(repository, provider, config, cache, clock);
+        service = new TrustStoreService(repository, provider, config, cache,
+                RaizesFixadas.de(Set.of(CertificateParser.getFingerprintSha256(root))), clock);
         indicator = new TrustStoreCacheHealthIndicator(config, cache);
     }
 
@@ -116,6 +122,25 @@ class TrustStoreCacheHealthIndicatorTest {
         assertEquals(Status.DOWN, health.getStatus());
         assertEquals("EXPIRED", health.getDetails().get("status"));
         assertDetalhesDoSnapshot(health);
+    }
+
+    @Test
+    @SneakyThrows
+    void testHealth_RaizDescartada_UpComDetalheRaizesNaoFixadas() {
+        X509Certificate estranha = TestBundleFactory.caCert("Estranha", TestBundleFactory.newKeyPair());
+        byte[] zipComEstranha = TestBundleFactory.bundleOf(root, estranha);
+        String hashComEstranha = HashValidator.computeSha512(zipComEstranha);
+        when(downloader.downloadText(IcpBrasilEndpoints.BUNDLE_HASH_URL)).thenReturn(hashComEstranha + "  ACcompactado.zip\n");
+        when(downloader.downloadBytes(IcpBrasilEndpoints.BUNDLE_ZIP_URL)).thenReturn(zipComEstranha);
+        service.refresh();
+
+        Health health = indicator.health();
+
+        assertEquals(Status.UP, health.getStatus());
+        assertEquals(List.of(Map.of(
+                        "subject", estranha.getSubjectX500Principal().getName(),
+                        "fingerprintSha256", CertificateParser.getFingerprintSha256(estranha))),
+                health.getDetails().get("raizesNaoFixadas"));
     }
 
     /** Publica via pipeline real com a confirmação no instante indicado. */

@@ -1,16 +1,21 @@
 package br.gov.go.saude.truststore.icpbrasil.model;
 
+import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestCertificateFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AccessDescription;
 import org.bouncycastle.asn1.x509.DistributionPoint;
 import org.bouncycastle.asn1.x509.GeneralNames;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.List;
@@ -203,5 +208,72 @@ class CertificateParserTest {
 
         assertNotNull(ocspUrls);
         assertTrue(ocspUrls.isEmpty());
+    }
+
+    @Test
+    void testIsSelfSignedRoot_RaizSintetica_True() {
+        assertTrue(CertificateParser.isSelfSignedRoot(testCa));
+    }
+
+    @Test
+    void testIsSelfSignedRoot_CertificadoEmitidoPorOutro_False() {
+        assertFalse(CertificateParser.isSelfSignedRoot(certificate));
+    }
+
+    @Test
+    void testIsSelfSignedRoot_RaizSemAki_True() {
+        KeyPair keyPair = TestBundleFactory.newKeyPair();
+
+        assertTrue(CertificateParser.isSelfSignedRoot(TestBundleFactory.caCert("Raiz Sem AKI", keyPair)));
+    }
+
+    @Test
+    @SneakyThrows
+    void testIsSelfSignedRoot_AkiDiferenteDoSki_False() {
+        KeyPair keyPair = TestBundleFactory.newKeyPair();
+        X500Name subject = new X500Name("CN=Raiz AKI Alheio, O=Test, C=BR");
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(subject, subject, 77, keyPair);
+        TestCertificateFactory.addSki(builder, keyPair);
+        TestCertificateFactory.addAki(builder, TestBundleFactory.newKeyPair());
+
+        assertFalse(CertificateParser.isSelfSignedRoot(TestCertificateFactory.sign(builder, keyPair)));
+    }
+
+    @Test
+    @SneakyThrows
+    void testIsSelfSignedRoot_AkiIgualAoSkiComAssinaturaInvalida_False() {
+        KeyPair keyPair = TestBundleFactory.newKeyPair();
+        X500Name subject = new X500Name("CN=Raiz Falsa, O=Test, C=BR");
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(subject, subject, 78, keyPair);
+        TestCertificateFactory.addSki(builder, keyPair);
+        TestCertificateFactory.addAki(builder, keyPair);
+
+        X509Certificate falsa = TestCertificateFactory.sign(builder, TestBundleFactory.newKeyPair());
+
+        assertEquals(CertificateParser.getSubjectKeyIdentifier(falsa), CertificateParser.getAuthorityKeyIdentifier(falsa));
+        assertFalse(CertificateParser.isSelfSignedRoot(falsa));
+    }
+
+    @Test
+    @SneakyThrows
+    void testIsSelfSignedRoot_RaizV7_AlgoritmoNaoSuportadoPelaJvm() {
+        X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
+
+        assertThrows(NoSuchAlgorithmException.class, () -> v7.verify(v7.getPublicKey()));
+        assertTrue(CertificateParser.isSelfSignedRoot(v7));
+    }
+
+    @Test
+    @SneakyThrows
+    void testIsSelfSignedRoot_AkiSemSki_FalseSemLancar() {
+        assertFalse(CertificateParser.isSelfSignedRoot(autoemitidoSoComAki()));
+    }
+
+    static X509Certificate autoemitidoSoComAki() {
+        KeyPair keyPair = TestBundleFactory.newKeyPair();
+        X500Name subject = new X500Name("CN=Raiz Sem SKI, O=Test, C=BR");
+        X509v3CertificateBuilder builder = TestCertificateFactory.createBuilder(subject, subject, 79, keyPair);
+        TestCertificateFactory.addAki(builder, keyPair);
+        return TestCertificateFactory.sign(builder, keyPair);
     }
 }

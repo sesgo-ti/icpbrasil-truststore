@@ -16,7 +16,7 @@ import java.util.Set;
 /**
  * Âncoras e intermediárias que fundamentam uma validação PKIX.
  *
- * <p>Do acervo, apenas certificados auto-assinados viram âncoras; todos os demais são oferecidos
+ * <p>Do acervo, apenas raízes (critério de {@link CertificateParser#isSelfSignedRoot}) viram âncoras; todos os demais são oferecidos
  * ao construtor de caminhos como candidatos e revalidados criptograficamente — constar do acervo
  * não substitui a validação PKIX.</p>
  */
@@ -30,12 +30,16 @@ public final class TrustMaterial {
         this.intermediates = collectionStore(intermediates);
     }
 
-    /** Separa raízes (auto-assinadas) de intermediárias a partir de um acervo. */
+    /**
+     * Separa raízes de intermediárias a partir de um acervo, pelo critério de
+     * {@link CertificateParser#isSelfSignedRoot}; a raiz cuja assinatura a JVM não verifica
+     * (Raiz v7) também vira âncora.
+     */
     public static TrustMaterial of(Collection<X509Certificate> certificates) {
         Set<TrustAnchor> anchors = new LinkedHashSet<>();
         List<X509Certificate> intermediates = new ArrayList<>();
         for (X509Certificate certificate : certificates) {
-            if (CertificateParser.isSelfSigned(certificate)) {
+            if (CertificateParser.isSelfSignedRoot(certificate)) {
                 anchors.add(new TrustAnchor(certificate, null));
             } else {
                 intermediates.add(certificate);

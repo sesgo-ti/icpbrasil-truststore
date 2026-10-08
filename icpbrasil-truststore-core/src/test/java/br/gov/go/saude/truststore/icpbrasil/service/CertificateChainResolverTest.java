@@ -5,6 +5,7 @@ import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
 import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicyException;
 import br.gov.go.saude.truststore.icpbrasil.http.RetryPolicy;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
+import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import lombok.SneakyThrows;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.*;
@@ -87,6 +88,15 @@ class CertificateChainResolverTest {
 
         retryPolicy = new RetryPolicy(trustStoreConfig);
         resolver = new CertificateChainResolver(retryPolicy, chainConfig, mockHttpClient, downloadPolicy);
+    }
+
+    @Test
+    @SneakyThrows
+    void testResolveChain_FolhaQueJaERaizV7_RetornaSemDownload() {
+        X509Certificate v7 = CertificateParser.parse(TestResourceLoader.getResource("icp/raiz-v7.crt"));
+
+        assertEquals(List.of(v7), resolver.resolveChain(v7));
+        verify(mockHttpClient, never()).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test

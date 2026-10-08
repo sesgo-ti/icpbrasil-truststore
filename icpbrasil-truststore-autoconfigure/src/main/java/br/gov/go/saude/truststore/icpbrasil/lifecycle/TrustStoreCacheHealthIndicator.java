@@ -7,6 +7,7 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -21,8 +22,11 @@ import java.util.Optional;
  *   <li>{@code VALID} (UP): vigente e confirmado dentro do limiar crítico.</li>
  * </ul>
  *
- * <p>Os detalhes limitam-se a {@code status}, {@code confirmedAt} e {@code expiresAt}: nenhuma
- * mensagem de exceção ou caminho interno é exposto pelo endpoint.</p>
+ * <p>Os detalhes limitam-se a {@code status}, {@code confirmedAt}, {@code expiresAt} e, só quando
+ * há descarte, {@code raizesNaoFixadas} (lista de {@code subject} e {@code fingerprintSha256} das
+ * raízes fora da lista fixada, dados públicos do certificado; o status segue UP, pois o acervo
+ * publicado continua íntegro): nenhuma mensagem de exceção ou caminho interno é exposto pelo
+ * endpoint.</p>
  */
 public class TrustStoreCacheHealthIndicator implements HealthIndicator {
 
@@ -53,10 +57,14 @@ public class TrustStoreCacheHealthIndicator implements HealthIndicator {
             builder = Health.up();
             status = idade.toMillis() <= config.getCacheTtlCriticalMillis() ? "VALID" : "CRITICAL";
         }
-        return builder
-                .withDetail("status", status)
+        builder.withDetail("status", status)
                 .withDetail("confirmedAt", state.confirmedAt().toString())
-                .withDetail("expiresAt", state.expiresAt().toString())
-                .build();
+                .withDetail("expiresAt", state.expiresAt().toString());
+        if (!state.raizesNaoFixadas().isEmpty()) {
+            builder.withDetail("raizesNaoFixadas", state.raizesNaoFixadas().stream()
+                    .map(raiz -> Map.of("subject", raiz.subject(), "fingerprintSha256", raiz.fingerprintSha256()))
+                    .toList());
+        }
+        return builder.build();
     }
 }
