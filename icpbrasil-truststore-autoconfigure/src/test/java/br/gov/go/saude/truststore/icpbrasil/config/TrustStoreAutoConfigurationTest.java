@@ -257,7 +257,7 @@ class TrustStoreAutoConfigurationTest {
         // Provider real com um certificado do classpath: o TrustStoreManager
         // rejeita providers sem certificados, então um stub vazio não serve.
         CertificateProvider provider = new TrustedCertsProvider(
-                List.of(lerRecurso("registries/certificates/isrgrootx1.json")));
+                List.of(lerRecurso("registries/certificates/letsencrypt_ye1.json")));
 
         @Bean
         CertificateProvider trustedCertsProvider() {

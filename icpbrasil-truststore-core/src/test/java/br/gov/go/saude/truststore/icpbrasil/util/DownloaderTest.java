@@ -11,9 +11,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("integration")
 class DownloaderTest {
 
+    private static final Path PRODUCTION_REGISTRY = Path.of("src/main/resources/registries/certificates");
+
     private Downloader downloader;
     private TrustStoreConfig trustStoreConfig;
 
@@ -33,23 +37,22 @@ class DownloaderTest {
     void setUp() {
         trustStoreConfig = buildTrustStoreConfig();
 
-        List<String> resourceNames = List.of(
-                "registries/certificates/isrgrootx1.json",
-                "registries/certificates/isrgrootx2.json",
-                "registries/certificates/letsencrypt_e7.json"
-        );
-        List<byte[]> docs = resourceNames.stream()
-                .map(name -> {
-                    try (InputStream is = DownloaderTest.class.getClassLoader().getResourceAsStream(name)) {
-                        if (is == null) {
-                            throw new IllegalStateException("Recurso de teste não encontrado: " + name);
+        // Registro de produção: o teste deve falhar se ele deixar de cobrir o TLS atual do ITI
+        List<byte[]> docs;
+        try (Stream<Path> files = Files.list(PRODUCTION_REGISTRY)) {
+            docs = files.filter(file -> file.toString().endsWith(".json"))
+                    .sorted()
+                    .map(file -> {
+                        try {
+                            return Files.readAllBytes(file);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException("Erro ao ler registro: " + file, e);
                         }
-                        return is.readAllBytes();
-                    } catch (IOException e) {
-                        throw new UncheckedIOException("Erro ao ler recurso: " + name, e);
-                    }
-                })
-                .toList();
+                    })
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Erro ao listar registro: " + PRODUCTION_REGISTRY, e);
+        }
 
         TrustedCertsProvider trustedCertsProvider = new TrustedCertsProvider(docs);
         TrustStoreManager trustStoreManager = new TrustStoreManager(trustedCertsProvider);
