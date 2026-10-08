@@ -19,6 +19,7 @@ import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.ocsp.*;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -29,6 +30,7 @@ import java.math.BigInteger;
 import java.net.http.HttpClient;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
@@ -64,7 +66,8 @@ import java.util.Set;
 @Slf4j
 public class OcspClient {
 
-    private static final String BC_PROVIDER = "BC";
+    /** Instância própria: a lib não registra providers na JVM do consumidor. */
+    private static final Provider BOUNCY_CASTLE = new BouncyCastleProvider();
     private static final String OCSP_REQUEST_CONTENT_TYPE = "application/ocsp-request";
     private static final String OCSP_RESPONSE_CONTENT_TYPE = "application/ocsp-response";
     private static final String CACHE_KEY_DIGEST = "SHA-256";
@@ -445,7 +448,7 @@ public class OcspClient {
     }
 
     private ContentVerifierProvider buildContentVerifier(X509CertificateHolder holder) throws Exception {
-        return new JcaContentVerifierProviderBuilder().setProvider(BC_PROVIDER).build(holder);
+        return new JcaContentVerifierProviderBuilder().setProvider(BOUNCY_CASTLE).build(holder);
     }
 
     private static DigestCalculatorProvider createDigestCalculators() {
