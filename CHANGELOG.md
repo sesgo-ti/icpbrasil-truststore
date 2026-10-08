@@ -11,6 +11,10 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
 
+### Alterado
+
+- `/certificate`: parâmetros validados antes da consulta (precedência 400 → 503 → 404); `ski` aceita octetos hexadecimais em maiúsculas ou minúsculas, de 1 a 64; `ski` ou `type` ausentes, vazios ou repetidos respondem 400 (#19).
+
 ### Corrigido
 
 - Âncoras TLS do download do ITI com o mesmo CN (reemissões e cross-signs) deixaram de se sobrescrever: o alias passou a ser o fingerprint SHA-256; certificado sem CN deixou de impedir a carga (#18).
