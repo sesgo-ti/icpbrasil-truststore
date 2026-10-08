@@ -1,5 +1,8 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
+import br.gov.go.saude.truststore.icpbrasil.http.DownloadPolicy;
+import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +13,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,5 +75,29 @@ class TrustOverrideReporterTest {
                             context.getBean(TrustOverrideReporter.class).substituidos());
                     assertTrue(output.getOut().contains("TrustMaterialSource " + AVISO), output.getOut());
                 });
+    }
+
+    @Test
+    void testInicializacao_DownloaderDoConsumidor_AvisaEmWarn(CapturedOutput output) {
+        runner.withBean(Downloader.class, () -> new Downloader(transporteQualquer(), null, new TrustStoreConfig()))
+                .run(context -> {
+                    assertEquals(List.of("Downloader"),
+                            context.getBean(TrustOverrideReporter.class).substituidos());
+                    assertTrue(output.getOut().contains("Downloader " + AVISO), output.getOut());
+                });
+    }
+
+    @Test
+    void testInicializacao_CertificateHttpTransportDoConsumidor_AvisaEmWarn(CapturedOutput output) {
+        runner.withBean(CertificateHttpTransport.class, TrustOverrideReporterTest::transporteQualquer)
+                .run(context -> {
+                    assertEquals(List.of("CertificateHttpTransport"),
+                            context.getBean(TrustOverrideReporter.class).substituidos());
+                    assertTrue(output.getOut().contains("CertificateHttpTransport " + AVISO), output.getOut());
+                });
+    }
+
+    private static CertificateHttpTransport transporteQualquer() {
+        return new CertificateHttpTransport(DownloadPolicy.acervoIti(), Duration.ofSeconds(1));
     }
 }

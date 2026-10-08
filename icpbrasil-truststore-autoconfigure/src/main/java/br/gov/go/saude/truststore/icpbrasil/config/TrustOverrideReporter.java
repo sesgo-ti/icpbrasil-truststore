@@ -1,5 +1,7 @@
 package br.gov.go.saude.truststore.icpbrasil.config;
 
+import br.gov.go.saude.truststore.icpbrasil.http.CertificateHttpTransport;
+import br.gov.go.saude.truststore.icpbrasil.http.Downloader;
 import br.gov.go.saude.truststore.icpbrasil.http.TrustStoreManager;
 import br.gov.go.saude.truststore.icpbrasil.service.pkix.TrustMaterialSource;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +21,10 @@ import java.util.List;
 @Slf4j
 class TrustOverrideReporter implements SmartInitializingSingleton {
 
-    static final List<Class<?>> TIPOS_DE_CONFIANCA = List.of(TrustStoreManager.class, TrustMaterialSource.class);
+    // Downloader e CertificateHttpTransport carregam a confiança do canal (SSLContext e política de destino).
+    static final List<Class<?>> TIPOS_DE_CONFIANCA = List.of(
+            TrustStoreManager.class, TrustMaterialSource.class,
+            Downloader.class, CertificateHttpTransport.class);
 
     private final ConfigurableListableBeanFactory beanFactory;
 
