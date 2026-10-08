@@ -23,7 +23,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - `/certificate`: parâmetros validados antes da consulta (precedência 400 → 503 → 404); `ski` aceita octetos hexadecimais em maiúsculas ou minúsculas, de 1 a 64; `ski` ou `type` ausentes, vazios ou repetidos respondem 400 (#19).
 - Workflow de release em jobs separados: verificação sem secrets e publicação no environment protegido `release`; actions fixadas por SHA; recuperação da GitHub Release sem republicar no Central (#21, #14).
 - Spring Boot 3.5.16, BouncyCastle 1.86, AWS SDK 2.55.8, commons-codec 1.22.1 e commons-compress 1.28.0 (#17).
-- Manuais: procedimento suportado de gestão das âncoras TLS e de disponibilização do serviço; o rascunho do HubSaúde foi para `docs/historico/` (#12).
+- Manuais: procedimento suportado de gestão das âncoras TLS e de disponibilização do serviço; o rascunho do HubSaúde foi removido (#12).
 
 ### Corrigido
 
