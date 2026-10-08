@@ -9,3 +9,13 @@
 # id = "GHSA-xxxx-xxxx-xxxx"
 # ignoreUntil = 2026-12-31
 # reason = "Só afeta o conector AJP, desabilitado no serviço REST. Responsável: @usuario"
+
+[[IgnoredVulns]]
+id = "GHSA-j9f9-w8pj-32f8"
+ignoreUntil = 2026-12-31
+reason = "Spring MVC 6.2.19 (última 6.2.x aberta, sem correção): exige Server-Sent Events com view fragments, que o serviço REST não usa. Correção definitiva: Spring Framework 7.0.9 (Spring Boot 4). Responsável: @nogueiralegacy"
+
+[[IgnoredVulns]]
+id = "GHSA-pc63-qcmh-9cmg"
+ignoreUntil = 2026-12-31
+reason = "Spring MVC 6.2.19 (última 6.2.x aberta, sem correção): exige XsltView, que o serviço REST não usa (só JSON). Correção definitiva: Spring Framework 7.0.9 (Spring Boot 4). Responsável: @nogueiralegacy"

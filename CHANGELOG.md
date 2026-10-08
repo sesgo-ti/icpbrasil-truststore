@@ -33,7 +33,8 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ### Segurança
 
-- Versões corrigidas de Tomcat (10.1.60), Netty (4.1.137), Jackson (2.21.6), Log4j API (2.25.5), HttpClient5 (5.6.3), HttpCore5 (5.4.3) e commons-lang3 (3.18.0) sobre o BOM do Spring Boot (#17).
+- Versões corrigidas de Tomcat (10.1.60), Netty (4.1.137), Jackson (2.21.7), Log4j API (2.25.5), HttpClient5 (5.6.3), HttpCore5 (5.4.3) e commons-lang3 (3.18.0) sobre o BOM do Spring Boot (#17).
+- Exceções temporárias em `osv-scanner.toml` para GHSA-j9f9-w8pj-32f8 e GHSA-pc63-qcmh-9cmg, do Spring MVC 6.2.19, sem correção na linha 6.2: o serviço REST não usa Server-Sent Events com fragments nem `XsltView`.
 
 ## [0.0.1] - 2026-09-10
 
