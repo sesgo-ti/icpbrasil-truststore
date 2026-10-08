@@ -78,6 +78,23 @@ Notas importantes:
   pela chave antiga; a semântica correta para consumidores é: assinaturas feitas
   **antes** da data de revogação continuam auditáveis, novas assinaturas não.
 
+## Alerta agendado das raízes ICP-Brasil e do TLS do ITI
+
+O workflow *Alerta de raízes ICP-Brasil e TLS do ITI* (`.github/workflows/raizes-icp.yml`) roda todo dia
+às 09:17 UTC, em push na `main` e manualmente. Ele executa `DownloaderTest` (download real do ITI com as
+âncoras TLS fixadas em `ItiTlsAnchors`) e `RaizesFixadasIntegrationTest` (acervo real contra `RaizesFixadas`),
+com `-Pintegration-tests`. Se algo diverge, abre uma issue cujo título traz o hash do relatório: a mesma
+divergência não gera issue duplicada enquanto a anterior estiver aberta.
+
+Ao receber a issue:
+
+- **Raiz nova ou fora da lista**: confirmar no DOU/ITI que a mudança é oficial → atualizar `RaizesFixadas` → publicar release.
+- **Falha de TLS no download**: verificar se o ITI trocou de CA → atualizar `ItiTlsAnchors` → publicar release.
+- Falha sem mudança oficial (acervo adulterado ou instabilidade do ITI): investigar antes de alterar qualquer lista.
+
+**Limitação**: o GitHub desativa workflows agendados após 60 dias sem atividade no repositório, e nenhum
+aviso é emitido. Em período sem commits, reative em Actions → o workflow → *Enable workflow*.
+
 ## Secrets da organização (GitHub → sesgo-ti → Actions)
 
 | Secret | Conteúdo |
@@ -121,6 +138,8 @@ Todas as actions são fixadas por SHA completo, com a versão em comentário; o 
 
 ```bash
 # 1. Garanta main atualizada e CI verde
+#    Confira em Actions que o workflow "Alerta de raízes ICP-Brasil e TLS do ITI" está ativo
+#    e sem issue de alerta aberta
 git checkout main && git pull
 
 # 2. Atualize o CHANGELOG.md: mova o conteúdo de [Unreleased]
