@@ -85,9 +85,9 @@ icpbrasil-truststore:
 
 Gera `icpbrasil-truststore-rest/target/icpbrasil-truststore-rest-*.jar` (fat JAR executável — módulo `rest`).
 
-O build é reproduzível: `project.build.outputTimestamp` fixa as datas gravadas nos JARs e o CI
-compara, a cada push, dois builds limpos (JARs, sources, Javadoc e o executável REST). O wrapper
-confere o SHA-256 da distribuição do Maven (`distributionSha256Sum`).
+O build é reproduzível: `project.build.outputTimestamp` fixa as datas gravadas nos JARs, e o
+workflow de release usa a data do commit da tag, de modo que o mesmo commit gera os mesmos JARs. O
+wrapper confere o SHA-256 da distribuição do Maven (`distributionSha256Sum`).
 
 ### Execução
 
