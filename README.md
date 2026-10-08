@@ -39,7 +39,7 @@ Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets
 ## Requisitos
 
 - Java 21
-- Spring Boot 3.4.x
+- Spring Boot 3.5.x
 
 ---
 
@@ -373,7 +373,7 @@ A carga inicial do cache é executada por um `ApplicationRunner` (`TrustStoreBoo
 | AIA, OCSP e CRL | `cacerts` da JVM; URLs `http://` e integridade pela assinatura |
 | S3/MinIO | `cacerts` da JVM ou a CA de `S3_CA_CERT_PATH` |
 
-O `SSLContext` do download não é exposto como bean nem aplicado à JVM. A confiança no canal do ITI e nas raízes ICP-Brasil nunca muda por configuração; só código da aplicação pode alterá-la (bean próprio de `TrustStoreManager`, `TrustMaterialSource` ou `RaizesFixadas`), e a biblioteca registra `WARN` quando isso acontece. No S3, a confiança é configurada por `S3_CA_CERT_PATH`. A confiança de cada canal é registrada em log no início. Os downloads por extensões X.509 passam pelo `DownloadPolicy` descrito em [Política de download](#política-de-download-ssrf-e-limites-de-tamanho).
+O `SSLContext` do download não é exposto como bean nem aplicado à JVM. A confiança no canal do ITI e nas raízes ICP-Brasil nunca muda por configuração; só código da aplicação pode alterá-la (bean próprio de `TrustStoreManager`, `TrustMaterialSource`, `RaizesFixadas`, `Downloader` ou `CertificateHttpTransport`), e a biblioteca registra `WARN` quando isso acontece. No S3, a confiança é configurada por `S3_CA_CERT_PATH`. A confiança de cada canal é registrada em log no início. Os downloads por extensões X.509 passam pelo `DownloadPolicy` descrito em [Política de download](#política-de-download-ssrf-e-limites-de-tamanho).
 
 Troca de CA do ITI ou nova raiz ICP-Brasil: [manual de gestão](docs/manual-gestao-certificados-confiaveis.md). Sinais de falha: [monitoramento](docs/manual-monitoramento.md).
 
