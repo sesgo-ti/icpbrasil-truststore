@@ -21,8 +21,8 @@ import java.util.List;
  * <p>A lógica de protocolo é delegada a {@link OcspClient} e {@link CrlClient}.
  * Este serviço é responsável apenas pela orquestração e decisão de fallback.</p>
  *
- * <p>Nota: o HttpClient usado pelos clients OCSP/CRL utiliza o trust store padrão da JVM
- * intencionalmente, pois os endpoints de revogação são acessados via CAs públicas.</p>
+ * <p>Nota: o HttpClient dos clients OCSP/CRL usa o trust store da JVM: as URLs de OCSP/CRL do
+ * acervo são {@code http://}; a integridade vem da assinatura da resposta.</p>
  */
 @Slf4j
 @RequiredArgsConstructor

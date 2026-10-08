@@ -35,8 +35,8 @@ import java.util.Set;
  * resultado não depende da ordem dos certificados nem das URLs. As URLs CA Issuers são
  * tentadas em ordem até alguma fornecer um emissor utilizável.</p>
  *
- * <p>O transporte HTTP usa o trust store padrão da JVM, pois os endpoints AIA são
- * acessados via CAs públicas.</p>
+ * <p>O transporte HTTP usa o trust store da JVM: as URLs AIA são {@code http://}; o emissor
+ * obtido só é aceito se verificar a assinatura do certificado, e a confiança vem da validação PKIX.</p>
  */
 @Slf4j
 public class CertificateChainResolver {

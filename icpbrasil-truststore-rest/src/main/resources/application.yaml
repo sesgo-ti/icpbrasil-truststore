@@ -85,8 +85,8 @@ icpbrasil-truststore:
 
   # Configurações de Verificação de Revogação (OCSP e CRL)
   # [Resultado]: Controla timeouts, retries e cache para checagem de revogação
-  # Nota: O HttpClient de revogação usa o trust store padrão da JVM intencionalmente,
-  # pois os endpoints OCSP/CRL são acessados via CAs públicas (não ICP-Brasil).
+  # Nota: O HttpClient de revogação usa o trust store da JVM: as URLs de OCSP/CRL do acervo
+  # são http://; a integridade vem da assinatura da resposta.
   revocation:
     ocsp-timeout-seconds: 10        # Timeout da requisição OCSP (1-60s)
     crl-timeout-seconds: 10         # Timeout da requisição CRL (1-60s)

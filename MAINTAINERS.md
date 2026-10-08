@@ -139,7 +139,8 @@ Todas as actions são fixadas por SHA completo, com a versão em comentário; o 
 ```bash
 # 1. Garanta main atualizada e CI verde
 #    Confira em Actions que o workflow "Alerta de raízes ICP-Brasil e TLS do ITI" está ativo
-#    e sem issue de alerta aberta
+#    e sem issue de alerta aberta; confira a validade das raízes ISRG (`ItiTlsAnchors`)
+#    e a lista de `RaizesFixadas`
 git checkout main && git pull
 
 # 2. Atualize o CHANGELOG.md: mova o conteúdo de [Unreleased]
