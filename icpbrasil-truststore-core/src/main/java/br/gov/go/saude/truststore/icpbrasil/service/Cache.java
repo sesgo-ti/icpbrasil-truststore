@@ -67,7 +67,7 @@ public class Cache {
     /**
      * @param index        SKI → candidato preferido (ver {@link #PREFERENCE})
      * @param candidates   SKI → todos os certificados com esse SKI, o preferido primeiro
-     * @param certificates todos os certificados distintos da geração, na ordem do bundle
+     * @param certificates todos os certificados distintos da geração, na ordem recebida
      */
     private record Snapshot(Map<String, X509Certificate> index, Map<String, List<X509Certificate>> candidates,
                             List<X509Certificate> certificates, String hash,
@@ -75,9 +75,9 @@ public class Cache {
     }
 
     /**
-     * Ordem entre certificados que compartilham o SKI (mesma chave: reemissão ou cross-sign):
-     * autoassinado primeiro, depois o de maior {@code notAfter} e, por fim, o menor fingerprint
-     * SHA-256. A escolha não depende da ordem do bundle.
+     * Ordem entre certificados que compartilham o SKI (mesma chave, reemitida ou cross-signed):
+     * autoassinado primeiro, por encerrar a cadeia; depois o de maior {@code notAfter}; por fim,
+     * o menor fingerprint SHA-256, só para que a escolha não dependa da ordem recebida.
      */
     static final Comparator<X509Certificate> PREFERENCE =
             Comparator.comparing((X509Certificate certificate) -> !CertificateParser.isSelfSigned(certificate))
@@ -96,14 +96,9 @@ public class Cache {
     }
 
     /**
-     * Monta o índice SKI → certificado preferido a partir dos certificados já parseados.
-     * Falha se algum certificado não tiver SKI, para que o pipeline detecte o problema antes
-     * de persistir ou publicar qualquer coisa.
-     *
-     * <p>Contrato: o índice tem uma entrada por SKI. Certificados distintos com o mesmo SKI
-     * (reemissão ou cross-sign da mesma chave) continuam todos no acervo — ver
-     * {@link #getCertificatesBySki} e {@link #currentCertificates} —, e a entrada do índice é o
-     * candidato preferido segundo {@link #PREFERENCE}.</p>
+     * Índice com uma entrada por SKI: o candidato preferido segundo {@link #PREFERENCE}. Os
+     * demais certificados com o mesmo SKI ficam fora do índice; no acervo publicado, continuam
+     * acessíveis por {@link #getCertificatesBySki} e {@link #currentCertificates}.
      *
      * @throws IllegalArgumentException se algum certificado não possuir a extensão SKI
      */
@@ -148,9 +143,8 @@ public class Cache {
     }
 
     /**
-     * Publica um novo snapshot, substituindo o anterior de forma atômica.
-     * Pré-condição (garantida pelo pipeline): os certificados vêm de um ZIP cujo hash foi
-     * validado e foram todos parseados. Duplicatas idênticas contam uma vez.
+     * Publica um novo snapshot, substituindo o anterior de forma atômica. Certificados idênticos
+     * contam uma vez; os que compartilham SKI são todos mantidos.
      *
      * @throws IllegalArgumentException se algum certificado não possuir a extensão SKI; nesse
      *                                  caso o snapshot anterior é mantido
