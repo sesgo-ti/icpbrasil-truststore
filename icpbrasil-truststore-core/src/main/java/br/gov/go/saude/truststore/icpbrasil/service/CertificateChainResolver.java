@@ -28,10 +28,10 @@ import java.util.Set;
  * <p>O download pode retornar um certificado único (DER/PEM) ou um pacote PKCS#7 (.p7b)
  * contendo a cadeia inteira. Todos os certificados baixados são armazenados em um pool
  * indexado por SKI para evitar downloads redundantes; um SKI pode ter vários candidatos
- * (raiz autoassinada e sua versão cross-signed, ou um certificado com SKI forjado).</p>
+ * (raiz e sua versão cross-signed, ou um certificado com SKI forjado).</p>
  *
  * <p>O emissor é escolhido entre os candidatos com SKI igual ao AKI cujo subject é o issuer
- * do certificado e cuja chave verifica sua assinatura, preferindo o autoassinado — o
+ * do certificado e cuja chave verifica sua assinatura, preferindo a raiz ({@link CertificateParser#isSelfSignedRoot}) — o
  * resultado não depende da ordem dos certificados nem das URLs. As URLs CA Issuers são
  * tentadas em ordem até alguma fornecer um emissor utilizável.</p>
  *
@@ -69,12 +69,12 @@ public class CertificateChainResolver {
 
     /**
      * Resolve a cadeia de certificados a partir de um certificado folha (leaf),
-     * baixando emissores via AIA CA Issuers até encontrar um auto-assinado (raiz)
+     * baixando emissores via AIA CA Issuers até encontrar uma raiz ({@link CertificateParser#isSelfSignedRoot})
      * ou não haver mais URLs AIA disponíveis.
      *
      * @param leaf certificado folha (end-entity) a partir do qual a cadeia será montada
-     * @return Lista ordenada [leaf, intermediário1, ..., raiz] terminando em auto-assinado
-     * @throws IncompleteChainException se não for possível alcançar um certificado raiz (auto-assinado)
+     * @return Lista ordenada [leaf, intermediário1, ..., raiz] terminando em raiz
+     * @throws IncompleteChainException se não for possível alcançar um certificado raiz
      */
     public List<X509Certificate> resolveChain(X509Certificate leaf) throws IncompleteChainException {
         List<X509Certificate> chain = new ArrayList<>();
@@ -141,14 +141,14 @@ public class CertificateChainResolver {
             current = issuer;
         }
 
-        // Saiu do loop sem encontrar auto-assinado — profundidade máxima
+        // Saiu do loop sem encontrar raiz — profundidade máxima
         throw new IncompleteChainException(
                 "Profundidade máxima (" + MAX_CHAIN_DEPTH + ") excedida sem alcançar raiz", chain);
     }
 
     /**
      * Candidato utilizável: subject igual ao issuer do certificado e chave que verifica sua
-     * assinatura. Entre vários, o autoassinado encerra a cadeia e é preferido.
+     * assinatura. Entre vários, a raiz ({@link CertificateParser#isSelfSignedRoot}) encerra a cadeia e é preferida.
      */
     private X509Certificate selectIssuer(X509Certificate certificate, List<X509Certificate> candidates) {
         if (candidates == null) {

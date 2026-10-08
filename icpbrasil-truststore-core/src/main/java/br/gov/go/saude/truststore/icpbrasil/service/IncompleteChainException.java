@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Lançada quando a montagem da cadeia de certificados não consegue
- * alcançar um certificado raiz (auto-assinado).
+ * alcançar um certificado raiz ({@code CertificateParser.isSelfSignedRoot}).
  *
  * <p>Carrega a cadeia parcial para fins de diagnóstico.</p>
  */

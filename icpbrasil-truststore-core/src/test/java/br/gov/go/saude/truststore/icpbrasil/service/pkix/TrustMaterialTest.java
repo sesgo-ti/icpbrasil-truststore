@@ -1,12 +1,12 @@
 package br.gov.go.saude.truststore.icpbrasil.service.pkix;
 
-import lombok.SneakyThrows;
-import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
 import br.gov.go.saude.truststore.icpbrasil.model.CertificateParser;
 import br.gov.go.saude.truststore.icpbrasil.service.Cache;
 import br.gov.go.saude.truststore.icpbrasil.service.CacheFixture;
 import br.gov.go.saude.truststore.icpbrasil.support.TestBundleFactory;
 import br.gov.go.saude.truststore.icpbrasil.support.TestClock;
+import br.gov.go.saude.truststore.icpbrasil.support.TestResourceLoader;
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

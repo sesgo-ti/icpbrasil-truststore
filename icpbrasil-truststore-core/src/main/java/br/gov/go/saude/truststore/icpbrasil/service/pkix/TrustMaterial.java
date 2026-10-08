@@ -16,7 +16,7 @@ import java.util.Set;
 /**
  * Âncoras e intermediárias que fundamentam uma validação PKIX.
  *
- * <p>Do acervo, apenas certificados auto-assinados viram âncoras; todos os demais são oferecidos
+ * <p>Do acervo, apenas raízes (critério de {@link CertificateParser#isSelfSignedRoot}) viram âncoras; todos os demais são oferecidos
  * ao construtor de caminhos como candidatos e revalidados criptograficamente — constar do acervo
  * não substitui a validação PKIX.</p>
  */

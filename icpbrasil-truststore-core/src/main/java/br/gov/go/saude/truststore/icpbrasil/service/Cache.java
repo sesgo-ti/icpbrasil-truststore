@@ -77,8 +77,9 @@ public class Cache {
 
     /**
      * Ordem entre certificados que compartilham o SKI (mesma chave, reemitida ou cross-signed):
-     * autoassinado primeiro, por encerrar a cadeia; depois o de maior {@code notAfter}; por fim,
-     * o menor fingerprint SHA-256, só para que a escolha não dependa da ordem recebida.
+     * a raiz ({@link CertificateParser#isSelfSignedRoot}) primeiro, por encerrar a cadeia; depois
+     * o de maior {@code notAfter}; por fim, o menor fingerprint SHA-256, só para que a escolha não
+     * dependa da ordem recebida.
      */
     static final Comparator<X509Certificate> PREFERENCE =
             Comparator.comparing((X509Certificate certificate) -> !CertificateParser.isSelfSignedRoot(certificate))
