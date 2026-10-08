@@ -12,6 +12,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - `Cache.getCertificatesBySki` e `Cache.currentCertificates`: todos os certificados do acervo, inclusive os que compartilham SKI (#20).
 - Cache de revogação: downloads concorrentes da mesma CRL ou da mesma resposta OCSP são compartilhados (#13).
 - SBOM CycloneDX (`-Psbom`) e análise de dependências com osv-scanner no CI; exceções temporárias, com responsável e validade, em `osv-scanner.toml` (#17).
+- GitHub Release com o executável REST, o SBOM e `SHA256SUMS`; notas extraídas do CHANGELOG, com falha se a seção da versão não existir (#14).
 - `META-INF/LICENSE` nos JARs binário e de sources de `core` e `autoconfigure` (#22).
 - Build reproduzível: `project.build.outputTimestamp` fixa as datas gravadas nos JARs, e o workflow de release usa a data do commit da tag; checksum da distribuição do Maven no wrapper (#15).
 
@@ -20,6 +21,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - **Incompatível:** `icpbrasil-truststore.revocation.ocsp-cache-max-size` e `crl-cache-max-size` (entradas) foram substituídas por `ocsp-cache-max-bytes` (padrão 16 MiB) e `crl-cache-max-bytes` (padrão 256 MiB), com eviction por peso (#13).
 - **Incompatível:** `TrustStoreRepository` persiste por geração: `recuperarGeracao()` e `armazenarGeracao(zip, hash, confirmacao)` substituem `armazenarZip`/`armazenarHash`; filesystem e S3 gravam em `geracoes/<hash>/` e trocam o ponteiro `hash.txt` por último. O layout da 0.0.1 é lido e migrado sem novo download (#16).
 - `/certificate`: parâmetros validados antes da consulta (precedência 400 → 503 → 404); `ski` aceita octetos hexadecimais em maiúsculas ou minúsculas, de 1 a 64; `ski` ou `type` ausentes, vazios ou repetidos respondem 400 (#19).
+- Workflow de release em jobs separados: verificação sem secrets e publicação no environment protegido `release`; actions fixadas por SHA; recuperação da GitHub Release sem republicar no Central (#21, #14).
 - Spring Boot 3.5.16, BouncyCastle 1.86, AWS SDK 2.55.8, commons-codec 1.22.1 e commons-compress 1.28.0 (#17).
 
 ### Corrigido
