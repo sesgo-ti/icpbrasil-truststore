@@ -113,9 +113,7 @@ Todas as actions são fixadas por SHA completo, com a versão em comentário; o 
 - Namespace `br.gov.go.saude` **verificado** no Sonatype Central.
 - Chave GPG publicada nos dois keyservers (seção acima).
 - **Environment `release`** (Settings → Environments) com *required reviewers* (ao menos um
-  mantenedor além de quem cria a tag) e *deployment branches and tags* restrito a tags `v*`. Os
-  secrets de publicação podem ficar no environment em vez da organização, o que os tira do alcance
-  de qualquer outro workflow.
+  mantenedor além de quem cria a tag) e *deployment branches and tags* restrito a tags `v*`.
 - **Ruleset de tags `v*`** (Settings → Rules): criação restrita aos mantenedores, com
   atualização e remoção bloqueadas.
 
