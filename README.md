@@ -11,10 +11,10 @@ Biblioteca de auto-configuração Spring Boot que mantém atualizado o acervo de
 | Módulo | Papel | Publicado no Maven Central |
 |---|---|---|
 | `icpbrasil-truststore-core` | Domínio e lógica (parsers X.509, cache, revogação OCSP/CRL, download) — **Java puro, zero Spring/AWS** | ✅ |
-| `icpbrasil-truststore-autoconfigure` | Auto-configuração Spring Boot: beans, binding de properties, scheduler, bootstrap, health, S3 | ✅ |
+| `icpbrasil-truststore-spring-boot-starter` | Starter Spring Boot (auto-configuração): beans, binding de properties, scheduler, bootstrap, health, S3 | ✅ |
 | `icpbrasil-truststore-rest` | Microserviço standalone (endpoint REST + fat jar) | ❌ |
 
-Para consumir como **biblioteca**, dependa de `icpbrasil-truststore-autoconfigure`. Para rodar como **serviço**, use o fat jar do módulo `rest`.
+Para consumir como **biblioteca**, dependa de `icpbrasil-truststore-spring-boot-starter`. Para rodar como **serviço**, use o fat jar do módulo `rest`.
 
 Mantenedores: processo de release, chave GPG (renovação/revogação) e secrets estão centralizados em [MAINTAINERS.md](MAINTAINERS.md).
 
@@ -50,8 +50,8 @@ Adicione a dependência:
 ```xml
 <dependency>
     <groupId>br.gov.go.saude</groupId>
-    <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
-    <version>0.0.1</version>
+    <artifactId>icpbrasil-truststore-spring-boot-starter</artifactId>
+    <version>0.0.3</version>
 </dependency>
 ```
 
@@ -100,7 +100,7 @@ Cada GitHub Release traz o executável REST, o SBOM CycloneDX (`*-sbom.cdx.json`
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
-As bibliotecas `core` e `autoconfigure` são publicadas no Maven Central assinadas com GPG (veja
+As bibliotecas `core` e `spring-boot-starter` são publicadas no Maven Central assinadas com GPG (veja
 [MAINTAINERS.md](MAINTAINERS.md#chave-gpg-de-release)); os assets da GitHub Release não têm
 assinatura GPG própria — a integridade é dada pelo `SHA256SUMS` publicado na mesma Release.
 
@@ -161,7 +161,7 @@ icpbrasil-truststore:
     type: s3
 ```
 
-Credenciais via variáveis de ambiente (no modo biblioteca, adicione `software.amazon.awssdk:s3` e `software.amazon.awssdk:apache-client` à aplicação — são dependências opcionais do `autoconfigure`):
+Credenciais via variáveis de ambiente (no modo biblioteca, adicione `software.amazon.awssdk:s3` e `software.amazon.awssdk:apache-client` à aplicação — são dependências opcionais do starter):
 
 | Variável | Descrição |
 |---|---|

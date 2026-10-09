@@ -116,7 +116,7 @@ em três jobs:
    notas da seção `[X.Y.Z]` do CHANGELOG (falha se ela não existir ou estiver vazia) e monta os
    assets: o executável REST, o SBOM e o `SHA256SUMS`.
 2. **`publicar-central`** (environment `release`, com os secrets): assina com GPG e publica
-   **parent POM + `core` + `autoconfigure`**. O `rest` (fat jar) não vai ao Central.
+   **parent POM + `core` + `spring-boot-starter`**. O `rest` (fat jar) não vai ao Central.
 3. **`github-release`** (environment `release`, `contents: write`): cria a GitHub Release com as
    notas e os assets, ou a atualiza se já existir.
 
@@ -158,8 +158,8 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main vX.Y.Z
 
 # 6. Acompanhe o workflow em Actions e aprove os jobs do environment `release`;
-#    ao final ele cria a GitHub Release e o artefato fica disponível no Central
-#    em até ~30 min
+#    ao final ele cria a GitHub Release. O job do Central conclui assim que o Central
+#    valida o bundle: o artefato pode ainda não estar disponível nesse momento
 
 # 7. Reabra o ciclo de desenvolvimento
 ./mvnw versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT && ./mvnw versions:commit
@@ -188,5 +188,5 @@ gh release download vX.Y.Z -R sesgo-ti/icpbrasil-truststore && sha256sum -c SHA2
 ```
 
 ```bash
-curl -s "https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore-autoconfigure/X.Y.Z" -o /dev/null -w '%{http_code}\n'
+curl -s "https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore-spring-boot-starter/X.Y.Z" -o /dev/null -w '%{http_code}\n'
 ```

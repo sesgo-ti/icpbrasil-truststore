@@ -7,6 +7,11 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Alterado
+
+- **Incompatível:** o artefato `icpbrasil-truststore-autoconfigure` passa a se chamar `icpbrasil-truststore-spring-boot-starter`, conforme a convenção de nomes do Spring Boot para starters de terceiros. Basta trocar o `artifactId` na dependência; pacotes, classes e propriedades não mudam. O POM pai `icpbrasil-truststore` não contém código e não deve ser declarado como dependência.
+- Release: o deploy no Maven Central espera só a validação do bundle, não a publicação, para não falhar por timeout com o artefato já publicado.
+
 ## [0.0.2] - 2026-10-08
 
 ### Adicionado

@@ -5,17 +5,17 @@
 
   <groupId>br.gov.go.saude</groupId>
   <artifactId>icpbrasil-truststore</artifactId>
-  <version>0.0.2</version>
+  <version>0.0.3-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <modules>
     <module>icpbrasil-truststore-core</module>
-    <module>icpbrasil-truststore-autoconfigure</module>
+    <module>icpbrasil-truststore-spring-boot-starter</module>
     <module>icpbrasil-truststore-rest</module>
   </modules>
 
   <name>ICP-Brasil TrustStore</name>
-  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, validação PKIX de certificados com o JDK (caminho até as raízes do acervo e revogação OCSP/CRL) e SSLContext dedicado.</description>
+  <description>POM pai do build. Para usar a biblioteca, declare icpbrasil-truststore-spring-boot-starter.</description>
   <url>https://github.com/sesgo-ti/icpbrasil-truststore</url>
 
   <licenses>
@@ -423,7 +423,9 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
-              <waitUntil>published</waitUntil>
+              <!-- Espera só a validação: a publicação segue automática no Central, mas a sincronização
+                   pode passar dos 30 min do waitMaxTime e marcar como falho um deploy bem-sucedido. -->
+              <waitUntil>validated</waitUntil>
               <!-- Exclui o fat jar do REST. Não usar skipPublishing no módulo: como último do
                    reactor, a flag suprimia o upload de todos os módulos (plugin anterior à 0.9.0). -->
               <excludeArtifacts>

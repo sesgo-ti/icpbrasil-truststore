@@ -7,14 +7,14 @@ Uso embutido em uma aplicação Spring Boot que precisa consultar em memória os
 ```xml
 <dependency>
     <groupId>br.gov.go.saude</groupId>
-    <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <artifactId>icpbrasil-truststore-spring-boot-starter</artifactId>
+    <version>0.0.3</version>
 </dependency>
 ```
 
-> O `autoconfigure` traz o `icpbrasil-truststore-core` transitivamente. Para storage S3,
+> O starter traz o `icpbrasil-truststore-core` transitivamente. Para storage S3,
 > adicione também `software.amazon.awssdk:s3` e `software.amazon.awssdk:apache-client`
-> (são `optional` no autoconfigure).
+> (são `optional` no starter).
 
 Auto-configuração: nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
