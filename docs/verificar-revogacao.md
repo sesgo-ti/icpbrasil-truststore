@@ -6,23 +6,18 @@ sabendo quem é o emissor. Para decidir se um certificado é confiável, use o
 
 ## 1. Consulte
 
-O starter já registra o bean.
-
 ```java
-import br.gov.go.saude.truststore.icpbrasil.model.RevocationStatus;
-import br.gov.go.saude.truststore.icpbrasil.service.revocation.RevocationService;
-
 RevocationStatus status = revocationService.check(certificado, emissor);
 ```
 
-Se precisar guardar a prova (resposta OCSP ou CRL), use `revocationService.lookup(certificado, emissor)`,
+Para guardar a prova (resposta OCSP ou CRL), use `revocationService.lookup(certificado, emissor)`,
 que devolve o status junto com a evidência.
 
 ## 2. Trate o status
 
 | Status | Significado |
 |---|---|
-| `Good` | Não revogado no instante da consulta |
+| `Good` | Não revogado no instante da consulta; traz os bytes da resposta |
 | `Revoked` | Revogado no instante da consulta |
 | `NoDistributionPoints` | O certificado não informa OCSP nem CRL |
 | `OcspUnavailable` | Servidor OCSP inacessível após todas as tentativas |
@@ -33,20 +28,22 @@ que devolve o status junto com a evidência.
 Só `Good` indica "não revogado". Os demais estados, exceto `Revoked`, significam que não foi
 possível saber.
 
-## Como funciona
+## Comportamento
 
-1. Tenta OCSP. Se o resultado for inconclusivo, tenta a CRL.
-2. Respostas OCSP e CRLs ficam em cache em memória. Consultas simultâneas pela mesma CRL ou
-   resposta OCSP compartilham um único download.
-3. A revogação vale a partir da data informada pela AC: uma revogação com data futura resulta em
-   `Good` até essa data chegar.
+- Tenta OCSP. Se o resultado for inconclusivo, tenta a CRL.
+- Respostas OCSP e CRLs ficam em cache em memória. Consultas simultâneas pela mesma CRL ou
+  resposta OCSP compartilham um único download. Falhas não ficam em cache.
+- A revogação vale a partir da data informada pela AC, como no JDK: uma revogação com data futura
+  resulta em `Good`, com aviso no log. O cache guarda a evidência, não o veredito, então o
+  resultado passa a `Revoked` assim que a data chega, sem esperar o TTL.
+- Resposta de um respondedor OCSP delegado sem a extensão `id-pkix-ocsp-nocheck` só é aceita se a
+  CRL da AC emissora estiver acessível. Sem ela, a resposta é recusada e a consulta segue para a CRL
+  do próprio certificado.
+- Uma CRL da ICP-Brasil pode ter de poucos kilobytes a dezenas de megabytes. Por isso o cache é
+  limitado pelo tamanho do DER, não pela quantidade de entradas; a CRL decodificada ocupa mais que
+  isso no heap: dimensione a memória com folga.
 
-## Atenção
+## Veja também
 
-- **Firewall:** algumas ACs usam um respondedor OCSP delegado que exige consultar também a CRL da
-  AC. Liberar só o OCSP não basta: libere o acesso HTTP às CRLs.
-- **Memória:** uma CRL da ICP-Brasil pode ter dezenas de megabytes. O cache é limitado em bytes
-  (`revocation.crl-cache-max-bytes`, padrão 256 MiB), mas a CRL decodificada ocupa mais que isso
-  no heap: dimensione a memória com folga.
-
-Timeouts, tentativas e tamanho dos caches: [referência de configuração](configuracao.md#revogação).
+- [Segurança e rede](seguranca.md#saídas-de-rede-necessárias): o que liberar no firewall
+- [Referência de configuração](configuracao.md#revogação): timeouts, tentativas e tamanho dos caches

@@ -1,20 +1,8 @@
-# Quero usar um diretório local como armazenamento
+# Quero gravar o acervo num diretório local
 
 O acervo de ACs baixado do ITI é gravado num diretório do disco. É o armazenamento padrão.
 
-## 1. Dependência
-
-```xml
-<dependency>
-    <groupId>br.gov.go.saude</groupId>
-    <artifactId>icpbrasil-truststore-spring-boot-starter</artifactId>
-    <version>0.0.3</version>
-</dependency>
-```
-
-Nenhuma outra dependência é necessária.
-
-## 2. Configuração
+## 1. Configure o diretório
 
 No `application.yml`:
 
@@ -24,18 +12,17 @@ icpbrasil-truststore:
     base-dir: /var/lib/minha-app/icpbrasil-truststore
 ```
 
-`base-dir` é a única propriedade obrigatória. Sem ela, a aplicação não sobe.
+No serviço REST, passe na linha de comando: `--icpbrasil-truststore.filesystem.base-dir=/data/truststore`.
 
-## 3. Pronto
+`base-dir` é obrigatória: sem ela, a aplicação não sobe. O diretório é criado se não existir.
 
-Na subida, a biblioteca cria o diretório se ele não existir, baixa o acervo do ITI e carrega o cache.
-Nas subidas seguintes, reaproveita o que já está no disco.
-
-## Cuidados
+## 2. Garanta a persistência
 
 - O usuário da aplicação precisa de permissão de escrita no diretório.
 - Em contêiner, monte o diretório num volume. Sem volume, o acervo é baixado de novo a cada
   reinício.
-- Várias instâncias podem usar o mesmo diretório (por exemplo, um volume compartilhado).
 
-Como os arquivos são organizados: [como o acervo é gravado](armazenamento-funcionamento.md).
+## Veja também
+
+- [Como o acervo é gravado](armazenamento-funcionamento.md): estrutura e uso por várias instâncias
+- [Armazenamento no S3](armazenamento-s3.md)
