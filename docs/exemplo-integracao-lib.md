@@ -12,9 +12,8 @@ Uso embutido em uma aplicação Spring Boot que precisa consultar em memória os
 </dependency>
 ```
 
-> O starter traz o `icpbrasil-truststore-core` transitivamente. Para storage S3,
-> adicione também `software.amazon.awssdk:s3` e `software.amazon.awssdk:apache-client`
-> (são `optional` no starter).
+> O starter traz o `icpbrasil-truststore-core` transitivamente. Para gravar o acervo no S3, veja
+> [armazenamento no S3](armazenamento-s3.md).
 
 Auto-configuração: nenhuma anotação `@Import` ou registro manual de beans é necessário.
 
@@ -22,8 +21,6 @@ Auto-configuração: nenhuma anotação `@Import` ou registro manual de beans é
 
 ```yaml
 icpbrasil-truststore:
-  storage:
-    type: filesystem
   filesystem:
     base-dir: .data/icpbrasil-truststore
 ```
@@ -81,7 +78,7 @@ que devolve todos.
 | `icpbrasil-truststore.scheduling.enabled` | `true` | Desligar só em testes |
 | `icpbrasil-truststore.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 
-Demais propriedades (rede, revogação, cadeia, política de download) têm defaults adequados — consulte o [README](../README.md) se precisar ajustar.
+Demais propriedades (rede, revogação, cadeia, política de download) têm defaults adequados — consulte a [referência de configuração](configuracao.md) se precisar ajustar.
 
 ## 5. Testes
 
