@@ -54,7 +54,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven.compiler.release>21</maven.compiler.release>
     <spring-boot.version>3.5.16</spring-boot.version>
-    <lombok.version>1.18.38</lombok.version>
+    <lombok.version>1.18.48</lombok.version>
     <surefire.version>3.2.5</surefire.version>
     <!-- Build reproduzível: data fixa gravada nos JARs. O workflow de release a substitui pela
          data do commit da tag. -->
