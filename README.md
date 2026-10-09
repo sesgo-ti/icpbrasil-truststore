@@ -47,7 +47,7 @@ icpbrasil-truststore:
 ValidationResult resultado = pkixCertificateValidator.validate(certificado);
 ```
 
-Na primeira subida, a biblioteca baixa o acervo do ITI; se o download falhar, a aplicação não sobe.
+Guia completo: [usar como biblioteca](docs/usar-como-biblioteca.md).
 
 ### Como serviço
 
@@ -58,27 +58,25 @@ Baixe o `icpbrasil-truststore-rest-<versão>.jar` da
 java -jar icpbrasil-truststore-rest-<versão>.jar --icpbrasil-truststore.filesystem.base-dir=/data/truststore
 ```
 
-```bash
-curl "http://localhost:8080/certificate?ski=<SKI>&type=pem"
-```
+Guia completo: [subir o serviço](docs/subir-servico.md).
 
 ## Documentação
 
 | Quero... | Guia |
 |---|---|
-| Usar a biblioteca na minha aplicação | [Integração como biblioteca](docs/exemplo-integracao-lib.md) |
+| Usar a biblioteca na minha aplicação | [Usar como biblioteca](docs/usar-como-biblioteca.md) |
 | Validar um certificado | [Validação de certificados](docs/validar-certificado.md) |
 | Consultar só a revogação (OCSP/CRL) | [Revogação](docs/verificar-revogacao.md) |
 | Montar a cadeia de um certificado | [Montagem de cadeia](docs/montar-cadeia.md) |
 | Gravar o acervo num diretório local | [Armazenamento em diretório](docs/armazenamento-filesystem.md) |
 | Gravar o acervo no S3 | [Armazenamento no S3](docs/armazenamento-s3.md) |
-| Subir o serviço REST | [Disponibilizar o serviço](docs/manual-disponibilizacao-trust-store.md) |
-| Consultar os endpoints do serviço | [Endpoints REST](docs/exemplo-integracao-microservico.md) |
-| Monitorar (health, logs, alertas) | [Monitoramento](docs/manual-monitoramento.md) |
+| Subir o serviço REST | [Subir o serviço](docs/subir-servico.md) |
+| Consultar os endpoints do serviço | [Endpoints REST](docs/endpoints-rest.md) |
+| Monitorar (health, probes, logs) | [Monitoramento](docs/monitorar.md) |
 | Ajustar timeouts, caches e limites | [Referência de configuração](docs/configuracao.md) |
-| Entender TLS, confiança e proteção contra SSRF | [Segurança](docs/seguranca.md) |
+| Liberar a rede e entender a confiança e a proteção contra SSRF | [Segurança e rede](docs/seguranca.md) |
 | Conferir a autenticidade dos artefatos | [Verificação dos artefatos](docs/verificar-artefatos.md) |
-| Atualizar raízes fixadas (mantenedores) | [Gestão das raízes confiáveis](docs/manual-gestao-certificados-confiaveis.md) |
+| Atualizar raízes fixadas (mantenedores) | [Atualizar raízes confiáveis](docs/atualizar-raizes-confiaveis.md) |
 
 ## Módulos
 

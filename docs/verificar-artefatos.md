@@ -1,5 +1,7 @@
 # Quero conferir a autenticidade dos artefatos
 
+Como confirmar que o executável e a biblioteca que você baixou são os publicados pelo projeto.
+
 ## Executável do serviço (GitHub Release)
 
 Cada [GitHub Release](https://github.com/sesgo-ti/icpbrasil-truststore/releases) traz o executável
@@ -37,3 +39,7 @@ git checkout vX.Y.Z
 ```bash
 ./mvnw clean package -DskipTests -Dproject.build.outputTimestamp="$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)"
 ```
+
+## Veja também
+
+- [Subir o serviço](subir-servico.md)

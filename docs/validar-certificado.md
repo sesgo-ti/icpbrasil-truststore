@@ -1,46 +1,27 @@
 # Quero validar um certificado
 
 O `PkixCertificateValidator` responde se um certificado é confiável **agora**: monta o caminho até
-uma raiz ICP-Brasil do acervo, valida esse caminho com o JDK e verifica a revogação de cada
-certificado nele.
+uma raiz ICP-Brasil do acervo, valida esse caminho com o `CertPathValidator` do JDK (encadeamento
+de nomes, assinaturas, validade, BasicConstraints, KeyUsage, políticas, extensões críticas e
+`jdk.certpath.disabledAlgorithms`) e verifica a revogação de cada certificado nele.
 
-## 1. Injete o validador
-
-O starter já registra o bean.
+## 1. Valide
 
 ```java
-import br.gov.go.saude.truststore.icpbrasil.model.ValidationResult;
-import br.gov.go.saude.truststore.icpbrasil.service.pkix.PkixCertificateValidator;
-import org.springframework.stereotype.Service;
-
-import java.security.cert.X509Certificate;
-
-@Service
-public class AssinaturaService {
-
-    private final PkixCertificateValidator validator;
-
-    public AssinaturaService(PkixCertificateValidator validator) {
-        this.validator = validator;
-    }
-
-    public boolean confiavel(X509Certificate certificado) {
-        return validator.validate(certificado) instanceof ValidationResult.Valid;
-    }
-}
+ValidationResult resultado = validator.validate(certificado);
 ```
 
 Se você já tem as intermediárias (por exemplo, de uma assinatura CMS), passe-as junto:
 `validator.validate(certificado, intermediarias)`. O caminho é montado primeiro com as
-intermediárias informadas e as do acervo. Só se isso não for suficiente os emissores são baixados
-via AIA, e mesmo assim só como candidatos: a confiança continua vindo das raízes do acervo.
+intermediárias informadas e as do acervo. Só se isso não bastar os emissores são baixados via AIA,
+e mesmo assim só como candidatos: a confiança continua vindo das raízes do acervo.
 
 ## 2. Trate o resultado
 
 **Só `Valid` autoriza o uso do certificado.** Todo o resto é rejeição.
 
 ```java
-switch (validator.validate(certificado)) {
+switch (resultado) {
     case ValidationResult.Valid valid -> usar(valid.path(), valid.anchor(), valid.evidence());
     case ValidationResult.Revoked revoked -> rejeitar(revoked.certificate(), revoked.reason());
     case ValidationResult.Untrusted untrusted -> rejeitar(untrusted.reason());
@@ -51,11 +32,19 @@ switch (validator.validate(certificado)) {
 
 | Resultado | Significado |
 |---|---|
-| `Valid` | Caminho válido até uma raiz do acervo e nenhum certificado revogado |
-| `Revoked` | Algum certificado do caminho está revogado |
-| `Untrusted` | Não há caminho válido até uma raiz (expirado, assinatura inválida, raiz desconhecida...) |
+| `Valid` | Caminho válido até uma raiz do acervo e nenhum certificado revogado. Traz `path` (da folha ao último intermediário), `anchor` e uma `evidence` por certificado do caminho |
+| `Revoked` | Algum certificado do caminho está revogado. Traz `certificate`, `revokedAt`, `reason` e a `evidence` |
+| `Untrusted` | Não há caminho válido até uma raiz. `reason` é o motivo PKIX do JDK (`EXPIRED`, `NOT_YET_VALID`, `NO_TRUST_ANCHOR`, `INVALID_SIGNATURE`...) |
 | `RevocationUndetermined` | Caminho válido, mas a revogação não pôde ser verificada. **Não** equivale a "não revogado" |
 | `TrustStoreUnavailable` | Acervo indisponível ou expirado |
+
+## Como a revogação é verificada
+
+Certificado a certificado, da folha ao último intermediário, em duas camadas: o
+[`RevocationService`](verificar-revogacao.md) obtém e valida a evidência (OCSP, depois CRL), e o
+`PKIXRevocationChecker` do JDK a reavalia usando só essa evidência, sem abrir conexões. Por isso a
+folha pode ser verificada por OCSP e a AC por CRL. Se as duas camadas discordarem, o resultado é
+`RevocationUndetermined` com status `Malformed`, e um aviso vai para o log.
 
 ## Limites
 
@@ -66,6 +55,11 @@ switch (validator.validate(certificado)) {
   quem precisar guardá-las. Quando o OCSP vem de um respondedor delegado, a CRL que comprovou esse
   respondedor não é incluída, então essa resposta OCSP sozinha não basta para revalidar depois.
 - Para confiar num emissor fora do acervo (por exemplo, homologação), use
-  `validate(certificado, extras, TrustMaterial.anchoredAt(List.of(emissor)))`.
+  `validate(certificado, extras, TrustMaterial.anchoredAt(List.of(emissor)))`. A revogação da
+  própria âncora não é verificada.
 
-Timeouts e caches de revogação: [referência de configuração](configuracao.md).
+## Veja também
+
+- [Revogação](verificar-revogacao.md): status e comportamento da consulta OCSP/CRL
+- [Segurança e rede](seguranca.md#saídas-de-rede-necessárias): o que liberar no firewall
+- [Referência de configuração](configuracao.md#revogação)

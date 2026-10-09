@@ -1,8 +1,8 @@
 # Referência de configuração
 
-Todas as propriedades ficam sob o prefixo `icpbrasil-truststore`. Só `filesystem.base-dir` é
-obrigatória (com o armazenamento padrão). As demais já têm valores adequados para produção: mude
-apenas o que precisar.
+Todas as propriedades da biblioteca, com padrão e faixa válida. Ficam sob o prefixo
+`icpbrasil-truststore`. Só `filesystem.base-dir` é obrigatória (com o armazenamento padrão); as
+demais já têm valores adequados para produção.
 
 ## Acervo
 
@@ -23,19 +23,15 @@ apenas o que precisar.
 
 ## Inicialização
 
-| Propriedade | Padrão | Descrição |
+| `bootstrap.enabled` | `bootstrap.fail-fast` | Efeito |
 |---|---|---|
-| `bootstrap.enabled` | `true` | Carrega o acervo durante a subida da aplicação |
-| `bootstrap.fail-fast` | `true` | Se a carga inicial falhar, a aplicação não sobe |
-
-| `enabled` | `fail-fast` | Efeito |
-|---|---|---|
-| `true` | `true` | Se a carga falhar, a aplicação não sobe (recomendado em produção) |
+| `true` (padrão) | `true` (padrão) | Carrega o acervo na subida; se falhar, a aplicação não sobe |
 | `true` | `false` | Se a carga falhar, a aplicação sobe sem acervo e tenta de novo no próximo ciclo |
-| `false` | — | Sem carga na subida; útil em testes sem rede |
+| `false` | — | Sem carga na subida ([testes sem rede](usar-como-biblioteca.md#4-testes-sem-rede)) |
 
-Em testes que sobem o contexto Spring sem rede, desligue `bootstrap.enabled` e
-`scheduling.enabled`.
+A atualização em background roda num executor próprio e só começa depois de um intervalo
+completo (`refresh-interval-hours`), para não competir com a carga da subida. Com
+`fail-fast: false`, portanto, a aplicação fica sem acervo até esse primeiro ciclo.
 
 ## Download do acervo
 
@@ -68,7 +64,7 @@ Em testes que sobem o contexto Spring sem rede, desligue `bootstrap.enabled` e
 
 ## Proteção dos downloads
 
-Valem para AIA, OCSP e CRL. O que cada uma protege está em [segurança](seguranca.md#proteção-dos-downloads).
+Valem para os downloads de AIA, OCSP e CRL ([o que protegem](seguranca.md#proteção-dos-downloads)).
 
 | Propriedade | Padrão | Faixa |
 |---|---|---|
@@ -77,3 +73,8 @@ Valem para AIA, OCSP e CRL. O que cada uma protege está em [segurança](seguran
 | `download-policy.max-aia-response-bytes` | `10485760` (10 MiB) | 1 KiB–100 MiB |
 | `download-policy.block-private-hostnames` | `true` | |
 | `download-policy.allowed-domains` | vazio (qualquer domínio público) | |
+
+## Veja também
+
+- [Armazenamento em diretório local](armazenamento-filesystem.md) e [no S3](armazenamento-s3.md)
+- [Monitoramento](monitorar.md): estados `CRITICAL` e `EXPIRED`
