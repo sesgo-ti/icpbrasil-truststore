@@ -116,7 +116,7 @@ em três jobs:
    notas da seção `[X.Y.Z]` do CHANGELOG (falha se ela não existir ou estiver vazia) e monta os
    assets: o executável REST, o SBOM e o `SHA256SUMS`.
 2. **`publicar-central`** (environment `release`, com os secrets): assina com GPG e publica
-   **parent POM + `core` + `autoconfigure`**. O `rest` (fat jar) não vai ao Central.
+   **parent POM + `core` + `spring-boot-starter`**. O `rest` (fat jar) não vai ao Central.
 3. **`github-release`** (environment `release`, `contents: write`): cria a GitHub Release com as
    notas e os assets, ou a atualiza se já existir.
 
@@ -188,5 +188,5 @@ gh release download vX.Y.Z -R sesgo-ti/icpbrasil-truststore && sha256sum -c SHA2
 ```
 
 ```bash
-curl -s "https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore-autoconfigure/X.Y.Z" -o /dev/null -w '%{http_code}\n'
+curl -s "https://central.sonatype.com/artifact/br.gov.go.saude/icpbrasil-truststore-spring-boot-starter/X.Y.Z" -o /dev/null -w '%{http_code}\n'
 ```

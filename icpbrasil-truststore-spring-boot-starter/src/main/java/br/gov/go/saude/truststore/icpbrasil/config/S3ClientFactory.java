@@ -26,7 +26,7 @@ import java.util.List;
  * evitando registro duplicado no serviço standalone.
  *
  * <p>Separada de {@link S3Properties} para manter o core livre de dependências do AWS SDK:
- * {@code S3Properties} é um POJO puro; este módulo ({@code autoconfigure}) detém a dependência
+ * {@code S3Properties} é um POJO puro; este módulo ({@code spring-boot-starter}) detém a dependência
  * do SDK e toda a lógica de construção do cliente. Um bean {@code S3Client} definido pelo
  * consumidor tem precedência.</p>
  *

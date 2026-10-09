@@ -116,12 +116,12 @@ jobs:
       - name: Fixar a data dos artefatos na data do commit da tag
         run: echo "OUTPUT_TIMESTAMP=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
-      - name: Assinar e publicar parent, core e autoconfigure no Maven Central
+      - name: Assinar e publicar parent, core e starter no Maven Central
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: ./mvnw -B -ntp -Prelease -DskipTests -pl icpbrasil-truststore-core,icpbrasil-truststore-autoconfigure -am deploy -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
+        run: ./mvnw -B -ntp -Prelease -DskipTests -pl icpbrasil-truststore-core,icpbrasil-truststore-spring-boot-starter -am deploy -Dproject.build.outputTimestamp="$OUTPUT_TIMESTAMP"
 
   github-release:
     name: Criar ou atualizar a GitHub Release

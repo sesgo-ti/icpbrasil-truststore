@@ -85,7 +85,7 @@ public class TrustStoreAutoConfiguration {
         S3SdkAusenteConfiguration() {
             throw new IllegalStateException("icpbrasil-truststore.storage.type=s3 requer as dependências "
                     + "software.amazon.awssdk:s3 e software.amazon.awssdk:apache-client no classpath "
-                    + "(opcionais no icpbrasil-truststore-autoconfigure)");
+                    + "(opcionais no icpbrasil-truststore-spring-boot-starter)");
         }
     }
 

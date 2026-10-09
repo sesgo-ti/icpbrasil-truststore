@@ -10,9 +10,9 @@
     <version>0.0.3-SNAPSHOT</version>
   </parent>
 
-  <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
-  <name>ICP-Brasil TrustStore — Auto-configuração</name>
-  <description>Wiring Spring Boot do core: beans, binding de properties, agendamento, health e bootstrap.</description>
+  <artifactId>icpbrasil-truststore-spring-boot-starter</artifactId>
+  <name>ICP-Brasil TrustStore — Spring Boot Starter</name>
+  <description>Biblioteca Spring Boot que mantém atualizado o acervo de Autoridades Certificadoras vigentes da ICP-Brasil: download do bundle oficial do ITI com validação SHA-512, cache em memória por SKI, validação PKIX de certificados com o JDK (caminho até as raízes do acervo e revogação OCSP/CRL) e SSLContext dedicado.</description>
 
   <dependencies>
     <dependency>

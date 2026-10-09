@@ -22,7 +22,7 @@
   <dependencies>
     <dependency>
       <groupId>br.gov.go.saude</groupId>
-      <artifactId>icpbrasil-truststore-autoconfigure</artifactId>
+      <artifactId>icpbrasil-truststore-spring-boot-starter</artifactId>
       <version>${project.version}</version>
     </dependency>
 
@@ -36,7 +36,7 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- Suporte a storage.type=s3 no serviço (opcional no autoconfigure, concreto aqui) -->
+    <!-- Suporte a storage.type=s3 no serviço (opcional no starter, concreto aqui) -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
@@ -85,7 +85,7 @@
       </plugin>
 
       <!-- Relatório de cobertura CONSOLIDADO do projeto: este módulo depende
-           (transitivamente) de core e autoconfigure, então o report-aggregate
+           (transitivamente) de core e starter, então o report-aggregate
            soma a cobertura de todos em target/site/jacoco-aggregate/index.html -->
       <plugin>
         <groupId>org.jacoco</groupId>

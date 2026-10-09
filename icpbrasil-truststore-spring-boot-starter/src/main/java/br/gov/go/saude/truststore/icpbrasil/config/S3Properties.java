@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
  * Propriedades de conexão com armazenamento S3-compatível (AWS S3, MinIO, Digital Ocean Spaces, etc.).
  *
  * <p>POJO puro de dados — sem Spring nem AWS SDK. O binding de {@code @ConfigurationProperties}
- * e a criação do {@code S3Client} são responsabilidade do módulo {@code autoconfigure}.</p>
+ * e a criação do {@code S3Client} são responsabilidade do módulo {@code spring-boot-starter}.</p>
  */
 @Slf4j
 @Getter
