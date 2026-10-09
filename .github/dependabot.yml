@@ -7,6 +7,11 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    # Major do Spring Boot exige migração de código e revisão dos overrides do pom raiz;
+    # é planejada à parte, não aplicada como bump.
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
