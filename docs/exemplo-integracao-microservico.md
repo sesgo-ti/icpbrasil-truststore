@@ -83,4 +83,4 @@ curl http://localhost:8080/actuator/health
 | `icpbrasil-truststore.refresh-interval-hours` | `2` | Ajustar se precisar de sincronização mais/menos frequente |
 | `server.port` | `8080` | Padrão Spring Boot |
 
-Credenciais para `storage.type=s3` são definidas via variáveis de ambiente (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`). Veja o [README](../README.md#armazenamento-s3-compatível).
+Credenciais para `storage.type=s3` são definidas via variáveis de ambiente (`S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`). Veja [armazenamento no S3](armazenamento-s3.md).

@@ -38,9 +38,9 @@ Certificadoras vigentes da ICP-Brasil e o serve por SKI.
 
     S3-compatível: defina `icpbrasil-truststore.storage.type=s3` e as variáveis `S3_ENDPOINT`,
     `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` e, só para endpoint com CA própria,
-    `S3_CA_CERT_PATH` (veja o [README](../README.md#armazenamento-s3-compatível)). Várias
+    `S3_CA_CERT_PATH` (veja [armazenamento no S3](armazenamento-s3.md)). Várias
     instâncias podem compartilhar o mesmo diretório ou bucket (veja
-    [layout do armazenamento](../README.md#layout-do-armazenamento)).
+    [como o acervo é gravado](armazenamento-funcionamento.md)).
 
 3. **Verificar.** A readiness só fica `UP` quando há acervo vigente:
 
