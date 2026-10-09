@@ -7,10 +7,13 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-10-09
+
 ### Alterado
 
 - **Incompatível:** o artefato `icpbrasil-truststore-autoconfigure` passa a se chamar `icpbrasil-truststore-spring-boot-starter`, conforme a convenção de nomes do Spring Boot para starters de terceiros. Basta trocar o `artifactId` na dependência; pacotes, classes e propriedades não mudam. O POM pai `icpbrasil-truststore` não contém código e não deve ser declarado como dependência.
 - Release: o deploy no Maven Central espera só a validação do bundle, não a publicação, para não falhar por timeout com o artefato já publicado.
+- Documentação reorganizada em guias por tarefa em `docs/`, com guias de armazenamento em diretório local e no S3; o README passa a ser só a capa.
 
 ## [0.0.2] - 2026-10-08
 
@@ -97,6 +100,7 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - `DownloadPolicy.validateOcspResponseSize`, `validateCrlResponseSize` e `validateAiaResponseSize`: o limite é aplicado pelo transporte durante o recebimento.
 - Métodos públicos de mutação do acervo em `TrustStoreService` (`assegurarDisponibilidade`, `reposicaoArtefatosRepositorioLocal`, `carregarArtefatosNoRepositorioLocal`, `verificarDisponibilidadeRepositorioLocal`, `verificarSincronizacaoRepositorioLocal`, `assegurrarNaoExpiracaoCache`) e o enum `DisponibilidadeRepositorio`; `refresh()` é o único ponto de entrada.
 
-[Unreleased]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/v0.0.2...main
+[Unreleased]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/v0.0.3...main
+[0.0.3]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/sesgo-ti/icpbrasil-truststore/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/sesgo-ti/icpbrasil-truststore/tree/9f6a0b852e7d10ecef4799396e8c250ea47cfa46
