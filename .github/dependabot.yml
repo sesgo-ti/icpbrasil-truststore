@@ -19,10 +19,8 @@ updates:
       interval: weekly
     labels:
       - dependencies
-    # setup-java >= 6.3.0 passou a gravar repositórios no settings.xml
-    # (mvn-repositories-include-central / prioritize-central) e o build deixa de
-    # resolver a extensão central-publishing-maven-plugin:0.11.0 (PR #61,
-    # run 44059872455). Contido até investigar overwrite-settings/inputs novos.
+    # setup-java >= 6.3.0 grava repositórios no settings.xml e o build deixa de
+    # resolver central-publishing-maven-plugin:0.11.0 (PR #61, run 44059872455).
     ignore:
       - dependency-name: "actions/setup-java"
         versions: [">= 6.3.0"]
