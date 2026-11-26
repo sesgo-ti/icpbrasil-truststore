@@ -19,3 +19,8 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    # setup-java >= 6.3.0 grava repositórios no settings.xml e o build deixa de
+    # resolver central-publishing-maven-plugin:0.11.0 (PR #61, run 44059872455).
+    ignore:
+      - dependency-name: "actions/setup-java"
+        versions: [">= 6.3.0"]
